@@ -1,13 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
-using System.Management;
-using System.Runtime.InteropServices;
 
 namespace BO2.Services
 {
-    public sealed class GameProcessDetector
+    public sealed class GameProcessDetector : IGameProcessDetector
     {
         private static readonly TimeSpan CommandLineCacheDuration = TimeSpan.FromSeconds(5);
         private static readonly GameProcessDefinition[] Definitions =
@@ -70,19 +66,36 @@ namespace BO2.Services
                 AppStrings.Get("GameProcessDetectorUnsupportedReasonSteamSinglePlayer"))
         ];
 
+        private readonly IProcessInfoProvider _processInfoProvider;
+        private readonly TimeProvider _timeProvider;
+        private readonly Dictionary<int, CommandLineCacheEntry> _commandLineCache = [];
+
+        public GameProcessDetector()
+            : this(new WindowsProcessInfoProvider(), TimeProvider.System)
+        {
+        }
+
+        // Internal constructor used by unit tests to inject fakes for process discovery and time.
+        internal GameProcessDetector(IProcessInfoProvider processInfoProvider, TimeProvider timeProvider)
+        {
+            ArgumentNullException.ThrowIfNull(processInfoProvider);
+            ArgumentNullException.ThrowIfNull(timeProvider);
+            _processInfoProvider = processInfoProvider;
+            _timeProvider = timeProvider;
+        }
+
         public DetectedGame? Detect()
         {
             List<DetectedGame> detectedGames = [];
 
             foreach (GameProcessDefinition definition in Definitions)
             {
-                Process[] processes = Process.GetProcessesByName(definition.ProcessName);
+                int[] processIds = _processInfoProvider.GetProcessIds(definition.ProcessName);
 
-                foreach (Process process in processes)
+                foreach (int processId in processIds)
                 {
-                    if (!IsCommandLineMatch(definition, process.Id))
+                    if (!IsCommandLineMatch(definition, processId))
                     {
-                        process.Dispose();
                         continue;
                     }
 
@@ -90,11 +103,9 @@ namespace BO2.Services
                         definition.Variant,
                         definition.DisplayName,
                         definition.ProcessName,
-                        process.Id,
+                        processId,
                         definition.AddressMap,
                         definition.UnsupportedReason));
-
-                    process.Dispose();
                 }
             }
 
@@ -109,52 +120,12 @@ namespace BO2.Services
             }
 
             string? commandLine = GetCachedCommandLine(processId);
-            return commandLine?.Contains(definition.CommandLineToken, System.StringComparison.OrdinalIgnoreCase) == true;
-        }
-
-        private readonly Dictionary<int, CommandLineCacheEntry> _commandLineCache = [];
-
-        private static string? GetCommandLine(int processId)
-        {
-            if (processId <= 0)
-            {
-                return null;
-            }
-
-            string query = $"SELECT CommandLine FROM Win32_Process WHERE ProcessId = {processId.ToString(CultureInfo.InvariantCulture)}";
-
-            try
-            {
-                using ManagementObjectSearcher searcher = new(query);
-                using ManagementObjectCollection results = searcher.Get();
-
-                foreach (ManagementBaseObject result in results)
-                {
-                    using (result)
-                    {
-                        return result["CommandLine"] as string;
-                    }
-                }
-            }
-            catch (ManagementException)
-            {
-                return null;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return null;
-            }
-            catch (COMException)
-            {
-                return null;
-            }
-
-            return null;
+            return commandLine?.Contains(definition.CommandLineToken, StringComparison.OrdinalIgnoreCase) == true;
         }
 
         private string? GetCachedCommandLine(int processId)
         {
-            DateTimeOffset now = DateTimeOffset.UtcNow;
+            DateTimeOffset now = _timeProvider.GetUtcNow();
             RemoveExpiredCommandLineCacheEntries(now);
 
             if (_commandLineCache.TryGetValue(processId, out CommandLineCacheEntry? cacheEntry)
@@ -163,7 +134,7 @@ namespace BO2.Services
                 return cacheEntry.CommandLine;
             }
 
-            string? commandLine = GetCommandLine(processId);
+            string? commandLine = _processInfoProvider.GetCommandLine(processId);
             _commandLineCache[processId] = new CommandLineCacheEntry(commandLine, now);
             return commandLine;
         }

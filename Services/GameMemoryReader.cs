@@ -1,22 +1,36 @@
 using System;
 using System.ComponentModel;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
 
 namespace BO2.Services
 {
     public sealed class GameMemoryReader : IDisposable
     {
-        private const int Int32Size = sizeof(int);
-
         private static readonly TimeSpan DetectionCacheDuration = TimeSpan.FromSeconds(2);
-        private static readonly IntPtr InvalidHandleValue = new(-1);
 
-        private readonly GameProcessDetector _processDetector = new();
-        private SafeProcessHandle? _processHandle;
-        private int? _attachedProcessId;
+        private readonly IGameProcessDetector _processDetector;
+        private readonly IProcessMemoryAccessor _processMemoryAccessor;
+        private readonly TimeProvider _timeProvider;
         private DetectedGame? _cachedDetectedGame;
         private DateTimeOffset _cachedDetectionAt;
+
+        public GameMemoryReader()
+            : this(new GameProcessDetector(), new WindowsProcessMemoryAccessor(), TimeProvider.System)
+        {
+        }
+
+        internal GameMemoryReader(
+            IGameProcessDetector processDetector,
+            IProcessMemoryAccessor processMemoryAccessor,
+            TimeProvider timeProvider)
+        {
+            ArgumentNullException.ThrowIfNull(processDetector);
+            ArgumentNullException.ThrowIfNull(processMemoryAccessor);
+            ArgumentNullException.ThrowIfNull(timeProvider);
+
+            _processDetector = processDetector;
+            _processMemoryAccessor = processMemoryAccessor;
+            _timeProvider = timeProvider;
+        }
 
         public PlayerStatsReadResult ReadPlayerStats()
         {
@@ -24,13 +38,13 @@ namespace BO2.Services
 
             if (detectedGame is null)
             {
-                CloseAttachedProcess();
+                _processMemoryAccessor.Close();
                 return PlayerStatsReadResult.GameNotRunning;
             }
 
             if (detectedGame.AddressMap is null)
             {
-                CloseAttachedProcess();
+                _processMemoryAccessor.Close();
                 string statusText = string.IsNullOrWhiteSpace(detectedGame.UnsupportedReason)
                     ? AppStrings.Format("UnsupportedStatusFormat", detectedGame.DisplayName)
                     : AppStrings.Format("UnsupportedStatusWithReasonFormat", detectedGame.DisplayName, detectedGame.UnsupportedReason);
@@ -42,17 +56,18 @@ namespace BO2.Services
                     ConnectionState.Unsupported);
             }
 
-            EnsureAttached(detectedGame);
-
             try
             {
+                _processMemoryAccessor.Attach(detectedGame.ProcessId, detectedGame.ProcessName);
                 PlayerStatAddressMap addressMap = detectedGame.AddressMap;
+                ScoreStatAddresses scores = addressMap.Scores;
                 PlayerStats stats = new(
-                    ReadInt32(addressMap.PointsAddress, "points"),
-                    ReadInt32(addressMap.KillsAddress, "kills"),
-                    ReadInt32(addressMap.DownsAddress, "downs"),
-                    ReadInt32(addressMap.RevivesAddress, "revives"),
-                    ReadInt32(addressMap.HeadshotsAddress, "headshots"));
+                    ReadInt32(scores.PointsAddress, "points"),
+                    ReadInt32(scores.KillsAddress, "kills"),
+                    ReadInt32(scores.DownsAddress, "downs"),
+                    ReadInt32(scores.RevivesAddress, "revives"),
+                    ReadInt32(scores.HeadshotsAddress, "headshots"),
+                    ReadCandidateStats(addressMap.DerivedPlayerState, addressMap.Candidates));
 
                 return new PlayerStatsReadResult(
                     detectedGame,
@@ -60,70 +75,111 @@ namespace BO2.Services
                     AppStrings.Format("ConnectedStatusFormat", detectedGame.DisplayName),
                     ConnectionState.Connected);
             }
-            catch
+            catch (ArgumentException ex)
             {
-                InvalidateDetectionCache();
-                CloseAttachedProcess();
+                HandleReadFailure();
+                throw new InvalidOperationException(
+                    AppStrings.Format("InvalidDetectedGameProcessMetadataFormat", detectedGame.DisplayName),
+                    ex);
+            }
+            catch (InvalidOperationException)
+            {
+                HandleReadFailure();
+                throw;
+            }
+            catch (Win32Exception)
+            {
+                HandleReadFailure();
                 throw;
             }
         }
 
         public void Dispose()
         {
-            CloseAttachedProcess();
+            _processMemoryAccessor.Dispose();
+        }
+
+        private PlayerCandidateStats ReadCandidateStats(
+            DerivedPlayerStateAddresses derivedPlayerState,
+            PlayerCandidateAddresses candidates)
+        {
+            return new(
+                TryReadSingle(derivedPlayerState.PositionXAddress, "position X"),
+                TryReadSingle(derivedPlayerState.PositionYAddress, "position Y"),
+                TryReadSingle(derivedPlayerState.PositionZAddress, "position Z"),
+                TryReadInt32(candidates.LegacyHealthAddress, "legacy health"),
+                TryReadInt32(candidates.PlayerInfoHealthAddress, "player info health"),
+                TryReadInt32(candidates.GEntityPlayerHealthAddress, "GEntity player health"),
+                TryReadSingle(candidates.VelocityXAddress, "velocity X"),
+                TryReadSingle(candidates.VelocityYAddress, "velocity Y"),
+                TryReadSingle(candidates.VelocityZAddress, "velocity Z"),
+                TryReadInt32(candidates.GravityAddress, "gravity"),
+                TryReadInt32(candidates.SpeedAddress, "speed"),
+                TryReadSingle(candidates.LastJumpHeightAddress, "last jump height"),
+                TryReadSingle(candidates.AdsAmountAddress, "ADS amount"),
+                TryReadSingle(candidates.ViewAngleXAddress, "view angle X"),
+                TryReadSingle(candidates.ViewAngleYAddress, "view angle Y"),
+                TryReadInt32(candidates.HeightIntAddress, "height integer"),
+                TryReadSingle(candidates.HeightFloatAddress, "height float"),
+                TryReadInt32(candidates.AmmoSlot0Address, "ammo slot 0"),
+                TryReadInt32(candidates.AmmoSlot1Address, "ammo slot 1"),
+                TryReadInt32(candidates.LethalAmmoAddress, "lethal ammo"),
+                TryReadInt32(candidates.AmmoSlot2Address, "ammo slot 2"),
+                TryReadInt32(candidates.TacticalAmmoAddress, "tactical ammo"),
+                TryReadInt32(candidates.AmmoSlot3Address, "ammo slot 3"),
+                TryReadInt32(candidates.AmmoSlot4Address, "ammo slot 4"),
+                TryReadInt32(candidates.AlternateKillsAddress, "alternate kills"),
+                TryReadInt32(candidates.AlternateHeadshotsAddress, "alternate headshots"),
+                TryReadInt32(candidates.SecondaryKillsAddress, "secondary kills"),
+                TryReadInt32(candidates.SecondaryHeadshotsAddress, "secondary headshots"),
+                TryReadInt32(candidates.RoundAddress, "round"));
+        }
+
+        private int? TryReadInt32(uint address, string valueName)
+        {
+            try
+            {
+                return ReadInt32(address, valueName);
+            }
+            catch (Win32Exception)
+            {
+                return null;
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
+            }
+        }
+
+        private float? TryReadSingle(uint address, string valueName)
+        {
+            try
+            {
+                return ReadSingle(address, valueName);
+            }
+            catch (Win32Exception)
+            {
+                return null;
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
+            }
         }
 
         private int ReadInt32(uint address, string valueName)
         {
-            if (_processHandle is null || _processHandle.IsInvalid || _processHandle.IsClosed)
-            {
-                throw new InvalidOperationException(AppStrings.Get("GameProcessHandleUnavailable"));
-            }
-
-            byte[] buffer = new byte[Int32Size];
-            if (!ReadProcessMemory(_processHandle, new IntPtr(unchecked((long)address)), buffer, Int32Size, out int bytesRead))
-            {
-                throw new Win32Exception(Marshal.GetLastWin32Error(), AppStrings.Format("ReadMemoryFailedFormat", valueName));
-            }
-
-            if (bytesRead != Int32Size)
-            {
-                throw new InvalidOperationException(AppStrings.Format("ShortReadFormat", Int32Size, bytesRead));
-            }
-
-            return BitConverter.ToInt32(buffer, 0);
+            return _processMemoryAccessor.ReadInt32(address, valueName);
         }
 
-        private void EnsureAttached(DetectedGame detectedGame)
+        private float ReadSingle(uint address, string valueName)
         {
-            if (_attachedProcessId == detectedGame.ProcessId && _processHandle is not null && !_processHandle.IsInvalid && !_processHandle.IsClosed)
-            {
-                return;
-            }
-
-            CloseAttachedProcess();
-            _processHandle = OpenProcess(ProcessAccess.QueryLimitedInformation | ProcessAccess.VirtualMemoryRead, false, detectedGame.ProcessId);
-
-            if (_processHandle.IsInvalid)
-            {
-                int error = Marshal.GetLastWin32Error();
-                CloseAttachedProcess();
-                throw new Win32Exception(error, AppStrings.Format("OpenProcessFailedFormat", detectedGame.ProcessName));
-            }
-
-            _attachedProcessId = detectedGame.ProcessId;
-        }
-
-        private void CloseAttachedProcess()
-        {
-            _processHandle?.Dispose();
-            _processHandle = null;
-            _attachedProcessId = null;
+            return _processMemoryAccessor.ReadSingle(address, valueName);
         }
 
         private DetectedGame? DetectGame()
         {
-            DateTimeOffset now = DateTimeOffset.UtcNow;
+            DateTimeOffset now = _timeProvider.GetUtcNow();
             if (now - _cachedDetectionAt <= DetectionCacheDuration)
             {
                 return _cachedDetectedGame;
@@ -140,40 +196,10 @@ namespace BO2.Services
             _cachedDetectionAt = DateTimeOffset.MinValue;
         }
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern SafeProcessHandle OpenProcess(ProcessAccess desiredAccess, bool inheritHandle, int processId);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool ReadProcessMemory(
-            SafeProcessHandle process,
-            nint baseAddress,
-            byte[] buffer,
-            int size,
-            out int numberOfBytesRead);
-
-        [Flags]
-        private enum ProcessAccess
+        private void HandleReadFailure()
         {
-            QueryLimitedInformation = 0x1000,
-            VirtualMemoryRead = 0x0010
+            InvalidateDetectionCache();
+            _processMemoryAccessor.Close();
         }
-
-        private sealed class SafeProcessHandle : SafeHandle
-        {
-            public SafeProcessHandle()
-                : base(InvalidHandleValue, true)
-            {
-            }
-
-            public override bool IsInvalid => handle == IntPtr.Zero || handle == InvalidHandleValue;
-
-            protected override bool ReleaseHandle()
-            {
-                return CloseHandle(handle);
-            }
-        }
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool CloseHandle(IntPtr handle);
     }
 }

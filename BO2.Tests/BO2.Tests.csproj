@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Same Windows TFM as the app so linked Windows-only service source files compile cleanly.
+         No WinAppSDK reference means no runtime auto-init — safe for pure logic tests. -->
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>BO2.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <!-- FakeTimeProvider for deterministic cache-expiry tests -->
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="8.1.0" />
+    <!-- Needed to compile WindowsProcessInfoProvider (linked below) -->
+    <PackageReference Include="System.Management" Version="8.0.0" />
+  </ItemGroup>
+
+  <!-- Link pure service source files directly; AppStrings.cs is intentionally excluded and
+       replaced by the test stub in Fakes/ so WinAppSDK ResourceLoader is never invoked. -->
+  <ItemGroup>
+    <Compile Include="..\Services\ConnectionState.cs"           Link="Services\ConnectionState.cs" />
+    <Compile Include="..\Services\DetectedGame.cs"              Link="Services\DetectedGame.cs" />
+    <Compile Include="..\Services\IGameProcessDetector.cs"      Link="Services\IGameProcessDetector.cs" />
+    <Compile Include="..\Services\GameProcessDefinition.cs"     Link="Services\GameProcessDefinition.cs" />
+    <Compile Include="..\Services\GameVariant.cs"               Link="Services\GameVariant.cs" />
+    <Compile Include="..\Services\IProcessInfoProvider.cs"      Link="Services\IProcessInfoProvider.cs" />
+    <Compile Include="..\Services\IProcessMemoryAccessor.cs"    Link="Services\IProcessMemoryAccessor.cs" />
+    <Compile Include="..\Services\GameMemoryReader.cs"          Link="Services\GameMemoryReader.cs" />
+    <Compile Include="..\Services\GameProcessDetector.cs"       Link="Services\GameProcessDetector.cs" />
+    <Compile Include="..\Services\WindowsProcessInfoProvider.cs" Link="Services\WindowsProcessInfoProvider.cs" />
+    <Compile Include="..\Services\WindowsProcessMemoryAccessor.cs" Link="Services\WindowsProcessMemoryAccessor.cs" />
+    <Compile Include="..\Services\PlayerStatAddressMap.cs"      Link="Services\PlayerStatAddressMap.cs" />
+    <Compile Include="..\Services\PlayerStats.cs"               Link="Services\PlayerStats.cs" />
+    <Compile Include="..\Services\PlayerStatsReadResult.cs"     Link="Services\PlayerStatsReadResult.cs" />
+    <Compile Include="..\Services\StatFormatter.cs"             Link="Services\StatFormatter.cs" />
+  </ItemGroup>
+
+</Project>
