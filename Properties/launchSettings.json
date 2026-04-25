@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "BO2 (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "BO2 (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
