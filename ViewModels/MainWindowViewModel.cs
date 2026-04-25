@@ -102,12 +102,17 @@ namespace BO2.ViewModels
             }
             catch (InvalidOperationException ex) when (!cancellationToken.IsCancellationRequested)
             {
-                await RunOnDispatcherAsync(() => ApplyReadError(ex.Message), CancellationToken.None);
+                await TryApplyReadErrorAsync(ex.Message, cancellationToken);
             }
             catch (Win32Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
-                await RunOnDispatcherAsync(() => ApplyReadError(ex.Message), CancellationToken.None);
+                await TryApplyReadErrorAsync(ex.Message, cancellationToken);
             }
+        }
+
+        public Task TryApplyRefreshErrorAsync(string message, CancellationToken cancellationToken)
+        {
+            return TryApplyReadErrorAsync(message, cancellationToken);
         }
 
         public void Dispose()
@@ -161,6 +166,20 @@ namespace BO2.ViewModels
         private Task RunOnDispatcherAsync(Action action, CancellationToken cancellationToken)
         {
             return RunOnDispatcherAsync(_dispatcherQueue, action, cancellationToken);
+        }
+
+        private async Task TryApplyReadErrorAsync(string message, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await RunOnDispatcherAsync(() => ApplyReadError(message), cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+            }
+            catch (InvalidOperationException) when (cancellationToken.IsCancellationRequested)
+            {
+            }
         }
 
         private void ApplyReadResult(PlayerStatsReadResult result)

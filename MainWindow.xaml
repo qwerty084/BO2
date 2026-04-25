@@ -41,12 +41,15 @@
                         Height="8"
                         VerticalAlignment="Center">
                         <Ellipse
+                            AutomationProperties.AccessibilityView="Raw"
                             Fill="{ThemeResource SystemFillColorSuccessBrush}"
                             Visibility="{x:Bind ViewModel.ConnectedStatusVisibility, Mode=OneWay}" />
                         <Ellipse
+                            AutomationProperties.AccessibilityView="Raw"
                             Fill="{ThemeResource SystemFillColorCautionBrush}"
                             Visibility="{x:Bind ViewModel.UnsupportedStatusVisibility, Mode=OneWay}" />
                         <Ellipse
+                            AutomationProperties.AccessibilityView="Raw"
                             Fill="{ThemeResource SystemFillColorCriticalBrush}"
                             Visibility="{x:Bind ViewModel.DisconnectedStatusVisibility, Mode=OneWay}" />
                     </Grid>
@@ -93,18 +96,18 @@
                                     Grid.Column="0"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 <TextBlock
+                                    x:Uid="GameTimePlaceholder"
                                     Grid.Row="1"
-                                    Grid.Column="0"
-                                    Text="--:--:--" />
+                                    Grid.Column="0" />
                                 <TextBlock
                                     x:Uid="RoundTimeLabel"
                                     Grid.Row="0"
                                     Grid.Column="1"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 <TextBlock
+                                    x:Uid="RoundTimePlaceholder"
                                     Grid.Row="1"
-                                    Grid.Column="1"
-                                    Text="--:--" />
+                                    Grid.Column="1" />
                             </Grid>
                         </StackPanel>
 

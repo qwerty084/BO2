@@ -18,6 +18,51 @@
   <data name="DispatcherQueueFailed" xml:space="preserve">
     <value>Unable to queue UI update.</value>
   </data>
+  <data name="GameProcessDetectorDisplayNamePlutoniumMultiplayer" xml:space="preserve">
+    <value>Plutonium Multiplayer</value>
+  </data>
+  <data name="GameProcessDetectorDisplayNamePlutoniumUnknown" xml:space="preserve">
+    <value>Plutonium T6</value>
+  </data>
+  <data name="GameProcessDetectorDisplayNamePlutoniumZombies" xml:space="preserve">
+    <value>Plutonium Zombies</value>
+  </data>
+  <data name="GameProcessDetectorDisplayNameRedactedMultiplayer" xml:space="preserve">
+    <value>Redacted Multiplayer</value>
+  </data>
+  <data name="GameProcessDetectorDisplayNameRedactedZombies" xml:space="preserve">
+    <value>Redacted Zombies</value>
+  </data>
+  <data name="GameProcessDetectorDisplayNameSteamMultiplayer" xml:space="preserve">
+    <value>Steam Multiplayer</value>
+  </data>
+  <data name="GameProcessDetectorDisplayNameSteamSinglePlayer" xml:space="preserve">
+    <value>Steam Campaign</value>
+  </data>
+  <data name="GameProcessDetectorDisplayNameSteamZombies" xml:space="preserve">
+    <value>Steam Zombies</value>
+  </data>
+  <data name="GameProcessDetectorUnsupportedReasonPlutoniumMultiplayer" xml:space="preserve">
+    <value>No confirmed Plutonium Multiplayer address map</value>
+  </data>
+  <data name="GameProcessDetectorUnsupportedReasonPlutoniumUnknown" xml:space="preserve">
+    <value>No confirmed Plutonium address map</value>
+  </data>
+  <data name="GameProcessDetectorUnsupportedReasonPlutoniumZombies" xml:space="preserve">
+    <value>No confirmed Plutonium Zombies address map</value>
+  </data>
+  <data name="GameProcessDetectorUnsupportedReasonRedactedMultiplayer" xml:space="preserve">
+    <value>No confirmed Redacted Multiplayer address map</value>
+  </data>
+  <data name="GameProcessDetectorUnsupportedReasonRedactedZombies" xml:space="preserve">
+    <value>No confirmed Redacted Zombies address map</value>
+  </data>
+  <data name="GameProcessDetectorUnsupportedReasonSteamMultiplayer" xml:space="preserve">
+    <value>No confirmed Steam Multiplayer address map</value>
+  </data>
+  <data name="GameProcessDetectorUnsupportedReasonSteamSinglePlayer" xml:space="preserve">
+    <value>No confirmed Steam Campaign address map</value>
+  </data>
   <data name="DownsLabel.Text" xml:space="preserve">
     <value>Downs</value>
   </data>
@@ -29,6 +74,9 @@
   </data>
   <data name="GameTimeLabel.Text" xml:space="preserve">
     <value>Game time</value>
+  </data>
+  <data name="GameTimePlaceholder.Text" xml:space="preserve">
+    <value>--:--:--</value>
   </data>
   <data name="HeadshotsLabel.Text" xml:space="preserve">
     <value>Headshots</value>
@@ -62,6 +110,9 @@
   </data>
   <data name="RoundTimeLabel.Text" xml:space="preserve">
     <value>Round time</value>
+  </data>
+  <data name="RoundTimePlaceholder.Text" xml:space="preserve">
+    <value>--:--</value>
   </data>
   <data name="SettingsDescription.Text" xml:space="preserve">
     <value>Settings will appear here.</value>

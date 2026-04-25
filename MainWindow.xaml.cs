@@ -109,6 +109,10 @@ namespace BO2
             catch (OperationCanceledException) when (_refreshCancellationTokenSource.IsCancellationRequested)
             {
             }
+            catch (Exception ex) when (!_refreshCancellationTokenSource.IsCancellationRequested)
+            {
+                await ViewModel.TryApplyRefreshErrorAsync(ex.Message, _refreshCancellationTokenSource.Token);
+            }
         }
 
         private void DisposeRefreshResources()

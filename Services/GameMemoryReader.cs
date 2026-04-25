@@ -9,15 +9,18 @@ namespace BO2.Services
     {
         private const int Int32Size = sizeof(int);
 
+        private static readonly TimeSpan DetectionCacheDuration = TimeSpan.FromSeconds(2);
         private static readonly IntPtr InvalidHandleValue = new(-1);
 
         private readonly GameProcessDetector _processDetector = new();
         private SafeProcessHandle? _processHandle;
         private int? _attachedProcessId;
+        private DetectedGame? _cachedDetectedGame;
+        private DateTimeOffset _cachedDetectionAt;
 
         public PlayerStatsReadResult ReadPlayerStats()
         {
-            DetectedGame? detectedGame = _processDetector.Detect();
+            DetectedGame? detectedGame = DetectGame();
 
             if (detectedGame is null)
             {
@@ -59,6 +62,7 @@ namespace BO2.Services
             }
             catch
             {
+                InvalidateDetectionCache();
                 CloseAttachedProcess();
                 throw;
             }
@@ -115,6 +119,25 @@ namespace BO2.Services
             _processHandle?.Dispose();
             _processHandle = null;
             _attachedProcessId = null;
+        }
+
+        private DetectedGame? DetectGame()
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            if (now - _cachedDetectionAt <= DetectionCacheDuration)
+            {
+                return _cachedDetectedGame;
+            }
+
+            _cachedDetectedGame = _processDetector.Detect();
+            _cachedDetectionAt = now;
+            return _cachedDetectedGame;
+        }
+
+        private void InvalidateDetectionCache()
+        {
+            _cachedDetectedGame = null;
+            _cachedDetectionAt = DateTimeOffset.MinValue;
         }
 
         [DllImport("kernel32.dll", SetLastError = true)]

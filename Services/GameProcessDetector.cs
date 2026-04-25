@@ -14,60 +14,60 @@ namespace BO2.Services
         [
             new(
                 GameVariant.SteamZombies,
-                "Steam Zombies",
+                AppStrings.Get("GameProcessDetectorDisplayNameSteamZombies"),
                 "t6zm",
                 null,
                 PlayerStatAddressMap.SteamZombies,
                 null),
             new(
                 GameVariant.RedactedZombies,
-                "Redacted Zombies",
+                AppStrings.Get("GameProcessDetectorDisplayNameRedactedZombies"),
                 "t6zmv41",
                 null,
                 null,
-                "No confirmed Redacted Zombies address map"),
+                AppStrings.Get("GameProcessDetectorUnsupportedReasonRedactedZombies")),
             new(
                 GameVariant.PlutoniumZombies,
-                "Plutonium Zombies",
+                AppStrings.Get("GameProcessDetectorDisplayNamePlutoniumZombies"),
                 "plutonium-bootstrapper-win32",
                 "t6zm",
                 null,
-                "No confirmed Plutonium Zombies address map"),
+                AppStrings.Get("GameProcessDetectorUnsupportedReasonPlutoniumZombies")),
             new(
                 GameVariant.PlutoniumMultiplayer,
-                "Plutonium Multiplayer",
+                AppStrings.Get("GameProcessDetectorDisplayNamePlutoniumMultiplayer"),
                 "plutonium-bootstrapper-win32",
                 "t6mp",
                 null,
-                "No confirmed Plutonium Multiplayer address map"),
+                AppStrings.Get("GameProcessDetectorUnsupportedReasonPlutoniumMultiplayer")),
             new(
                 GameVariant.PlutoniumUnknown,
-                "Plutonium T6",
+                AppStrings.Get("GameProcessDetectorDisplayNamePlutoniumUnknown"),
                 "plutonium-bootstrapper-win32",
                 null,
                 null,
-                "No confirmed Plutonium address map"),
+                AppStrings.Get("GameProcessDetectorUnsupportedReasonPlutoniumUnknown")),
             new(
                 GameVariant.SteamMultiplayer,
-                "Steam Multiplayer",
+                AppStrings.Get("GameProcessDetectorDisplayNameSteamMultiplayer"),
                 "t6mp",
                 null,
                 null,
-                "No confirmed Steam Multiplayer address map"),
+                AppStrings.Get("GameProcessDetectorUnsupportedReasonSteamMultiplayer")),
             new(
                 GameVariant.RedactedMultiplayer,
-                "Redacted Multiplayer",
+                AppStrings.Get("GameProcessDetectorDisplayNameRedactedMultiplayer"),
                 "t6mpv43",
                 null,
                 null,
-                "No confirmed Redacted Multiplayer address map"),
+                AppStrings.Get("GameProcessDetectorUnsupportedReasonRedactedMultiplayer")),
             new(
                 GameVariant.SteamSinglePlayer,
-                "Steam Campaign",
+                AppStrings.Get("GameProcessDetectorDisplayNameSteamSinglePlayer"),
                 "t6sp",
                 null,
                 null,
-                "No confirmed Steam Campaign address map")
+                AppStrings.Get("GameProcessDetectorUnsupportedReasonSteamSinglePlayer"))
         ];
 
         public DetectedGame? Detect()
@@ -155,6 +155,8 @@ namespace BO2.Services
         private string? GetCachedCommandLine(int processId)
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
+            RemoveExpiredCommandLineCacheEntries(now);
+
             if (_commandLineCache.TryGetValue(processId, out CommandLineCacheEntry? cacheEntry)
                 && now - cacheEntry.CachedAt <= CommandLineCacheDuration)
             {
@@ -164,6 +166,31 @@ namespace BO2.Services
             string? commandLine = GetCommandLine(processId);
             _commandLineCache[processId] = new CommandLineCacheEntry(commandLine, now);
             return commandLine;
+        }
+
+        private void RemoveExpiredCommandLineCacheEntries(DateTimeOffset now)
+        {
+            List<int>? expiredProcessIds = null;
+            foreach (KeyValuePair<int, CommandLineCacheEntry> cacheEntry in _commandLineCache)
+            {
+                if (now - cacheEntry.Value.CachedAt <= CommandLineCacheDuration)
+                {
+                    continue;
+                }
+
+                expiredProcessIds ??= [];
+                expiredProcessIds.Add(cacheEntry.Key);
+            }
+
+            if (expiredProcessIds is null)
+            {
+                return;
+            }
+
+            foreach (int processId in expiredProcessIds)
+            {
+                _commandLineCache.Remove(processId);
+            }
         }
 
         private sealed record CommandLineCacheEntry(string? CommandLine, DateTimeOffset CachedAt);
