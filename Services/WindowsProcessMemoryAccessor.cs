@@ -47,15 +47,16 @@ namespace BO2.Services
         {
             SafeProcessHandle processHandle = GetRequiredProcessHandle();
             byte[] buffer = new byte[Int32Size];
+            nuint size = Int32Size;
 
-            if (!ReadProcessMemory(processHandle, new IntPtr(unchecked((long)address)), buffer, Int32Size, out int bytesRead))
+            if (!ReadProcessMemory(processHandle, new IntPtr(unchecked((long)address)), buffer, size, out nuint bytesRead))
             {
                 throw new Win32Exception(Marshal.GetLastWin32Error(), AppStrings.Format("ReadMemoryFailedFormat", valueName));
             }
 
-            if (bytesRead != Int32Size)
+            if (bytesRead != size)
             {
-                throw new InvalidOperationException(AppStrings.Format("ShortReadFormat", Int32Size, bytesRead));
+                throw new InvalidOperationException(AppStrings.Format("ShortReadFormat", size, bytesRead));
             }
 
             return BitConverter.ToInt32(buffer, 0);
@@ -65,15 +66,16 @@ namespace BO2.Services
         {
             SafeProcessHandle processHandle = GetRequiredProcessHandle();
             byte[] buffer = new byte[SingleSize];
+            nuint size = SingleSize;
 
-            if (!ReadProcessMemory(processHandle, new IntPtr(unchecked((long)address)), buffer, SingleSize, out int bytesRead))
+            if (!ReadProcessMemory(processHandle, new IntPtr(unchecked((long)address)), buffer, size, out nuint bytesRead))
             {
                 throw new Win32Exception(Marshal.GetLastWin32Error(), AppStrings.Format("ReadMemoryFailedFormat", valueName));
             }
 
-            if (bytesRead != SingleSize)
+            if (bytesRead != size)
             {
-                throw new InvalidOperationException(AppStrings.Format("ShortReadFormat", SingleSize, bytesRead));
+                throw new InvalidOperationException(AppStrings.Format("ShortReadFormat", size, bytesRead));
             }
 
             return BitConverter.ToSingle(buffer, 0);
@@ -109,8 +111,8 @@ namespace BO2.Services
             SafeProcessHandle process,
             nint baseAddress,
             byte[] buffer,
-            int size,
-            out int numberOfBytesRead);
+            nuint size,
+            out nuint numberOfBytesRead);
 
         [Flags]
         private enum ProcessAccess

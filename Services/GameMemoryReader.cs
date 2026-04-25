@@ -92,6 +92,11 @@ namespace BO2.Services
                 HandleReadFailure();
                 throw;
             }
+            catch (Exception)
+            {
+                HandleReadFailure();
+                throw;
+            }
         }
 
         public void Dispose()

@@ -20,7 +20,7 @@
 - Single-project WinUI 3 desktop app. `BO2.csproj` targets `net8.0-windows10.0.19041.0`, uses Windows App SDK + single-project MSIX tooling.
 - `App.xaml` merges `XamlControlsResources` for app-wide WinUI resources.
 - `App.xaml.cs`: launch entry. `OnLaunched` creates `MainWindow`, stores private `_window`, activates it.
-- `MainWindow.xaml`: full UI shell; one `Window` with `MicaBackdrop` + empty root `Grid`. `MainWindow.xaml.cs` only initializes partial class.
+- `MainWindow.xaml`: full UI shell; one `Window` with `MicaBackdrop` and the app's main UI content, including sections such as player stats and candidate details. `MainWindow.xaml.cs` only initializes partial class.
 - Packaging lives in project, no separate packaging project. `Package.appxmanifest` defines identity, logos, capabilities; `app.manifest` carries unpackaged compatibility + DPI.
 - `Properties\launchSettings.json`: two local run profiles: packaged (`MsixPackage`) and unpackaged (`Project`).
 

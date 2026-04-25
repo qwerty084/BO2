@@ -114,6 +114,28 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void WhenUnexpectedRequiredReadFails_ThenInvalidatesDetectionCacheAndClosesMemoryAccessor()
+        {
+            PlayerStatAddressMap addressMap = PlayerStatAddressMap.SteamZombies;
+            var detector = new FakeGameProcessDetector
+            {
+                Result = MakeSupportedGame(addressMap)
+            };
+            var memoryAccessor = new FakeProcessMemoryAccessor();
+            memoryAccessor.SetInt32Exception(addressMap.Scores.PointsAddress, new FormatException("boom"));
+            using var reader = new GameMemoryReader(detector, memoryAccessor, TimeProvider.System);
+
+            Assert.Throws<FormatException>(() => reader.ReadPlayerStats());
+
+            detector.Result = null;
+            PlayerStatsReadResult result = reader.ReadPlayerStats();
+
+            Assert.Equal(ConnectionState.Disconnected, result.ConnectionState);
+            Assert.Equal(2, detector.DetectCallCount);
+            Assert.True(memoryAccessor.CloseCallCount >= 2);
+        }
+
+        [Fact]
         public void WhenAttachGetsInvalidArguments_ThenWrapsAsInvalidOperationAndInvalidatesDetectionCache()
         {
             PlayerStatAddressMap addressMap = PlayerStatAddressMap.SteamZombies;
