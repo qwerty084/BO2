@@ -7,99 +7,137 @@ namespace BO2.Services
 {
     public sealed class GameMemoryReader : IDisposable
     {
-        private const string TargetProcessName = "t6zm";
-        private const int PlayerPointsAddress = 0x0234C068;
-        private const int PlayerKillsAddress = 0x0234C080;
-        private const int PlayerDownsAddress = 0x0234C084;
-        private const int PlayerRevivesAddress = 0x0234C088;
-        private const int PlayerHeadshotsAddress = 0x0234C08C;
         private const int Int32Size = sizeof(int);
 
+        private static readonly TimeSpan DetectionCacheDuration = TimeSpan.FromSeconds(2);
         private static readonly IntPtr InvalidHandleValue = new(-1);
 
+        private readonly GameProcessDetector _processDetector = new();
         private SafeProcessHandle? _processHandle;
         private int? _attachedProcessId;
+        private DetectedGame? _cachedDetectedGame;
+        private DateTimeOffset _cachedDetectionAt;
 
-        public PlayerStats ReadPlayerStats()
+        public PlayerStatsReadResult ReadPlayerStats()
         {
-            EnsureAttached();
+            DetectedGame? detectedGame = DetectGame();
 
-            return new PlayerStats(
-                ReadInt32(PlayerPointsAddress, "points"),
-                ReadInt32(PlayerKillsAddress, "kills"),
-                ReadInt32(PlayerDownsAddress, "downs"),
-                ReadInt32(PlayerRevivesAddress, "revives"),
-                ReadInt32(PlayerHeadshotsAddress, "headshots"));
-        }
+            if (detectedGame is null)
+            {
+                CloseAttachedProcess();
+                return PlayerStatsReadResult.GameNotRunning;
+            }
 
-        public int ReadPlayerPoints()
-        {
-            EnsureAttached();
+            if (detectedGame.AddressMap is null)
+            {
+                CloseAttachedProcess();
+                string statusText = string.IsNullOrWhiteSpace(detectedGame.UnsupportedReason)
+                    ? AppStrings.Format("UnsupportedStatusFormat", detectedGame.DisplayName)
+                    : AppStrings.Format("UnsupportedStatusWithReasonFormat", detectedGame.DisplayName, detectedGame.UnsupportedReason);
 
-            return ReadInt32(PlayerPointsAddress, "player points");
+                return new PlayerStatsReadResult(
+                    detectedGame,
+                    null,
+                    statusText,
+                    ConnectionState.Unsupported);
+            }
+
+            EnsureAttached(detectedGame);
+
+            try
+            {
+                PlayerStatAddressMap addressMap = detectedGame.AddressMap;
+                PlayerStats stats = new(
+                    ReadInt32(addressMap.PointsAddress, "points"),
+                    ReadInt32(addressMap.KillsAddress, "kills"),
+                    ReadInt32(addressMap.DownsAddress, "downs"),
+                    ReadInt32(addressMap.RevivesAddress, "revives"),
+                    ReadInt32(addressMap.HeadshotsAddress, "headshots"));
+
+                return new PlayerStatsReadResult(
+                    detectedGame,
+                    stats,
+                    AppStrings.Format("ConnectedStatusFormat", detectedGame.DisplayName),
+                    ConnectionState.Connected);
+            }
+            catch
+            {
+                InvalidateDetectionCache();
+                CloseAttachedProcess();
+                throw;
+            }
         }
 
         public void Dispose()
         {
-            _processHandle?.Dispose();
+            CloseAttachedProcess();
         }
 
-        private int ReadInt32(int address, string valueName)
+        private int ReadInt32(uint address, string valueName)
         {
             if (_processHandle is null || _processHandle.IsInvalid || _processHandle.IsClosed)
             {
-                throw new InvalidOperationException("The game process handle is not available.");
+                throw new InvalidOperationException(AppStrings.Get("GameProcessHandleUnavailable"));
             }
 
             byte[] buffer = new byte[Int32Size];
-            if (!ReadProcessMemory(_processHandle, new IntPtr(address), buffer, Int32Size, out int bytesRead))
+            if (!ReadProcessMemory(_processHandle, new IntPtr(unchecked((long)address)), buffer, Int32Size, out int bytesRead))
             {
-                throw new Win32Exception(Marshal.GetLastWin32Error(), $"Unable to read {valueName} from game memory.");
+                throw new Win32Exception(Marshal.GetLastWin32Error(), AppStrings.Format("ReadMemoryFailedFormat", valueName));
             }
 
             if (bytesRead != Int32Size)
             {
-                throw new InvalidOperationException($"Expected to read {Int32Size} bytes but read {bytesRead} bytes.");
+                throw new InvalidOperationException(AppStrings.Format("ShortReadFormat", Int32Size, bytesRead));
             }
 
             return BitConverter.ToInt32(buffer, 0);
         }
 
-        private void EnsureAttached()
+        private void EnsureAttached(DetectedGame detectedGame)
         {
-            using Process process = GetTargetProcess();
-
-            if (_attachedProcessId == process.Id && _processHandle is not null && !_processHandle.IsInvalid && !_processHandle.IsClosed)
+            if (_attachedProcessId == detectedGame.ProcessId && _processHandle is not null && !_processHandle.IsInvalid && !_processHandle.IsClosed)
             {
                 return;
             }
 
-            _processHandle?.Dispose();
-            _processHandle = OpenProcess(ProcessAccess.QueryLimitedInformation | ProcessAccess.VirtualMemoryRead, false, process.Id);
+            CloseAttachedProcess();
+            _processHandle = OpenProcess(ProcessAccess.QueryLimitedInformation | ProcessAccess.VirtualMemoryRead, false, detectedGame.ProcessId);
 
             if (_processHandle.IsInvalid)
             {
-                throw new Win32Exception(Marshal.GetLastWin32Error(), $"Unable to open {TargetProcessName}.exe for read-only memory access.");
+                int error = Marshal.GetLastWin32Error();
+                CloseAttachedProcess();
+                throw new Win32Exception(error, AppStrings.Format("OpenProcessFailedFormat", detectedGame.ProcessName));
             }
 
-            _attachedProcessId = process.Id;
+            _attachedProcessId = detectedGame.ProcessId;
         }
 
-        private static Process GetTargetProcess()
+        private void CloseAttachedProcess()
         {
-            Process[] processes = Process.GetProcessesByName(TargetProcessName);
+            _processHandle?.Dispose();
+            _processHandle = null;
+            _attachedProcessId = null;
+        }
 
-            if (processes.Length == 0)
+        private DetectedGame? DetectGame()
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            if (now - _cachedDetectionAt <= DetectionCacheDuration)
             {
-                throw new InvalidOperationException($"{TargetProcessName}.exe is not running.");
+                return _cachedDetectedGame;
             }
 
-            for (int index = 1; index < processes.Length; index++)
-            {
-                processes[index].Dispose();
-            }
+            _cachedDetectedGame = _processDetector.Detect();
+            _cachedDetectionAt = now;
+            return _cachedDetectedGame;
+        }
 
-            return processes[0];
+        private void InvalidateDetectionCache()
+        {
+            _cachedDetectedGame = null;
+            _cachedDetectionAt = DateTimeOffset.MinValue;
         }
 
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -108,7 +146,7 @@ namespace BO2.Services
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool ReadProcessMemory(
             SafeProcessHandle process,
-            IntPtr baseAddress,
+            nint baseAddress,
             byte[] buffer,
             int size,
             out int numberOfBytesRead);
