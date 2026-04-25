@@ -7,41 +7,62 @@ namespace BO2.Services
 {
     public sealed class GameMemoryReader : IDisposable
     {
-        private const string TargetProcessName = "t6zm";
-        private const int PlayerPointsAddress = 0x0234C068;
-        private const int PlayerKillsAddress = 0x0234C080;
-        private const int PlayerDownsAddress = 0x0234C084;
-        private const int PlayerRevivesAddress = 0x0234C088;
-        private const int PlayerHeadshotsAddress = 0x0234C08C;
         private const int Int32Size = sizeof(int);
 
         private static readonly IntPtr InvalidHandleValue = new(-1);
 
+        private readonly GameProcessDetector _processDetector = new();
         private SafeProcessHandle? _processHandle;
         private int? _attachedProcessId;
 
-        public PlayerStats ReadPlayerStats()
+        public PlayerStatsReadResult ReadPlayerStats()
         {
-            EnsureAttached();
+            DetectedGame? detectedGame = _processDetector.Detect();
 
-            return new PlayerStats(
-                ReadInt32(PlayerPointsAddress, "points"),
-                ReadInt32(PlayerKillsAddress, "kills"),
-                ReadInt32(PlayerDownsAddress, "downs"),
-                ReadInt32(PlayerRevivesAddress, "revives"),
-                ReadInt32(PlayerHeadshotsAddress, "headshots"));
-        }
+            if (detectedGame is null)
+            {
+                CloseAttachedProcess();
+                return PlayerStatsReadResult.GameNotRunning;
+            }
 
-        public int ReadPlayerPoints()
-        {
-            EnsureAttached();
+            if (detectedGame.AddressMap is null)
+            {
+                CloseAttachedProcess();
+                return new PlayerStatsReadResult(
+                    detectedGame,
+                    null,
+                    $"Unsupported: {detectedGame.DisplayName}",
+                    ConnectionState.Unsupported);
+            }
 
-            return ReadInt32(PlayerPointsAddress, "player points");
+            EnsureAttached(detectedGame);
+
+            try
+            {
+                PlayerStatAddressMap addressMap = detectedGame.AddressMap;
+                PlayerStats stats = new(
+                    ReadInt32(addressMap.PointsAddress, "points"),
+                    ReadInt32(addressMap.KillsAddress, "kills"),
+                    ReadInt32(addressMap.DownsAddress, "downs"),
+                    ReadInt32(addressMap.RevivesAddress, "revives"),
+                    ReadInt32(addressMap.HeadshotsAddress, "headshots"));
+
+                return new PlayerStatsReadResult(
+                    detectedGame,
+                    stats,
+                    $"Connected: {detectedGame.DisplayName}",
+                    ConnectionState.Connected);
+            }
+            catch
+            {
+                CloseAttachedProcess();
+                throw;
+            }
         }
 
         public void Dispose()
         {
-            _processHandle?.Dispose();
+            CloseAttachedProcess();
         }
 
         private int ReadInt32(int address, string valueName)
@@ -65,41 +86,29 @@ namespace BO2.Services
             return BitConverter.ToInt32(buffer, 0);
         }
 
-        private void EnsureAttached()
+        private void EnsureAttached(DetectedGame detectedGame)
         {
-            using Process process = GetTargetProcess();
-
-            if (_attachedProcessId == process.Id && _processHandle is not null && !_processHandle.IsInvalid && !_processHandle.IsClosed)
+            if (_attachedProcessId == detectedGame.ProcessId && _processHandle is not null && !_processHandle.IsInvalid && !_processHandle.IsClosed)
             {
                 return;
             }
 
-            _processHandle?.Dispose();
-            _processHandle = OpenProcess(ProcessAccess.QueryLimitedInformation | ProcessAccess.VirtualMemoryRead, false, process.Id);
+            CloseAttachedProcess();
+            _processHandle = OpenProcess(ProcessAccess.QueryLimitedInformation | ProcessAccess.VirtualMemoryRead, false, detectedGame.ProcessId);
 
             if (_processHandle.IsInvalid)
             {
-                throw new Win32Exception(Marshal.GetLastWin32Error(), $"Unable to open {TargetProcessName}.exe for read-only memory access.");
+                throw new Win32Exception(Marshal.GetLastWin32Error(), $"Unable to open {detectedGame.ProcessName}.exe for read-only memory access.");
             }
 
-            _attachedProcessId = process.Id;
+            _attachedProcessId = detectedGame.ProcessId;
         }
 
-        private static Process GetTargetProcess()
+        private void CloseAttachedProcess()
         {
-            Process[] processes = Process.GetProcessesByName(TargetProcessName);
-
-            if (processes.Length == 0)
-            {
-                throw new InvalidOperationException($"{TargetProcessName}.exe is not running.");
-            }
-
-            for (int index = 1; index < processes.Length; index++)
-            {
-                processes[index].Dispose();
-            }
-
-            return processes[0];
+            _processHandle?.Dispose();
+            _processHandle = null;
+            _attachedProcessId = null;
         }
 
         [DllImport("kernel32.dll", SetLastError = true)]

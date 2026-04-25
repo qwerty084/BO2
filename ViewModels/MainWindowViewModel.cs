@@ -1,4 +1,5 @@
 using BO2.Services;
+using Microsoft.UI.Xaml;
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -13,7 +14,11 @@ namespace BO2.ViewModels
         private string _downsText = "--";
         private string _revivesText = "--";
         private string _headshotsText = "--";
-        private string _statusText = "Waiting for t6zm.exe";
+        private string _detectedGameText = "No game detected";
+        private string _statusText = "Game not running";
+        private Visibility _connectedStatusVisibility = Visibility.Collapsed;
+        private Visibility _unsupportedStatusVisibility = Visibility.Collapsed;
+        private Visibility _disconnectedStatusVisibility = Visibility.Visible;
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -27,6 +32,30 @@ namespace BO2.ViewModels
         {
             get => _statusText;
             private set => SetProperty(ref _statusText, value);
+        }
+
+        public string DetectedGameText
+        {
+            get => _detectedGameText;
+            private set => SetProperty(ref _detectedGameText, value);
+        }
+
+        public Visibility ConnectedStatusVisibility
+        {
+            get => _connectedStatusVisibility;
+            private set => SetProperty(ref _connectedStatusVisibility, value);
+        }
+
+        public Visibility UnsupportedStatusVisibility
+        {
+            get => _unsupportedStatusVisibility;
+            private set => SetProperty(ref _unsupportedStatusVisibility, value);
+        }
+
+        public Visibility DisconnectedStatusVisibility
+        {
+            get => _disconnectedStatusVisibility;
+            private set => SetProperty(ref _disconnectedStatusVisibility, value);
         }
 
         public string KillsText
@@ -57,23 +86,34 @@ namespace BO2.ViewModels
         {
             try
             {
-                PlayerStats stats = _memoryReader.ReadPlayerStats();
-                PointsText = FormatStat(stats.Points);
-                KillsText = FormatStat(stats.Kills);
-                DownsText = FormatStat(stats.Downs);
-                RevivesText = FormatStat(stats.Revives);
-                HeadshotsText = FormatStat(stats.Headshots);
-                StatusText = "Reading t6zm.exe player stat block at 0x0234C068";
+                PlayerStatsReadResult result = _memoryReader.ReadPlayerStats();
+                StatusText = result.StatusText;
+                DetectedGameText = result.DetectedGame?.DisplayName ?? "No game detected";
+                SetConnectionState(result.ConnectionState);
+
+                if (result.Stats is null)
+                {
+                    ClearStats();
+                    return;
+                }
+
+                PointsText = FormatStat(result.Stats.Points);
+                KillsText = FormatStat(result.Stats.Kills);
+                DownsText = FormatStat(result.Stats.Downs);
+                RevivesText = FormatStat(result.Stats.Revives);
+                HeadshotsText = FormatStat(result.Stats.Headshots);
             }
             catch (InvalidOperationException ex)
             {
                 ClearStats();
                 StatusText = ex.Message;
+                SetConnectionState(ConnectionState.Disconnected);
             }
             catch (Win32Exception ex)
             {
                 ClearStats();
                 StatusText = ex.Message;
+                SetConnectionState(ConnectionState.Disconnected);
             }
         }
 
@@ -85,6 +125,13 @@ namespace BO2.ViewModels
         private static string FormatStat(int value)
         {
             return value.ToString("N0");
+        }
+
+        private void SetConnectionState(ConnectionState connectionState)
+        {
+            ConnectedStatusVisibility = connectionState == ConnectionState.Connected ? Visibility.Visible : Visibility.Collapsed;
+            UnsupportedStatusVisibility = connectionState == ConnectionState.Unsupported ? Visibility.Visible : Visibility.Collapsed;
+            DisconnectedStatusVisibility = connectionState == ConnectionState.Disconnected ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void ClearStats()
