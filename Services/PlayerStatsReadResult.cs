@@ -6,7 +6,7 @@ namespace BO2.Services
         string StatusText,
         ConnectionState ConnectionState)
     {
-        public static PlayerStatsReadResult GameNotRunning { get; } = new(
+        public static PlayerStatsReadResult GameNotRunning => new(
             null,
             null,
             AppStrings.Get("GameNotRunning"),

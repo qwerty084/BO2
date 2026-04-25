@@ -125,15 +125,19 @@ namespace BO2.ViewModels
             return value.ToString("N0");
         }
 
-        private static Task RunOnDispatcherAsync(DispatcherQueue dispatcherQueue, Action action, CancellationToken cancellationToken)
+        private static async Task RunOnDispatcherAsync(DispatcherQueue dispatcherQueue, Action action, CancellationToken cancellationToken)
         {
             if (dispatcherQueue.HasThreadAccess)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 action();
-                return Task.CompletedTask;
+                return;
             }
 
             TaskCompletionSource completionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            using CancellationTokenRegistration cancellationRegistration = cancellationToken.Register(
+                () => completionSource.TrySetCanceled(cancellationToken));
+
             bool queued = dispatcherQueue.TryEnqueue(() =>
             {
                 if (cancellationToken.IsCancellationRequested)
@@ -145,22 +149,25 @@ namespace BO2.ViewModels
                 try
                 {
                     action();
-                    completionSource.SetResult();
+                    completionSource.TrySetResult();
                 }
                 catch (Exception ex)
                 {
-                    completionSource.SetException(ex);
+                    completionSource.TrySetException(ex);
                 }
             });
 
             if (!queued)
             {
-                return cancellationToken.IsCancellationRequested
-                    ? Task.FromCanceled(cancellationToken)
-                    : Task.FromException(new InvalidOperationException(AppStrings.Get("DispatcherQueueFailed")));
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException(cancellationToken);
+                }
+
+                throw new InvalidOperationException(AppStrings.Get("DispatcherQueueFailed"));
             }
 
-            return completionSource.Task;
+            await completionSource.Task;
         }
 
         private Task RunOnDispatcherAsync(Action action, CancellationToken cancellationToken)

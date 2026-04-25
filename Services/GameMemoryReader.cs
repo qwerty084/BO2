@@ -73,22 +73,22 @@ namespace BO2.Services
             CloseAttachedProcess();
         }
 
-        private int ReadInt32(int address, string valueName)
+        private int ReadInt32(uint address, string valueName)
         {
             if (_processHandle is null || _processHandle.IsInvalid || _processHandle.IsClosed)
             {
-                throw new InvalidOperationException("The game process handle is not available.");
+                throw new InvalidOperationException(AppStrings.Get("GameProcessHandleUnavailable"));
             }
 
             byte[] buffer = new byte[Int32Size];
-            if (!ReadProcessMemory(_processHandle, new IntPtr(address), buffer, Int32Size, out int bytesRead))
+            if (!ReadProcessMemory(_processHandle, new IntPtr(unchecked((long)address)), buffer, Int32Size, out int bytesRead))
             {
-                throw new Win32Exception(Marshal.GetLastWin32Error(), $"Unable to read {valueName} from game memory.");
+                throw new Win32Exception(Marshal.GetLastWin32Error(), AppStrings.Format("ReadMemoryFailedFormat", valueName));
             }
 
             if (bytesRead != Int32Size)
             {
-                throw new InvalidOperationException($"Expected to read {Int32Size} bytes but read {bytesRead} bytes.");
+                throw new InvalidOperationException(AppStrings.Format("ShortReadFormat", Int32Size, bytesRead));
             }
 
             return BitConverter.ToInt32(buffer, 0);
@@ -108,7 +108,7 @@ namespace BO2.Services
             {
                 int error = Marshal.GetLastWin32Error();
                 CloseAttachedProcess();
-                throw new Win32Exception(error, $"Unable to open {detectedGame.ProcessName}.exe for read-only memory access.");
+                throw new Win32Exception(error, AppStrings.Format("OpenProcessFailedFormat", detectedGame.ProcessName));
             }
 
             _attachedProcessId = detectedGame.ProcessId;
@@ -146,7 +146,7 @@ namespace BO2.Services
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool ReadProcessMemory(
             SafeProcessHandle process,
-            IntPtr baseAddress,
+            nint baseAddress,
             byte[] buffer,
             int size,
             out int numberOfBytesRead);

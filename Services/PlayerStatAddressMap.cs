@@ -1,17 +1,17 @@
 namespace BO2.Services
 {
     public sealed record PlayerStatAddressMap(
-        int PointsAddress,
-        int KillsAddress,
-        int DownsAddress,
-        int RevivesAddress,
-        int HeadshotsAddress)
+        uint PointsAddress,
+        uint KillsAddress,
+        uint DownsAddress,
+        uint RevivesAddress,
+        uint HeadshotsAddress)
     {
         public static PlayerStatAddressMap SteamZombies { get; } = new(
-            0x0234C068,
-            0x0234C080,
-            0x0234C084,
-            0x0234C088,
-            0x0234C08C);
+            0x0234C068U,
+            0x0234C080U,
+            0x0234C084U,
+            0x0234C088U,
+            0x0234C08CU);
     }
 }

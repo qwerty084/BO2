@@ -72,6 +72,9 @@
   <data name="GameNotRunning" xml:space="preserve">
     <value>Game not running</value>
   </data>
+  <data name="GameProcessHandleUnavailable" xml:space="preserve">
+    <value>The game process handle is not available.</value>
+  </data>
   <data name="GameTimeLabel.Text" xml:space="preserve">
     <value>Game time</value>
   </data>
@@ -96,6 +99,9 @@
   <data name="NoGameDetected" xml:space="preserve">
     <value>No game detected</value>
   </data>
+  <data name="OpenProcessFailedFormat" xml:space="preserve">
+    <value>Unable to open {0}.exe for read-only memory access.</value>
+  </data>
   <data name="PageTitle.Text" xml:space="preserve">
     <value>Home</value>
   </data>
@@ -108,6 +114,9 @@
   <data name="RevivesLabel.Text" xml:space="preserve">
     <value>Revives</value>
   </data>
+  <data name="ReadMemoryFailedFormat" xml:space="preserve">
+    <value>Unable to read {0} from game memory.</value>
+  </data>
   <data name="RoundTimeLabel.Text" xml:space="preserve">
     <value>Round time</value>
   </data>
@@ -119,6 +128,9 @@
   </data>
   <data name="SettingsTitle.Text" xml:space="preserve">
     <value>Settings</value>
+  </data>
+  <data name="ShortReadFormat" xml:space="preserve">
+    <value>Expected to read {0} bytes but read {1} bytes.</value>
   </data>
   <data name="TimersTitle.Text" xml:space="preserve">
     <value>Timers</value>
