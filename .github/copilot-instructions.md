@@ -7,6 +7,13 @@
 - There is no test project in the repository yet, so there is no full-suite or single-test command to run.
 - There is no repository-specific lint or formatting command/config checked in yet.
 
+## Repository knowledge
+
+- For complex tasks, consult the GitHub wiki for additional project knowledge before designing or implementing changes: https://github.com/qwerty084/BO2/wiki.
+- If the task involves memory reading, address discovery, CDB/WinDbg usage, or BO2 Zombies runtime data, check wiki pages such as `Confirmed-Memory-Addresses` for confirmed addresses and validation notes.
+- Store durable findings that future agents should reuse in the repo wiki rather than in ad-hoc local notes. Use the `repo-wiki-notes` skill for wiki updates.
+- Do not store secrets, credentials, raw sensitive memory dumps, anti-cheat bypass techniques, process hiding techniques, code injection workflows, or memory-writing instructions in the wiki.
+
 ## Architecture
 
 - This repository is a single-project WinUI 3 desktop app. `BO2.csproj` targets `net8.0-windows10.0.19041.0`, uses Windows App SDK, and has single-project MSIX tooling enabled.
