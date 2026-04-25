@@ -186,6 +186,110 @@
 
                         <StackPanel Spacing="12">
                             <TextBlock
+                                x:Uid="PlayerStateTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{ThemeResource SubtitleTextBlockStyle}" />
+                            <Grid
+                                ColumnSpacing="32"
+                                RowSpacing="4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock
+                                    x:Uid="PositionXLabel"
+                                    Grid.Row="0"
+                                    Grid.Column="0"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    Grid.Row="1"
+                                    Grid.Column="0"
+                                    Style="{ThemeResource BodyStrongTextBlockStyle}"
+                                    Text="{x:Bind ViewModel.PositionXText, Mode=OneWay}" />
+                                <TextBlock
+                                    x:Uid="PositionYLabel"
+                                    Grid.Row="0"
+                                    Grid.Column="1"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    Grid.Row="1"
+                                    Grid.Column="1"
+                                    Style="{ThemeResource BodyStrongTextBlockStyle}"
+                                    Text="{x:Bind ViewModel.PositionYText, Mode=OneWay}" />
+                                <TextBlock
+                                    x:Uid="PositionZLabel"
+                                    Grid.Row="0"
+                                    Grid.Column="2"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    Grid.Row="1"
+                                    Grid.Column="2"
+                                    Style="{ThemeResource BodyStrongTextBlockStyle}"
+                                    Text="{x:Bind ViewModel.PositionZText, Mode=OneWay}" />
+                            </Grid>
+                        </StackPanel>
+
+                        <Expander x:Uid="AdvancedCandidateDetailsExpander">
+                            <StackPanel Spacing="16">
+                                <TextBlock
+                                    x:Uid="CandidateDetailsDescription"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    TextWrapping="Wrap" />
+
+                                <StackPanel Spacing="12">
+                                    <TextBlock
+                                        x:Uid="PlayerCandidateDetailsTitle"
+                                        AutomationProperties.HeadingLevel="Level2"
+                                        Style="{ThemeResource SubtitleTextBlockStyle}" />
+                                    <TextBlock
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="{x:Bind ViewModel.PlayerCandidateDetailsText, Mode=OneWay}"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <StackPanel Spacing="12">
+                                    <TextBlock
+                                        x:Uid="AmmoCandidateDetailsTitle"
+                                        AutomationProperties.HeadingLevel="Level2"
+                                        Style="{ThemeResource SubtitleTextBlockStyle}" />
+                                    <TextBlock
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="{x:Bind ViewModel.AmmoCandidateDetailsText, Mode=OneWay}"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <StackPanel Spacing="12">
+                                    <TextBlock
+                                        x:Uid="CounterCandidateDetailsTitle"
+                                        AutomationProperties.HeadingLevel="Level2"
+                                        Style="{ThemeResource SubtitleTextBlockStyle}" />
+                                    <TextBlock
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="{x:Bind ViewModel.CounterCandidateDetailsText, Mode=OneWay}"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <StackPanel Spacing="12">
+                                    <TextBlock
+                                        x:Uid="AddressCandidateDetailsTitle"
+                                        AutomationProperties.HeadingLevel="Level2"
+                                        Style="{ThemeResource SubtitleTextBlockStyle}" />
+                                    <TextBlock
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="{x:Bind ViewModel.AddressCandidateDetailsText, Mode=OneWay}"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Expander>
+
+                        <StackPanel Spacing="12">
+                            <TextBlock
                                 x:Uid="GameEventsTitle"
                                 AutomationProperties.HeadingLevel="Level2"
                                 Style="{ThemeResource SubtitleTextBlockStyle}" />

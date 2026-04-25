@@ -15,6 +15,48 @@
   <data name="ConnectedStatusFormat" xml:space="preserve">
     <value>Connected: {0}</value>
   </data>
+  <data name="AdvancedCandidateDetailsExpander.AutomationProperties.Name" xml:space="preserve">
+    <value>Advanced candidate details</value>
+  </data>
+  <data name="AdvancedCandidateDetailsExpander.Header" xml:space="preserve">
+    <value>Advanced candidate details</value>
+  </data>
+  <data name="AddressCandidateDetailsTitle.Text" xml:space="preserve">
+    <value>Address candidates</value>
+  </data>
+  <data name="AdsAmountLabel" xml:space="preserve">
+    <value>ADS amount</value>
+  </data>
+  <data name="AlternateHeadshotsLabel" xml:space="preserve">
+    <value>Alternate headshots</value>
+  </data>
+  <data name="AlternateKillsLabel" xml:space="preserve">
+    <value>Alternate kills</value>
+  </data>
+  <data name="AmmoCandidateDetailsTitle.Text" xml:space="preserve">
+    <value>Ammo candidates</value>
+  </data>
+  <data name="AmmoSlot0Label" xml:space="preserve">
+    <value>Ammo slot 0</value>
+  </data>
+  <data name="AmmoSlot1Label" xml:space="preserve">
+    <value>Ammo slot 1</value>
+  </data>
+  <data name="AmmoSlot2Label" xml:space="preserve">
+    <value>Ammo slot 2</value>
+  </data>
+  <data name="AmmoSlot3Label" xml:space="preserve">
+    <value>Ammo slot 3</value>
+  </data>
+  <data name="AmmoSlot4Label" xml:space="preserve">
+    <value>Ammo slot 4</value>
+  </data>
+  <data name="CounterCandidateDetailsTitle.Text" xml:space="preserve">
+    <value>Counter candidates</value>
+  </data>
+  <data name="CandidateDetailsDescription.Text" xml:space="preserve">
+    <value>These values are Steam-derived candidates from older public offsets. Treat unavailable or unexpected values as validation signals, not read failures for confirmed stats.</value>
+  </data>
   <data name="DispatcherQueueFailed" xml:space="preserve">
     <value>Unable to queue UI update.</value>
   </data>
@@ -75,6 +117,18 @@
   <data name="GameProcessHandleUnavailable" xml:space="preserve">
     <value>The game process handle is not available.</value>
   </data>
+  <data name="InvalidDetectedGameProcessMetadataFormat" xml:space="preserve">
+    <value>Unable to read from {0} because its process metadata was invalid.</value>
+  </data>
+  <data name="GEntityArrayLabel" xml:space="preserve">
+    <value>GEntity array</value>
+  </data>
+  <data name="GEntityPlayerHealthLabel" xml:space="preserve">
+    <value>GEntity player health</value>
+  </data>
+  <data name="GEntitySizeLabel" xml:space="preserve">
+    <value>GEntity size</value>
+  </data>
   <data name="GameTimeLabel.Text" xml:space="preserve">
     <value>Game time</value>
   </data>
@@ -84,11 +138,38 @@
   <data name="HeadshotsLabel.Text" xml:space="preserve">
     <value>Headshots</value>
   </data>
+  <data name="HealthLabel.Text" xml:space="preserve">
+    <value>Health</value>
+  </data>
+  <data name="GravityFieldLabel" xml:space="preserve">
+    <value>Gravity field</value>
+  </data>
+  <data name="HeightFloatLabel" xml:space="preserve">
+    <value>Height float</value>
+  </data>
+  <data name="HeightIntLabel" xml:space="preserve">
+    <value>Height integer</value>
+  </data>
   <data name="HomeNavigationItem.Content" xml:space="preserve">
     <value>Home</value>
   </data>
   <data name="KillsLabel.Text" xml:space="preserve">
     <value>Kills</value>
+  </data>
+  <data name="LabeledValueFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="LastJumpHeightLabel" xml:space="preserve">
+    <value>Last jump height</value>
+  </data>
+  <data name="LegacyHealthLabel" xml:space="preserve">
+    <value>Legacy health candidate</value>
+  </data>
+  <data name="LethalAmmoLabel" xml:space="preserve">
+    <value>Lethal ammo</value>
+  </data>
+  <data name="LocalPlayerBaseLabel" xml:space="preserve">
+    <value>Local player base</value>
   </data>
   <data name="NavigationHome" xml:space="preserve">
     <value>Home</value>
@@ -108,11 +189,32 @@
   <data name="PlayerStatsTitle.Text" xml:space="preserve">
     <value>Player stats</value>
   </data>
+  <data name="PlayerCandidateDetailsTitle.Text" xml:space="preserve">
+    <value>Player candidates</value>
+  </data>
+  <data name="PlayerInfoHealthLabel" xml:space="preserve">
+    <value>Player info health</value>
+  </data>
+  <data name="PlayerStateTitle.Text" xml:space="preserve">
+    <value>Derived player state candidates</value>
+  </data>
+  <data name="PositionXLabel.Text" xml:space="preserve">
+    <value>Position X candidate</value>
+  </data>
+  <data name="PositionYLabel.Text" xml:space="preserve">
+    <value>Position Y candidate</value>
+  </data>
+  <data name="PositionZLabel.Text" xml:space="preserve">
+    <value>Position Z candidate</value>
+  </data>
   <data name="PointsLabel.Text" xml:space="preserve">
     <value>Points</value>
   </data>
   <data name="RevivesLabel.Text" xml:space="preserve">
     <value>Revives</value>
+  </data>
+  <data name="RoundCandidateLabel" xml:space="preserve">
+    <value>Round candidate</value>
   </data>
   <data name="ReadMemoryFailedFormat" xml:space="preserve">
     <value>Unable to read {0} from game memory.</value>
@@ -132,6 +234,18 @@
   <data name="ShortReadFormat" xml:space="preserve">
     <value>Expected to read {0} bytes but read {1} bytes.</value>
   </data>
+  <data name="SecondaryHeadshotsLabel" xml:space="preserve">
+    <value>Secondary headshots</value>
+  </data>
+  <data name="SecondaryKillsLabel" xml:space="preserve">
+    <value>Secondary kills</value>
+  </data>
+  <data name="SpeedFieldLabel" xml:space="preserve">
+    <value>Speed field</value>
+  </data>
+  <data name="TacticalAmmoLabel" xml:space="preserve">
+    <value>Tactical ammo</value>
+  </data>
   <data name="TimersTitle.Text" xml:space="preserve">
     <value>Timers</value>
   </data>
@@ -140,5 +254,26 @@
   </data>
   <data name="UnsupportedStatusWithReasonFormat" xml:space="preserve">
     <value>Unsupported: {0} - {1}</value>
+  </data>
+  <data name="UnavailableValue" xml:space="preserve">
+    <value>Unavailable</value>
+  </data>
+  <data name="VelocityXLabel" xml:space="preserve">
+    <value>Velocity X</value>
+  </data>
+  <data name="VelocityYLabel" xml:space="preserve">
+    <value>Velocity Y</value>
+  </data>
+  <data name="VelocityZLabel" xml:space="preserve">
+    <value>Velocity Z</value>
+  </data>
+  <data name="ViewAngleXLabel" xml:space="preserve">
+    <value>View angle X</value>
+  </data>
+  <data name="ViewAngleYLabel" xml:space="preserve">
+    <value>View angle Y</value>
+  </data>
+  <data name="Zombie0GEntityLabel" xml:space="preserve">
+    <value>Zombie0 GEntity</value>
   </data>
 </root>

@@ -20,15 +20,24 @@ namespace BO2.ViewModels
         private string _downsText = EmptyStatText;
         private string _revivesText = EmptyStatText;
         private string _headshotsText = EmptyStatText;
+        private string _positionXText = EmptyStatText;
+        private string _positionYText = EmptyStatText;
+        private string _positionZText = EmptyStatText;
+        private string _playerCandidateDetailsText = EmptyStatText;
+        private string _ammoCandidateDetailsText = EmptyStatText;
+        private string _counterCandidateDetailsText = EmptyStatText;
+        private string _addressCandidateDetailsText = EmptyStatText;
         private string _detectedGameText = AppStrings.Get("NoGameDetected");
         private string _statusText = AppStrings.Get("GameNotRunning");
         private Visibility _connectedStatusVisibility = Visibility.Collapsed;
         private Visibility _unsupportedStatusVisibility = Visibility.Collapsed;
         private Visibility _disconnectedStatusVisibility = Visibility.Visible;
+        private readonly StatFormatter _formatter;
 
         public MainWindowViewModel(DispatcherQueue dispatcherQueue)
         {
             _dispatcherQueue = dispatcherQueue;
+            _formatter = new StatFormatter(AppStrings.Get("UnavailableValue"));
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -93,6 +102,48 @@ namespace BO2.ViewModels
             private set => SetProperty(ref _headshotsText, value);
         }
 
+        public string PositionXText
+        {
+            get => _positionXText;
+            private set => SetProperty(ref _positionXText, value);
+        }
+
+        public string PositionYText
+        {
+            get => _positionYText;
+            private set => SetProperty(ref _positionYText, value);
+        }
+
+        public string PositionZText
+        {
+            get => _positionZText;
+            private set => SetProperty(ref _positionZText, value);
+        }
+
+        public string PlayerCandidateDetailsText
+        {
+            get => _playerCandidateDetailsText;
+            private set => SetProperty(ref _playerCandidateDetailsText, value);
+        }
+
+        public string AmmoCandidateDetailsText
+        {
+            get => _ammoCandidateDetailsText;
+            private set => SetProperty(ref _ammoCandidateDetailsText, value);
+        }
+
+        public string CounterCandidateDetailsText
+        {
+            get => _counterCandidateDetailsText;
+            private set => SetProperty(ref _counterCandidateDetailsText, value);
+        }
+
+        public string AddressCandidateDetailsText
+        {
+            get => _addressCandidateDetailsText;
+            private set => SetProperty(ref _addressCandidateDetailsText, value);
+        }
+
         public async Task RefreshAsync(CancellationToken cancellationToken)
         {
             try
@@ -120,9 +171,9 @@ namespace BO2.ViewModels
             _memoryReader.Dispose();
         }
 
-        private static string FormatStat(int value)
+        private static string FormatLine(string labelResourceId, string value)
         {
-            return value.ToString("N0");
+            return AppStrings.Format("LabeledValueFormat", AppStrings.Get(labelResourceId), value);
         }
 
         private static async Task RunOnDispatcherAsync(DispatcherQueue dispatcherQueue, Action action, CancellationToken cancellationToken)
@@ -201,11 +252,80 @@ namespace BO2.ViewModels
                 return;
             }
 
-            PointsText = FormatStat(result.Stats.Points);
-            KillsText = FormatStat(result.Stats.Kills);
-            DownsText = FormatStat(result.Stats.Downs);
-            RevivesText = FormatStat(result.Stats.Revives);
-            HeadshotsText = FormatStat(result.Stats.Headshots);
+            PointsText = _formatter.FormatStat(result.Stats.Points);
+            KillsText = _formatter.FormatStat(result.Stats.Kills);
+            DownsText = _formatter.FormatStat(result.Stats.Downs);
+            RevivesText = _formatter.FormatStat(result.Stats.Revives);
+            HeadshotsText = _formatter.FormatStat(result.Stats.Headshots);
+            PositionXText = _formatter.FormatCandidate(result.Stats.Candidates.PositionX);
+            PositionYText = _formatter.FormatCandidate(result.Stats.Candidates.PositionY);
+            PositionZText = _formatter.FormatCandidate(result.Stats.Candidates.PositionZ);
+            PlayerCandidateDetailsText = FormatPlayerCandidateDetails(result.Stats.Candidates);
+            AmmoCandidateDetailsText = FormatAmmoCandidateDetails(result.Stats.Candidates);
+            CounterCandidateDetailsText = FormatCounterCandidateDetails(result.Stats.Candidates);
+            AddressCandidateDetailsText = result.DetectedGame?.AddressMap is PlayerStatAddressMap addressMap
+                ? FormatAddressCandidateDetails(addressMap)
+                : EmptyStatText;
+        }
+
+        private string FormatPlayerCandidateDetails(PlayerCandidateStats candidates)
+        {
+            return string.Join(Environment.NewLine,
+            [
+                FormatLine("VelocityXLabel", _formatter.FormatCandidate(candidates.VelocityX)),
+                FormatLine("VelocityYLabel", _formatter.FormatCandidate(candidates.VelocityY)),
+                FormatLine("VelocityZLabel", _formatter.FormatCandidate(candidates.VelocityZ)),
+                FormatLine("GravityFieldLabel", _formatter.FormatCandidate(candidates.Gravity)),
+                FormatLine("SpeedFieldLabel", _formatter.FormatCandidate(candidates.Speed)),
+                FormatLine("LastJumpHeightLabel", _formatter.FormatCandidate(candidates.LastJumpHeight)),
+                FormatLine("AdsAmountLabel", _formatter.FormatCandidate(candidates.AdsAmount)),
+                FormatLine("ViewAngleXLabel", _formatter.FormatCandidate(candidates.ViewAngleX)),
+                FormatLine("ViewAngleYLabel", _formatter.FormatCandidate(candidates.ViewAngleY)),
+                FormatLine("HeightIntLabel", _formatter.FormatCandidate(candidates.HeightInt)),
+                FormatLine("HeightFloatLabel", _formatter.FormatCandidate(candidates.HeightFloat)),
+                FormatLine("LegacyHealthLabel", _formatter.FormatCandidate(candidates.LegacyHealth)),
+                FormatLine("PlayerInfoHealthLabel", _formatter.FormatCandidate(candidates.PlayerInfoHealth)),
+                FormatLine("GEntityPlayerHealthLabel", _formatter.FormatCandidate(candidates.GEntityPlayerHealth))
+            ]);
+        }
+
+        private string FormatAmmoCandidateDetails(PlayerCandidateStats candidates)
+        {
+            return string.Join(Environment.NewLine,
+            [
+                FormatLine("AmmoSlot0Label", _formatter.FormatCandidate(candidates.AmmoSlot0)),
+                FormatLine("AmmoSlot1Label", _formatter.FormatCandidate(candidates.AmmoSlot1)),
+                FormatLine("LethalAmmoLabel", _formatter.FormatCandidate(candidates.LethalAmmo)),
+                FormatLine("AmmoSlot2Label", _formatter.FormatCandidate(candidates.AmmoSlot2)),
+                FormatLine("TacticalAmmoLabel", _formatter.FormatCandidate(candidates.TacticalAmmo)),
+                FormatLine("AmmoSlot3Label", _formatter.FormatCandidate(candidates.AmmoSlot3)),
+                FormatLine("AmmoSlot4Label", _formatter.FormatCandidate(candidates.AmmoSlot4))
+            ]);
+        }
+
+        private string FormatCounterCandidateDetails(PlayerCandidateStats candidates)
+        {
+            return string.Join(Environment.NewLine,
+            [
+                FormatLine("RoundCandidateLabel", _formatter.FormatCandidate(candidates.Round)),
+                FormatLine("AlternateKillsLabel", _formatter.FormatCandidate(candidates.AlternateKills)),
+                FormatLine("AlternateHeadshotsLabel", _formatter.FormatCandidate(candidates.AlternateHeadshots)),
+                FormatLine("SecondaryKillsLabel", _formatter.FormatCandidate(candidates.SecondaryKills)),
+                FormatLine("SecondaryHeadshotsLabel", _formatter.FormatCandidate(candidates.SecondaryHeadshots))
+            ]);
+        }
+
+        private static string FormatAddressCandidateDetails(PlayerStatAddressMap addressMap)
+        {
+            DerivedPlayerStateAddresses derivedPlayerState = addressMap.DerivedPlayerState;
+            PlayerCandidateAddresses candidates = addressMap.Candidates;
+            return string.Join(Environment.NewLine,
+            [
+                FormatLine("LocalPlayerBaseLabel", StatFormatter.FormatAddress(derivedPlayerState.LocalPlayerBaseAddress)),
+                FormatLine("GEntityArrayLabel", StatFormatter.FormatAddress(candidates.GEntityArrayAddress)),
+                FormatLine("Zombie0GEntityLabel", StatFormatter.FormatAddress(candidates.Zombie0GEntityAddress)),
+                FormatLine("GEntitySizeLabel", StatFormatter.FormatAddress(candidates.GEntitySize))
+            ]);
         }
 
         private void ApplyReadError(string message)
@@ -229,6 +349,13 @@ namespace BO2.ViewModels
             DownsText = EmptyStatText;
             RevivesText = EmptyStatText;
             HeadshotsText = EmptyStatText;
+            PositionXText = EmptyStatText;
+            PositionYText = EmptyStatText;
+            PositionZText = EmptyStatText;
+            PlayerCandidateDetailsText = EmptyStatText;
+            AmmoCandidateDetailsText = EmptyStatText;
+            CounterCandidateDetailsText = EmptyStatText;
+            AddressCandidateDetailsText = EmptyStatText;
         }
 
         private void SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
