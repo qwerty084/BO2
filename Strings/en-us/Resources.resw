@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ConnectedStatusFormat" xml:space="preserve">
+    <value>Connected: {0}</value>
+  </data>
+  <data name="DispatcherQueueFailed" xml:space="preserve">
+    <value>Unable to queue UI update.</value>
+  </data>
+  <data name="DownsLabel.Text" xml:space="preserve">
+    <value>Downs</value>
+  </data>
+  <data name="GameEventsTitle.Text" xml:space="preserve">
+    <value>Game events</value>
+  </data>
+  <data name="GameNotRunning" xml:space="preserve">
+    <value>Game not running</value>
+  </data>
+  <data name="GameTimeLabel.Text" xml:space="preserve">
+    <value>Game time</value>
+  </data>
+  <data name="HeadshotsLabel.Text" xml:space="preserve">
+    <value>Headshots</value>
+  </data>
+  <data name="HomeNavigationItem.Content" xml:space="preserve">
+    <value>Home</value>
+  </data>
+  <data name="KillsLabel.Text" xml:space="preserve">
+    <value>Kills</value>
+  </data>
+  <data name="NavigationHome" xml:space="preserve">
+    <value>Home</value>
+  </data>
+  <data name="NavigationSettings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="NoGameDetected" xml:space="preserve">
+    <value>No game detected</value>
+  </data>
+  <data name="PageTitle.Text" xml:space="preserve">
+    <value>Home</value>
+  </data>
+  <data name="PlayerStatsTitle.Text" xml:space="preserve">
+    <value>Player stats</value>
+  </data>
+  <data name="PointsLabel.Text" xml:space="preserve">
+    <value>Points</value>
+  </data>
+  <data name="RevivesLabel.Text" xml:space="preserve">
+    <value>Revives</value>
+  </data>
+  <data name="RoundTimeLabel.Text" xml:space="preserve">
+    <value>Round time</value>
+  </data>
+  <data name="SettingsDescription.Text" xml:space="preserve">
+    <value>Settings will appear here.</value>
+  </data>
+  <data name="SettingsTitle.Text" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="TimersTitle.Text" xml:space="preserve">
+    <value>Timers</value>
+  </data>
+  <data name="UnsupportedStatusFormat" xml:space="preserve">
+    <value>Unsupported: {0}</value>
+  </data>
+  <data name="UnsupportedStatusWithReasonFormat" xml:space="preserve">
+    <value>Unsupported: {0} - {1}</value>
+  </data>
+</root>

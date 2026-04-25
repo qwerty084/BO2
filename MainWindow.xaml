@@ -23,7 +23,7 @@
         <NavigationView.MenuItems>
             <NavigationViewItem
                 x:Name="HomeNavigationItem"
-                Content="Home"
+                x:Uid="HomeNavigationItem"
                 Tag="home">
                 <NavigationViewItem.Icon>
                     <SymbolIcon Symbol="Home" />
@@ -64,18 +64,18 @@
                 <StackPanel Spacing="28">
                     <TextBlock
                         x:Name="PageTitle"
+                        x:Uid="PageTitle"
                         AutomationProperties.HeadingLevel="Level1"
-                        Style="{ThemeResource TitleLargeTextBlockStyle}"
-                        Text="Home" />
+                        Style="{ThemeResource TitleLargeTextBlockStyle}" />
 
                     <StackPanel
                         x:Name="HomeContent"
                         Spacing="28">
                         <StackPanel Spacing="12">
                             <TextBlock
+                                x:Uid="TimersTitle"
                                 AutomationProperties.HeadingLevel="Level2"
-                                Style="{ThemeResource SubtitleTextBlockStyle}"
-                                Text="Timers" />
+                                Style="{ThemeResource SubtitleTextBlockStyle}" />
                             <Grid
                                 ColumnSpacing="32"
                                 RowSpacing="4">
@@ -88,19 +88,19 @@
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <TextBlock
+                                    x:Uid="GameTimeLabel"
                                     Grid.Row="0"
                                     Grid.Column="0"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="Game time" />
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 <TextBlock
                                     Grid.Row="1"
                                     Grid.Column="0"
                                     Text="--:--:--" />
                                 <TextBlock
+                                    x:Uid="RoundTimeLabel"
                                     Grid.Row="0"
                                     Grid.Column="1"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="Round time" />
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 <TextBlock
                                     Grid.Row="1"
                                     Grid.Column="1"
@@ -110,9 +110,9 @@
 
                         <StackPanel Spacing="12">
                             <TextBlock
+                                x:Uid="PlayerStatsTitle"
                                 AutomationProperties.HeadingLevel="Level2"
-                                Style="{ThemeResource SubtitleTextBlockStyle}"
-                                Text="Player stats" />
+                                Style="{ThemeResource SubtitleTextBlockStyle}" />
                             <Grid
                                 ColumnSpacing="32"
                                 RowSpacing="4">
@@ -129,50 +129,50 @@
                                 </Grid.RowDefinitions>
 
                                 <TextBlock
+                                    x:Uid="PointsLabel"
                                     Grid.Row="0"
                                     Grid.Column="0"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="Points" />
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 <TextBlock
                                     Grid.Row="1"
                                     Grid.Column="0"
                                     Style="{ThemeResource BodyStrongTextBlockStyle}"
                                     Text="{x:Bind ViewModel.PointsText, Mode=OneWay}" />
                                 <TextBlock
+                                    x:Uid="KillsLabel"
                                     Grid.Row="0"
                                     Grid.Column="1"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="Kills" />
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 <TextBlock
                                     Grid.Row="1"
                                     Grid.Column="1"
                                     Style="{ThemeResource BodyStrongTextBlockStyle}"
                                     Text="{x:Bind ViewModel.KillsText, Mode=OneWay}" />
                                 <TextBlock
+                                    x:Uid="DownsLabel"
                                     Grid.Row="0"
                                     Grid.Column="2"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="Downs" />
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 <TextBlock
                                     Grid.Row="1"
                                     Grid.Column="2"
                                     Style="{ThemeResource BodyStrongTextBlockStyle}"
                                     Text="{x:Bind ViewModel.DownsText, Mode=OneWay}" />
                                 <TextBlock
+                                    x:Uid="RevivesLabel"
                                     Grid.Row="0"
                                     Grid.Column="3"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="Revives" />
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 <TextBlock
                                     Grid.Row="1"
                                     Grid.Column="3"
                                     Style="{ThemeResource BodyStrongTextBlockStyle}"
                                     Text="{x:Bind ViewModel.RevivesText, Mode=OneWay}" />
                                 <TextBlock
+                                    x:Uid="HeadshotsLabel"
                                     Grid.Row="0"
                                     Grid.Column="4"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="Headshots" />
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 <TextBlock
                                     Grid.Row="1"
                                     Grid.Column="4"
@@ -183,9 +183,9 @@
 
                         <StackPanel Spacing="12">
                             <TextBlock
+                                x:Uid="GameEventsTitle"
                                 AutomationProperties.HeadingLevel="Level2"
-                                Style="{ThemeResource SubtitleTextBlockStyle}"
-                                Text="Game events" />
+                                Style="{ThemeResource SubtitleTextBlockStyle}" />
                             <TextBlock
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 Text="{x:Bind ViewModel.DetectedGameText, Mode=OneWay}" />
@@ -197,12 +197,12 @@
                         Spacing="12"
                         Visibility="Collapsed">
                         <TextBlock
+                            x:Uid="SettingsTitle"
                             AutomationProperties.HeadingLevel="Level2"
-                            Style="{ThemeResource SubtitleTextBlockStyle}"
-                            Text="Settings" />
+                            Style="{ThemeResource SubtitleTextBlockStyle}" />
                         <TextBlock
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="Settings will appear here." />
+                            x:Uid="SettingsDescription"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </StackPanel>
             </Grid>

@@ -9,7 +9,7 @@ namespace BO2.Services
         public static PlayerStatsReadResult GameNotRunning { get; } = new(
             null,
             null,
-            "Game not running",
+            AppStrings.Get("GameNotRunning"),
             ConnectionState.Disconnected);
     }
 }

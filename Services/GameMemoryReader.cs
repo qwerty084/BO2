@@ -28,10 +28,14 @@ namespace BO2.Services
             if (detectedGame.AddressMap is null)
             {
                 CloseAttachedProcess();
+                string statusText = string.IsNullOrWhiteSpace(detectedGame.UnsupportedReason)
+                    ? AppStrings.Format("UnsupportedStatusFormat", detectedGame.DisplayName)
+                    : AppStrings.Format("UnsupportedStatusWithReasonFormat", detectedGame.DisplayName, detectedGame.UnsupportedReason);
+
                 return new PlayerStatsReadResult(
                     detectedGame,
                     null,
-                    $"Unsupported: {detectedGame.DisplayName}",
+                    statusText,
                     ConnectionState.Unsupported);
             }
 
@@ -50,7 +54,7 @@ namespace BO2.Services
                 return new PlayerStatsReadResult(
                     detectedGame,
                     stats,
-                    $"Connected: {detectedGame.DisplayName}",
+                    AppStrings.Format("ConnectedStatusFormat", detectedGame.DisplayName),
                     ConnectionState.Connected);
             }
             catch
@@ -98,7 +102,9 @@ namespace BO2.Services
 
             if (_processHandle.IsInvalid)
             {
-                throw new Win32Exception(Marshal.GetLastWin32Error(), $"Unable to open {detectedGame.ProcessName}.exe for read-only memory access.");
+                int error = Marshal.GetLastWin32Error();
+                CloseAttachedProcess();
+                throw new Win32Exception(error, $"Unable to open {detectedGame.ProcessName}.exe for read-only memory access.");
             }
 
             _attachedProcessId = detectedGame.ProcessId;

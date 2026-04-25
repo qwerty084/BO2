@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Management;
 using System.Runtime.InteropServices;
 
@@ -8,6 +9,7 @@ namespace BO2.Services
 {
     public sealed class GameProcessDetector
     {
+        private static readonly TimeSpan CommandLineCacheDuration = TimeSpan.FromSeconds(5);
         private static readonly GameProcessDefinition[] Definitions =
         [
             new(
@@ -99,20 +101,27 @@ namespace BO2.Services
             return detectedGames.Find(game => game.IsStatsSupported) ?? (detectedGames.Count > 0 ? detectedGames[0] : null);
         }
 
-        private static bool IsCommandLineMatch(GameProcessDefinition definition, int processId)
+        private bool IsCommandLineMatch(GameProcessDefinition definition, int processId)
         {
             if (definition.CommandLineToken is null)
             {
                 return true;
             }
 
-            string? commandLine = GetCommandLine(processId);
+            string? commandLine = GetCachedCommandLine(processId);
             return commandLine?.Contains(definition.CommandLineToken, System.StringComparison.OrdinalIgnoreCase) == true;
         }
 
+        private readonly Dictionary<int, CommandLineCacheEntry> _commandLineCache = [];
+
         private static string? GetCommandLine(int processId)
         {
-            string query = $"SELECT CommandLine FROM Win32_Process WHERE ProcessId = {processId}";
+            if (processId <= 0)
+            {
+                return null;
+            }
+
+            string query = $"SELECT CommandLine FROM Win32_Process WHERE ProcessId = {processId.ToString(CultureInfo.InvariantCulture)}";
 
             try
             {
@@ -142,5 +151,21 @@ namespace BO2.Services
 
             return null;
         }
+
+        private string? GetCachedCommandLine(int processId)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            if (_commandLineCache.TryGetValue(processId, out CommandLineCacheEntry? cacheEntry)
+                && now - cacheEntry.CachedAt <= CommandLineCacheDuration)
+            {
+                return cacheEntry.CommandLine;
+            }
+
+            string? commandLine = GetCommandLine(processId);
+            _commandLineCache[processId] = new CommandLineCacheEntry(commandLine, now);
+            return commandLine;
+        }
+
+        private sealed record CommandLineCacheEntry(string? CommandLine, DateTimeOffset CachedAt);
     }
 }
