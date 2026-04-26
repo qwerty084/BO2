@@ -78,21 +78,20 @@ namespace BO2.Tests.Services
                 droppedNotifyCount: 0,
                 publishedNotifyCount: 0,
                 eventCount: GameEventMonitor.MaxEventCount + 10);
-            WriteEvent(snapshot, 0, GameEventType.PowerOn, 7, "power_on");
+            WriteEvent(snapshot, 0, GameEventType.StartOfRound, 7, "start_of_round");
             WriteEvent(snapshot, GameEventMonitor.MaxEventCount - 1, GameEventType.EndGame, 8, "end_game");
 
             GameEventMonitorStatus status = GameEventMonitor.DecodeSnapshot(snapshot, DateTimeOffset.UtcNow);
 
             Assert.Equal(2, status.RecentEvents.Count);
-            Assert.Equal(GameEventType.PowerOn, status.RecentEvents[0].EventType);
+            Assert.Equal(GameEventType.StartOfRound, status.RecentEvents[0].EventType);
             Assert.Equal(GameEventType.EndGame, status.RecentEvents[^1].EventType);
         }
 
         [Theory]
+        [InlineData("start_of_round", GameEventType.StartOfRound)]
         [InlineData("end_of_round", GameEventType.EndOfRound)]
-        [InlineData("powerup_grabbed", GameEventType.PowerUpGrabbed)]
-        [InlineData("dog_round_starting", GameEventType.DogRoundStarting)]
-        [InlineData("perk_bought", GameEventType.PerkBought)]
+        [InlineData("end_game", GameEventType.EndGame)]
         [InlineData("round_changed", GameEventType.RoundChanged)]
         [InlineData("points_changed", GameEventType.PointsChanged)]
         [InlineData("kills_changed", GameEventType.KillsChanged)]
@@ -103,12 +102,9 @@ namespace BO2.Tests.Services
         [InlineData("sl_get_string_of_size_candidate", GameEventType.StringResolverCandidate)]
         [InlineData("vm_notify_observed", GameEventType.NotifyObserved)]
         [InlineData("notify_log_opened", GameEventType.NotifyObserved)]
-        [InlineData("weapon_bought", GameEventType.NotifyObserved)]
-        [InlineData("zom_kill", GameEventType.NotifyObserved)]
-        [InlineData("chest_accessed", GameEventType.BoxEvent)]
-        [InlineData("user_grabbed_weapon", GameEventType.BoxEvent)]
-        [InlineData("weapon_grabbed", GameEventType.BoxEvent)]
         [InlineData("randomization_done", GameEventType.BoxEvent)]
+        [InlineData("user_grabbed_weapon", GameEventType.BoxEvent)]
+        [InlineData("chest_accessed", GameEventType.BoxEvent)]
         [InlineData("box_moving", GameEventType.BoxEvent)]
         [InlineData("weapon_fly_away_start", GameEventType.BoxEvent)]
         [InlineData("weapon_fly_away_end", GameEventType.BoxEvent)]
@@ -116,25 +112,38 @@ namespace BO2.Tests.Services
         [InlineData("left", GameEventType.BoxEvent)]
         [InlineData("opened", GameEventType.BoxEvent)]
         [InlineData("closed", GameEventType.BoxEvent)]
-        [InlineData("box_hacked_respin", GameEventType.BoxEvent)]
-        [InlineData("box_hacked_rerespin", GameEventType.BoxEvent)]
-        [InlineData("box_locked", GameEventType.BoxEvent)]
-        [InlineData("locked", GameEventType.BoxEvent)]
-        [InlineData("unlocked", GameEventType.BoxEvent)]
-        [InlineData("box_spin_done", GameEventType.BoxEvent)]
-        [InlineData("zbarrier_state_change", GameEventType.BoxEvent)]
-        [InlineData("kill_chest_think", GameEventType.BoxEvent)]
-        [InlineData("unregister_unitrigger_on_kill_think", GameEventType.BoxEvent)]
-        [InlineData("lid_closed", GameEventType.BoxEvent)]
-        [InlineData("kill_weapon_movement", GameEventType.BoxEvent)]
-        [InlineData("kill_respin_think_thread", GameEventType.BoxEvent)]
-        [InlineData("kill_respin_respin_think_thread", GameEventType.BoxEvent)]
-        [InlineData("mb_hostmigration", GameEventType.BoxEvent)]
-        [InlineData("stop_open_idle", GameEventType.BoxEvent)]
         [InlineData("unknown_notify", GameEventType.Unknown)]
         public void MapEventName_ReturnsExpectedEventType(string notifyName, GameEventType expected)
         {
             Assert.Equal(expected, GameEventMonitor.MapEventName(notifyName));
+        }
+
+        [Theory]
+        [InlineData("powerup_grabbed")]
+        [InlineData("dog_round_starting")]
+        [InlineData("power_on")]
+        [InlineData("perk_bought")]
+        [InlineData("weapon_bought")]
+        [InlineData("zom_kill")]
+        [InlineData("weapon_grabbed")]
+        [InlineData("box_spin_done")]
+        [InlineData("box_hacked_respin")]
+        [InlineData("box_hacked_rerespin")]
+        [InlineData("box_locked")]
+        [InlineData("locked")]
+        [InlineData("unlocked")]
+        [InlineData("zbarrier_state_change")]
+        [InlineData("kill_chest_think")]
+        [InlineData("unregister_unitrigger_on_kill_think")]
+        [InlineData("lid_closed")]
+        [InlineData("kill_weapon_movement")]
+        [InlineData("kill_respin_think_thread")]
+        [InlineData("kill_respin_respin_think_thread")]
+        [InlineData("mb_hostmigration")]
+        [InlineData("stop_open_idle")]
+        public void MapEventName_WhenNotifyWasRemoved_ReturnsUnknown(string notifyName)
+        {
+            Assert.Equal(GameEventType.Unknown, GameEventMonitor.MapEventName(notifyName));
         }
 
         private static byte[] CreateSnapshot(

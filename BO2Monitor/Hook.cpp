@@ -45,43 +45,21 @@ namespace BO2Monitor
             bool ReadRoundValue;
         };
 
-        std::array<ProductionNotifyTarget, 35> productionNotifyTargets =
+        std::array<ProductionNotifyTarget, 13> productionNotifyTargets =
         {
             ProductionNotifyTarget{ "start_of_round", GameEventType::StartOfRound, 0, false, true },
             ProductionNotifyTarget{ "end_of_round", GameEventType::EndOfRound, 0, false, true },
-            ProductionNotifyTarget{ "powerup_grabbed", GameEventType::PowerUpGrabbed, 0, false, false },
-            ProductionNotifyTarget{ "dog_round_starting", GameEventType::DogRoundStarting, 0, false, false },
-            ProductionNotifyTarget{ "power_on", GameEventType::PowerOn, 0, false, false },
             ProductionNotifyTarget{ "end_game", GameEventType::EndGame, 0, false, false },
-            ProductionNotifyTarget{ "perk_bought", GameEventType::PerkBought, 0, false, false },
-            ProductionNotifyTarget{ "weapon_bought", GameEventType::NotifyObserved, 0, false, false },
-            ProductionNotifyTarget{ "zom_kill", GameEventType::NotifyObserved, 0, false, false },
-            ProductionNotifyTarget{ "chest_accessed", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "user_grabbed_weapon", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "weapon_grabbed", GameEventType::BoxEvent, 0, false, false },
             ProductionNotifyTarget{ "randomization_done", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "user_grabbed_weapon", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "chest_accessed", GameEventType::BoxEvent, 0, false, false },
             ProductionNotifyTarget{ "box_moving", GameEventType::BoxEvent, 0, false, false },
             ProductionNotifyTarget{ "weapon_fly_away_start", GameEventType::BoxEvent, 0, false, false },
             ProductionNotifyTarget{ "weapon_fly_away_end", GameEventType::BoxEvent, 0, false, false },
             ProductionNotifyTarget{ "arrived", GameEventType::BoxEvent, 0, false, false },
             ProductionNotifyTarget{ "left", GameEventType::BoxEvent, 0, false, false },
             ProductionNotifyTarget{ "opened", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "closed", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "box_hacked_respin", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "box_hacked_rerespin", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "box_locked", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "locked", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "unlocked", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "box_spin_done", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "zbarrier_state_change", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "kill_chest_think", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "unregister_unitrigger_on_kill_think", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "lid_closed", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "kill_weapon_movement", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "kill_respin_think_thread", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "kill_respin_respin_think_thread", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "mb_hostmigration", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "stop_open_idle", GameEventType::BoxEvent, 0, false, false }
+            ProductionNotifyTarget{ "closed", GameEventType::BoxEvent, 0, false, false }
         };
 
         VmNotifyFunction originalVmNotify = nullptr;

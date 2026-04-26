@@ -141,11 +141,7 @@ namespace BO2.Services
             {
                 "start_of_round" => GameEventType.StartOfRound,
                 "end_of_round" => GameEventType.EndOfRound,
-                "powerup_grabbed" => GameEventType.PowerUpGrabbed,
-                "dog_round_starting" => GameEventType.DogRoundStarting,
-                "power_on" => GameEventType.PowerOn,
                 "end_game" => GameEventType.EndGame,
-                "perk_bought" => GameEventType.PerkBought,
                 "round_changed" => GameEventType.RoundChanged,
                 "points_changed" => GameEventType.PointsChanged,
                 "kills_changed" => GameEventType.KillsChanged,
@@ -156,34 +152,16 @@ namespace BO2.Services
                 "sl_get_string_of_size_candidate" => GameEventType.StringResolverCandidate,
                 "vm_notify_observed" => GameEventType.NotifyObserved,
                 "notify_log_opened" => GameEventType.NotifyObserved,
-                "weapon_bought" => GameEventType.NotifyObserved,
-                "zom_kill" => GameEventType.NotifyObserved,
-                "chest_accessed"
+                "randomization_done"
                     or "user_grabbed_weapon"
-                    or "weapon_grabbed"
-                    or "randomization_done"
+                    or "chest_accessed"
                     or "box_moving"
                     or "weapon_fly_away_start"
                     or "weapon_fly_away_end"
                     or "arrived"
                     or "left"
                     or "opened"
-                    or "closed"
-                    or "box_hacked_respin"
-                    or "box_hacked_rerespin"
-                    or "box_locked"
-                    or "locked"
-                    or "unlocked"
-                    or "box_spin_done"
-                    or "zbarrier_state_change"
-                    or "kill_chest_think"
-                    or "unregister_unitrigger_on_kill_think"
-                    or "lid_closed"
-                    or "kill_weapon_movement"
-                    or "kill_respin_think_thread"
-                    or "kill_respin_respin_think_thread"
-                    or "mb_hostmigration"
-                    or "stop_open_idle" => GameEventType.BoxEvent,
+                    or "closed" => GameEventType.BoxEvent,
                 _ => GameEventType.Unknown
             };
         }

@@ -151,7 +151,7 @@
     <value>Round {0} ({1})</value>
   </data>
   <data name="CurrentRoundLabel.Text" xml:space="preserve">
-    <value>Current round</value>
+    <value>Round/session</value>
   </data>
   <data name="EventMonitorCaptureDisabled" xml:space="preserve">
     <value>Native event capture disabled pending BO2 hook validation</value>
@@ -314,6 +314,9 @@
   </data>
   <data name="RoundTimePlaceholder.Text" xml:space="preserve">
     <value>--:--</value>
+  </data>
+  <data name="RoundSessionEnded" xml:space="preserve">
+    <value>Game over</value>
   </data>
   <data name="SettingsDescription.Text" xml:space="preserve">
     <value>Settings will appear here.</value>

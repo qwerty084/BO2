@@ -427,16 +427,26 @@ namespace BO2.ViewModels
                         gameEvent.StringValue)));
         }
 
-        private static string FormatCurrentRound(GameEventMonitorStatus eventStatus)
+        private static string FormatRoundSession(GameEventMonitorStatus eventStatus)
         {
-            GameEvent? roundEvent = eventStatus.RecentEvents
-                .LastOrDefault(gameEvent => gameEvent.EventType is GameEventType.StartOfRound or GameEventType.EndOfRound);
-            if (roundEvent is null || roundEvent.LevelTime <= 0)
+            GameEvent? sessionEvent = eventStatus.RecentEvents
+                .LastOrDefault(gameEvent => gameEvent.EventType is GameEventType.StartOfRound or GameEventType.EndOfRound or GameEventType.EndGame);
+            if (sessionEvent is null)
             {
                 return EmptyStatText;
             }
 
-            return AppStrings.Format("CurrentRoundFormat", roundEvent.LevelTime, roundEvent.EventName);
+            if (sessionEvent.EventType == GameEventType.EndGame)
+            {
+                return AppStrings.Get("RoundSessionEnded");
+            }
+
+            if (sessionEvent.LevelTime <= 0)
+            {
+                return EmptyStatText;
+            }
+
+            return AppStrings.Format("CurrentRoundFormat", sessionEvent.LevelTime, sessionEvent.EventName);
         }
 
         private static string FormatRecentBoxEvents(GameEventMonitorStatus eventStatus)
@@ -537,7 +547,7 @@ namespace BO2.ViewModels
 
             EventCompatibilityText = AppStrings.Get("GameProcessDetectorDisplayNameSteamZombies");
             EventMonitorStatusText = monitorStatusText;
-            CurrentRoundText = FormatCurrentRound(eventStatus);
+            CurrentRoundText = FormatRoundSession(eventStatus);
             BoxEventsText = FormatRecentBoxEvents(eventStatus);
             RecentGameEventsText = FormatRecentGameEvents(eventStatus);
         }
