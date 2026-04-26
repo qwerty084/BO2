@@ -499,8 +499,7 @@ namespace BO2.ViewModels
                 or DllInjectionState.Loaded
                 or DllInjectionState.MonitorReady
                 or DllInjectionState.PollingFallback
-                or DllInjectionState.UnsupportedVersion
-                or DllInjectionState.Failed;
+                or DllInjectionState.UnsupportedVersion;
         }
 
         private static string FormatInjectionStatus(

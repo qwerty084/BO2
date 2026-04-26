@@ -15,8 +15,9 @@ namespace BO2.Services
         private const string StartMonitorExportName = "StartMonitor";
         private const ushort ImageFileMachineI386 = 0x014c;
         private const uint DontResolveDllReferences = 0x00000001;
-        private const uint Infinite = 0xffffffff;
         private const uint WaitObject0 = 0;
+        private const uint WaitTimeout = 0x00000102;
+        private const uint RemoteThreadTimeoutMilliseconds = 15000;
         private const uint MemCommit = 0x00001000;
         private const uint MemReserve = 0x00002000;
         private const uint MemRelease = 0x00008000;
@@ -300,9 +301,15 @@ namespace BO2.Services
                     throw CreateWin32Exception("CreateRemoteThread");
                 }
 
-                uint waitResult = WaitForSingleObject(threadHandle, Infinite);
+                uint waitResult = WaitForSingleObject(threadHandle, RemoteThreadTimeoutMilliseconds);
                 if (waitResult != WaitObject0)
                 {
+                    if (waitResult == WaitTimeout)
+                    {
+                        // The remote loader thread may still read this buffer after our wait expires.
+                        remotePathAddress = IntPtr.Zero;
+                    }
+
                     throw new InvalidOperationException(AppStrings.Format("DllInjectionWaitFailedFormat", waitResult));
                 }
 
@@ -352,7 +359,7 @@ namespace BO2.Services
 
             try
             {
-                uint waitResult = WaitForSingleObject(threadHandle, Infinite);
+                uint waitResult = WaitForSingleObject(threadHandle, RemoteThreadTimeoutMilliseconds);
                 if (waitResult != WaitObject0)
                 {
                     throw new InvalidOperationException(AppStrings.Format("DllInjectionStartFailedFormat", waitResult));
