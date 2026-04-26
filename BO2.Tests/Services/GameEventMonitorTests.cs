@@ -146,7 +146,6 @@ namespace BO2.Tests.Services
         [InlineData("weapon_fly_away_end", GameEventType.BoxEvent)]
         [InlineData("arrived", GameEventType.BoxEvent)]
         [InlineData("left", GameEventType.BoxEvent)]
-        [InlineData("opened", GameEventType.BoxEvent)]
         [InlineData("closed", GameEventType.BoxEvent)]
         [InlineData("unknown_notify", GameEventType.Unknown)]
         public void MapEventName_ReturnsExpectedEventType(string notifyName, GameEventType expected)

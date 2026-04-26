@@ -212,7 +212,6 @@ namespace BO2.Services
                     or "weapon_fly_away_end"
                     or "arrived"
                     or "left"
-                    or "opened"
                     or "closed" => GameEventType.BoxEvent,
                 _ => GameEventType.Unknown
             };
