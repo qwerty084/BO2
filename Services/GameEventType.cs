@@ -17,6 +17,7 @@ namespace BO2.Services
         NotifyCandidateRejected,
         NotifyEntryCandidate,
         StringResolverCandidate,
-        NotifyObserved
+        NotifyObserved,
+        BoxEvent
     }
 }

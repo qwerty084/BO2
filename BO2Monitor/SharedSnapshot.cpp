@@ -68,44 +68,65 @@ namespace BO2Monitor
             return;
         }
 
+        BeginSnapshotWrite();
         snapshot_->CompatibilityState = compatibilityState;
+        EndSnapshotWrite();
         if (eventHandle_ != nullptr)
         {
             SetEvent(eventHandle_);
         }
     }
 
-    void SharedSnapshotWriter::PublishEvent(GameEventType eventType, const char* eventName, std::int32_t levelTime)
+    void SharedSnapshotWriter::SetNotifyEventCounters(std::uint32_t droppedNotifyCount, std::uint32_t publishedNotifyCount)
+    {
+        if (snapshot_ == nullptr)
+        {
+            return;
+        }
+
+        BeginSnapshotWrite();
+        snapshot_->DroppedNotifyCount = droppedNotifyCount;
+        snapshot_->PublishedNotifyCount = publishedNotifyCount;
+        EndSnapshotWrite();
+    }
+
+    void SharedSnapshotWriter::PublishEvent(
+        GameEventType eventType,
+        const char* eventName,
+        std::int32_t levelTime,
+        std::uint32_t ownerId,
+        std::uint32_t stringValue)
     {
         if (snapshot_ == nullptr || eventName == nullptr)
         {
             return;
         }
 
-        std::uint32_t slot = snapshot_->EventCount;
-        if (snapshot_->EventCount == MaxEventCount)
-        {
-            for (std::size_t index = 1; index < MaxEventCount; ++index)
-            {
-                snapshot_->Events[index - 1] = snapshot_->Events[index];
-            }
-
-            slot = static_cast<std::uint32_t>(MaxEventCount - 1);
-            ++snapshot_->DroppedEventCount;
-        }
-        else
-        {
-            ++snapshot_->EventCount;
-        }
+        BeginSnapshotWrite();
+        std::uint32_t slot = snapshot_->EventWriteIndex;
 
         GameEventRecord& record = snapshot_->Events[slot];
         record.EventType = eventType;
         record.LevelTime = levelTime;
+        record.OwnerId = ownerId;
+        record.StringValue = stringValue;
         std::memset(record.EventName, 0, sizeof(record.EventName));
         const std::size_t sourceLength = std::strlen(eventName);
         const std::size_t copyLength = std::min(sourceLength, MaxEventNameBytes - 1);
         std::memcpy(record.EventName, eventName, copyLength);
 
+        snapshot_->EventWriteIndex = (snapshot_->EventWriteIndex + 1) % MaxEventCount;
+
+        if (snapshot_->EventCount < MaxEventCount)
+        {
+            ++snapshot_->EventCount;
+        }
+        else
+        {
+            ++snapshot_->DroppedEventCount;
+        }
+
+        EndSnapshotWrite();
         if (eventHandle_ != nullptr)
         {
             SetEvent(eventHandle_);
@@ -118,5 +139,18 @@ namespace BO2Monitor
         snapshot_->Magic = SnapshotMagic;
         snapshot_->Version = SnapshotVersion;
         snapshot_->CompatibilityState = GameCompatibilityState::WaitingForMonitor;
+        snapshot_->WriteSequence = 0;
+    }
+
+    void SharedSnapshotWriter::BeginSnapshotWrite()
+    {
+        ++snapshot_->WriteSequence;
+        MemoryBarrier();
+    }
+
+    void SharedSnapshotWriter::EndSnapshotWrite()
+    {
+        MemoryBarrier();
+        ++snapshot_->WriteSequence;
     }
 }

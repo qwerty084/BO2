@@ -21,11 +21,8 @@ namespace
             return 0;
         }
 
-        while (true)
-        {
-            BO2Monitor::ResolveObservedNotifyNames(*snapshotWriter);
-            Sleep(1000);
-        }
+        BO2Monitor::RunNotifyEventWorker(*snapshotWriter);
+        return 0;
     }
 }
 

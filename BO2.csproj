@@ -64,10 +64,19 @@
     <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
   </PropertyGroup>
 
-  <Target Name="CopyBO2MonitorDll" AfterTargets="Build" Condition="'$(Platform)' == 'x86'">
+  <Target Name="BuildBO2MonitorDll" BeforeTargets="CopyBO2MonitorDll" Condition="'$(Platform)'!='ARM64'">
+    <MSBuild
+      Projects="$(MSBuildProjectDirectory)\BO2Monitor\BO2Monitor.vcxproj"
+      Targets="Build"
+      Properties="Configuration=Production;Platform=Win32;EnableVmNotifyHook=true" />
+  </Target>
+
+  <Target Name="CopyBO2MonitorDll" AfterTargets="Build">
     <ItemGroup>
-      <BO2MonitorDll Include="$(MSBuildProjectDirectory)\BO2Monitor\bin\Win32\$(Configuration)\BO2Monitor.dll" Condition="Exists('$(MSBuildProjectDirectory)\BO2Monitor\bin\Win32\$(Configuration)\BO2Monitor.dll')" />
+      <BO2MonitorDll Include="$(MSBuildProjectDirectory)\BO2Monitor\bin\Win32\Production\BO2Monitor.dll" Condition="Exists('$(MSBuildProjectDirectory)\BO2Monitor\bin\Win32\Production\BO2Monitor.dll')" />
+      <BO2MonitorDll Include="$(MSBuildProjectDirectory)\BO2Monitor\bin\Win32\$(Configuration)\BO2Monitor.dll" Condition="!Exists('$(MSBuildProjectDirectory)\BO2Monitor\bin\Win32\Production\BO2Monitor.dll') and Exists('$(MSBuildProjectDirectory)\BO2Monitor\bin\Win32\$(Configuration)\BO2Monitor.dll')" />
     </ItemGroup>
     <Copy SourceFiles="@(BO2MonitorDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(BO2MonitorDll)" DestinationFolder="$(OutDir)AppX\" SkipUnchangedFiles="true" Condition="Exists('$(OutDir)AppX')" />
   </Target>
 </Project>

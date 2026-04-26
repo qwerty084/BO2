@@ -310,6 +310,8 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
 
                                 <TextBlock
@@ -353,12 +355,32 @@
                                     Text="{x:Bind ViewModel.EventMonitorStatusText, Mode=OneWay}"
                                     TextWrapping="Wrap" />
                                 <TextBlock
-                                    x:Uid="RecentEventsLabel"
+                                    x:Uid="CurrentRoundLabel"
                                     Grid.Row="4"
                                     Grid.Column="0"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 <TextBlock
                                     Grid.Row="4"
+                                    Grid.Column="1"
+                                    Text="{x:Bind ViewModel.CurrentRoundText, Mode=OneWay}"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    x:Uid="BoxEventsLabel"
+                                    Grid.Row="5"
+                                    Grid.Column="0"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    Grid.Row="5"
+                                    Grid.Column="1"
+                                    Text="{x:Bind ViewModel.BoxEventsText, Mode=OneWay}"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    x:Uid="RecentEventsLabel"
+                                    Grid.Row="6"
+                                    Grid.Column="0"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    Grid.Row="6"
                                     Grid.Column="1"
                                     Text="{x:Bind ViewModel.RecentGameEventsText, Mode=OneWay}"
                                     TextWrapping="Wrap" />

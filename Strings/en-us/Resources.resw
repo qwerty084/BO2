@@ -88,7 +88,7 @@
     <value>Remote loader wait failed with result {0}</value>
   </data>
   <data name="DllInjectionWrongArchitecture" xml:space="preserve">
-    <value>Run the x86 app build to inject the 32-bit BO2 monitor</value>
+    <value>Unable to start the 32-bit helper for BO2Monitor injection</value>
   </data>
   <data name="GameProcessDetectorDisplayNamePlutoniumMultiplayer" xml:space="preserve">
     <value>Plutonium Multiplayer</value>
@@ -141,6 +141,18 @@
   <data name="EventCompatibilityLabel.Text" xml:space="preserve">
     <value>Compatibility</value>
   </data>
+  <data name="BoxEventFormat" xml:space="preserve">
+    <value>{0} - {1} (owner {2}, id {3})</value>
+  </data>
+  <data name="BoxEventsLabel.Text" xml:space="preserve">
+    <value>Box events</value>
+  </data>
+  <data name="CurrentRoundFormat" xml:space="preserve">
+    <value>Round {0} ({1})</value>
+  </data>
+  <data name="CurrentRoundLabel.Text" xml:space="preserve">
+    <value>Current round</value>
+  </data>
   <data name="EventMonitorCaptureDisabled" xml:space="preserve">
     <value>Native event capture disabled pending BO2 hook validation</value>
   </data>
@@ -152,6 +164,12 @@
   </data>
   <data name="EventMonitorDroppedEventsFormat" xml:space="preserve">
     <value>{0} ({1} dropped events)</value>
+  </data>
+  <data name="EventMonitorCaptureDropsFormat" xml:space="preserve">
+    <value>{0} ({1} summary drops, {2} notify drops, {3} published)</value>
+  </data>
+  <data name="EventMonitorPublishedEventsFormat" xml:space="preserve">
+    <value>{0} ({1} notifies published)</value>
   </data>
   <data name="EventMonitorStatusLabel.Text" xml:space="preserve">
     <value>Monitor status</value>
@@ -277,7 +295,7 @@
     <value>Revives</value>
   </data>
   <data name="RecentEventFormat" xml:space="preserve">
-    <value>{0} - {1} ({2}, value {3})</value>
+    <value>{0} - {1} ({2}, value {3}, owner {4}, id {5})</value>
   </data>
   <data name="RecentEventsEmpty" xml:space="preserve">
     <value>No events received</value>

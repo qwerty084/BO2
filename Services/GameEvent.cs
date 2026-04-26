@@ -6,5 +6,7 @@ namespace BO2.Services
         GameEventType EventType,
         string EventName,
         int LevelTime,
+        uint OwnerId,
+        uint StringValue,
         DateTimeOffset ReceivedAt);
 }

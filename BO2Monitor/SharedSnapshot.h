@@ -9,7 +9,7 @@ namespace BO2Monitor
     constexpr wchar_t SharedMemoryName[] = L"BO2MonitorSharedMem";
     constexpr wchar_t EventHandleName[] = L"BO2MonitorEvent";
     constexpr std::uint32_t SnapshotMagic = 0x45324F42; // BO2E
-    constexpr std::uint32_t SnapshotVersion = 1;
+    constexpr std::uint32_t SnapshotVersion = 4;
     constexpr std::size_t MaxEventCount = 128;
     constexpr std::size_t MaxEventNameBytes = 64;
 
@@ -40,7 +40,8 @@ namespace BO2Monitor
         NotifyCandidateRejected = 12,
         NotifyEntryCandidate = 13,
         StringResolverCandidate = 14,
-        NotifyObserved = 15
+        NotifyObserved = 15,
+        BoxEvent = 16
     };
 
 #pragma pack(push, 1)
@@ -48,6 +49,8 @@ namespace BO2Monitor
     {
         GameEventType EventType;
         std::int32_t LevelTime;
+        std::uint32_t OwnerId;
+        std::uint32_t StringValue;
         char EventName[MaxEventNameBytes];
     };
 
@@ -56,15 +59,18 @@ namespace BO2Monitor
         std::uint32_t Magic;
         std::uint32_t Version;
         GameCompatibilityState CompatibilityState;
-        std::uint32_t Reserved;
+        std::uint32_t EventWriteIndex;
         std::uint32_t DroppedEventCount;
         std::uint32_t EventCount;
+        std::uint32_t DroppedNotifyCount;
+        std::uint32_t PublishedNotifyCount;
+        std::uint32_t WriteSequence;
         GameEventRecord Events[MaxEventCount];
     };
 #pragma pack(pop)
 
-    static_assert(sizeof(GameEventRecord) == 72);
-    static_assert(sizeof(SharedSnapshot) == 9240);
+    static_assert(sizeof(GameEventRecord) == 80);
+    static_assert(sizeof(SharedSnapshot) == 10276);
 
     class SharedSnapshotWriter
     {
@@ -76,10 +82,18 @@ namespace BO2Monitor
 
         bool Initialize();
         void SetCompatibility(GameCompatibilityState compatibilityState);
-        void PublishEvent(GameEventType eventType, const char* eventName, std::int32_t levelTime);
+        void SetNotifyEventCounters(std::uint32_t droppedNotifyCount, std::uint32_t publishedNotifyCount);
+        void PublishEvent(
+            GameEventType eventType,
+            const char* eventName,
+            std::int32_t levelTime,
+            std::uint32_t ownerId = 0,
+            std::uint32_t stringValue = 0);
 
     private:
         void InitializeSnapshot();
+        void BeginSnapshotWrite();
+        void EndSnapshotWrite();
 
         HANDLE mappingHandle_ = nullptr;
         HANDLE eventHandle_ = nullptr;

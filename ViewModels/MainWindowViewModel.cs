@@ -36,6 +36,8 @@ namespace BO2.ViewModels
         private string _eventCompatibilityText = AppStrings.Get("NoGameDetected");
         private string _injectionStatusText = AppStrings.Get("DllInjectionNotAttempted");
         private string _eventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForMonitor");
+        private string _currentRoundText = EmptyStatText;
+        private string _boxEventsText = AppStrings.Get("RecentEventsEmpty");
         private string _recentGameEventsText = AppStrings.Get("RecentEventsEmpty");
         private string _statusText = AppStrings.Get("GameNotRunning");
         private Visibility _connectedStatusVisibility = Visibility.Collapsed;
@@ -91,6 +93,18 @@ namespace BO2.ViewModels
         {
             get => _recentGameEventsText;
             private set => SetProperty(ref _recentGameEventsText, value);
+        }
+
+        public string CurrentRoundText
+        {
+            get => _currentRoundText;
+            private set => SetProperty(ref _currentRoundText, value);
+        }
+
+        public string BoxEventsText
+        {
+            get => _boxEventsText;
+            private set => SetProperty(ref _boxEventsText, value);
         }
 
         public Visibility ConnectedStatusVisibility
@@ -402,13 +416,48 @@ namespace BO2.ViewModels
             return string.Join(
                 Environment.NewLine,
                 eventStatus.RecentEvents
-                    .Take(6)
+                    .TakeLast(6)
                     .Select(gameEvent => AppStrings.Format(
                         "RecentEventFormat",
                         gameEvent.ReceivedAt.ToLocalTime().ToString("HH:mm:ss"),
                         gameEvent.EventType,
                         gameEvent.EventName,
-                        gameEvent.LevelTime)));
+                        gameEvent.LevelTime,
+                        gameEvent.OwnerId,
+                        gameEvent.StringValue)));
+        }
+
+        private static string FormatCurrentRound(GameEventMonitorStatus eventStatus)
+        {
+            GameEvent? roundEvent = eventStatus.RecentEvents
+                .LastOrDefault(gameEvent => gameEvent.EventType is GameEventType.StartOfRound or GameEventType.EndOfRound);
+            if (roundEvent is null || roundEvent.LevelTime <= 0)
+            {
+                return EmptyStatText;
+            }
+
+            return AppStrings.Format("CurrentRoundFormat", roundEvent.LevelTime, roundEvent.EventName);
+        }
+
+        private static string FormatRecentBoxEvents(GameEventMonitorStatus eventStatus)
+        {
+            GameEvent[] boxEvents = eventStatus.RecentEvents
+                .Where(gameEvent => gameEvent.EventType == GameEventType.BoxEvent)
+                .TakeLast(6)
+                .ToArray();
+            if (boxEvents.Length == 0)
+            {
+                return AppStrings.Get("RecentEventsEmpty");
+            }
+
+            return string.Join(
+                Environment.NewLine,
+                boxEvents.Select(gameEvent => AppStrings.Format(
+                    "BoxEventFormat",
+                    gameEvent.ReceivedAt.ToLocalTime().ToString("HH:mm:ss"),
+                    gameEvent.EventName,
+                    gameEvent.OwnerId,
+                    gameEvent.StringValue)));
         }
 
         private DllInjectionResult EnsureMonitorInjected(DetectedGame? detectedGame)
@@ -450,6 +499,8 @@ namespace BO2.ViewModels
             {
                 EventCompatibilityText = AppStrings.Get("NoGameDetected");
                 EventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForMonitor");
+                CurrentRoundText = EmptyStatText;
+                BoxEventsText = AppStrings.Get("RecentEventsEmpty");
                 RecentGameEventsText = AppStrings.Get("RecentEventsEmpty");
                 return;
             }
@@ -460,21 +511,34 @@ namespace BO2.ViewModels
                     "EventMonitorUnsupportedGameFormat",
                     readResult.DetectedGame.DisplayName);
                 EventMonitorStatusText = AppStrings.Get("EventMonitorCaptureDisabled");
+                CurrentRoundText = EmptyStatText;
+                BoxEventsText = AppStrings.Get("RecentEventsEmpty");
                 RecentGameEventsText = AppStrings.Get("RecentEventsEmpty");
                 return;
             }
 
             string monitorStatusText = FormatEventCompatibility(eventStatus.CompatibilityState);
-            if (eventStatus.DroppedEventCount > 0)
+            if (eventStatus.DroppedEventCount > 0 || eventStatus.DroppedNotifyCount > 0)
             {
                 monitorStatusText = AppStrings.Format(
-                    "EventMonitorDroppedEventsFormat",
+                    "EventMonitorCaptureDropsFormat",
                     monitorStatusText,
-                    eventStatus.DroppedEventCount);
+                    eventStatus.DroppedEventCount,
+                    eventStatus.DroppedNotifyCount,
+                    eventStatus.PublishedNotifyCount);
+            }
+            else if (eventStatus.PublishedNotifyCount > 0)
+            {
+                monitorStatusText = AppStrings.Format(
+                    "EventMonitorPublishedEventsFormat",
+                    monitorStatusText,
+                    eventStatus.PublishedNotifyCount);
             }
 
             EventCompatibilityText = AppStrings.Get("GameProcessDetectorDisplayNameSteamZombies");
             EventMonitorStatusText = monitorStatusText;
+            CurrentRoundText = FormatCurrentRound(eventStatus);
+            BoxEventsText = FormatRecentBoxEvents(eventStatus);
             RecentGameEventsText = FormatRecentGameEvents(eventStatus);
         }
 
@@ -484,6 +548,8 @@ namespace BO2.ViewModels
             EventCompatibilityText = AppStrings.Get("NoGameDetected");
             InjectionStatusText = AppStrings.Get("DllInjectionNotAttempted");
             EventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForMonitor");
+            CurrentRoundText = EmptyStatText;
+            BoxEventsText = AppStrings.Get("RecentEventsEmpty");
             RecentGameEventsText = AppStrings.Get("RecentEventsEmpty");
             StatusText = message;
             SetConnectionState(ConnectionState.Disconnected);

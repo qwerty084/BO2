@@ -4,8 +4,7 @@
 
 namespace BO2Monitor
 {
-    GameEventType MapNotifyName(const char* notifyName);
     GameCompatibilityState TryInstallNotifyHook(SharedSnapshotWriter& snapshotWriter);
-    void ResolveObservedNotifyNames(SharedSnapshotWriter& snapshotWriter);
+    void RunNotifyEventWorker(SharedSnapshotWriter& snapshotWriter);
     void RunPollingFallback(SharedSnapshotWriter& snapshotWriter);
 }

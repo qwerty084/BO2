@@ -43,5 +43,20 @@ namespace BO2.Tests.Services
 
             Assert.Equal(expectedPath, actualPath);
         }
+
+        [Fact]
+        public void ResolveWow64PowerShellPath_UsesWindowsDirectory()
+        {
+            string expectedPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                "SysWOW64",
+                "WindowsPowerShell",
+                "v1.0",
+                "powershell.exe");
+
+            string actualPath = DllInjector.ResolveWow64PowerShellPath();
+
+            Assert.Equal(expectedPath, actualPath);
+        }
     }
 }

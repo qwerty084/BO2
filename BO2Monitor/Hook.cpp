@@ -1,7 +1,11 @@
 #include "Hook.h"
+#include "NotifyLog.h"
 
 #include <Windows.h>
+#include <algorithm>
+#include <array>
 #include <cstring>
+#include <limits>
 
 namespace BO2Monitor
 {
@@ -27,98 +31,64 @@ namespace BO2Monitor
         constexpr std::uintptr_t PointsAddress = 0x0234C068;
         constexpr std::uintptr_t KillsAddress = 0x0234C080;
         constexpr std::uintptr_t DownsAddress = 0x0234C084;
-        constexpr std::uintptr_t ScriptStringPoolStart = 0x02C20000;
-        constexpr std::uintptr_t ScriptStringPoolEnd = 0x02C80000;
         constexpr std::uint8_t JumpInstruction = 0xE9;
-        constexpr std::size_t MaxObservedNotifyIds = 128;
-        constexpr std::size_t MaxResolvedNameBytes = 64;
 
         using VmNotifyFunction = void(__cdecl*)(std::int32_t, unsigned int, unsigned int, void*);
         using SlGetStringOfSizeFunction = unsigned int(__cdecl*)(const char*, std::int32_t, unsigned int, std::int32_t);
 
-        struct KnownNotifyName
-        {
-            const char* Name;
-            GameEventType EventType;
-        };
-
-        struct KnownNotifyId
+        struct ProductionNotifyTarget
         {
             const char* Name;
             GameEventType EventType;
             unsigned int StringValue;
+            bool Resolved;
+            bool ReadRoundValue;
         };
 
-        constexpr std::array<KnownNotifyName, 50> KnownNotifyNames =
+        std::array<ProductionNotifyTarget, 35> productionNotifyTargets =
         {
-            KnownNotifyName{ "start_of_round", GameEventType::StartOfRound },
-            KnownNotifyName{ "end_of_round", GameEventType::EndOfRound },
-            KnownNotifyName{ "powerup_grabbed", GameEventType::PowerUpGrabbed },
-            KnownNotifyName{ "dog_round_starting", GameEventType::DogRoundStarting },
-            KnownNotifyName{ "power_on", GameEventType::PowerOn },
-            KnownNotifyName{ "end_game", GameEventType::EndGame },
-            KnownNotifyName{ "perk_bought", GameEventType::PerkBought },
-            KnownNotifyName{ "zombie_death", GameEventType::NotifyObserved },
-            KnownNotifyName{ "zombie_death_no_headshot", GameEventType::NotifyObserved },
-            KnownNotifyName{ "zombie_death_headshot", GameEventType::NotifyObserved },
-            KnownNotifyName{ "zombies_multikilled", GameEventType::NotifyObserved },
-            KnownNotifyName{ "last_headshot_kill_time", GameEventType::NotifyObserved },
-            KnownNotifyName{ "multikill_headshots", GameEventType::NotifyObserved },
-            KnownNotifyName{ "zombie_powerup_insta_kill_ug_on", GameEventType::NotifyObserved },
-            KnownNotifyName{ "kill_insta_kill_upgrade_hud_icon", GameEventType::NotifyObserved },
-            KnownNotifyName{ "player_failed_revive", GameEventType::NotifyObserved },
-            KnownNotifyName{ "death", GameEventType::NotifyObserved },
-            KnownNotifyName{ "deaths", GameEventType::NotifyObserved },
-            KnownNotifyName{ "death_anim", GameEventType::NotifyObserved },
-            KnownNotifyName{ "death_normal", GameEventType::NotifyObserved },
-            KnownNotifyName{ "death_torso", GameEventType::NotifyObserved },
-            KnownNotifyName{ "death_neck", GameEventType::NotifyObserved },
-            KnownNotifyName{ "death_head", GameEventType::NotifyObserved },
-            KnownNotifyName{ "death_melee", GameEventType::NotifyObserved },
-            KnownNotifyName{ "death_out", GameEventType::NotifyObserved },
-            KnownNotifyName{ "death_in", GameEventType::NotifyObserved },
-            KnownNotifyName{ "death_fx", GameEventType::NotifyObserved },
-            KnownNotifyName{ "death_high", GameEventType::NotifyObserved },
-            KnownNotifyName{ "death_throe_zm", GameEventType::NotifyObserved },
-            KnownNotifyName{ "death_self_zm", GameEventType::NotifyObserved },
-            KnownNotifyName{ "death_crawl", GameEventType::NotifyObserved },
-            KnownNotifyName{ "death_fall", GameEventType::NotifyObserved },
-            KnownNotifyName{ "kill", GameEventType::NotifyObserved },
-            KnownNotifyName{ "killed", GameEventType::NotifyObserved },
-            KnownNotifyName{ "kills", GameEventType::NotifyObserved },
-            KnownNotifyName{ "kill_time", GameEventType::NotifyObserved },
-            KnownNotifyName{ "kill_headshots", GameEventType::NotifyObserved },
-            KnownNotifyName{ "kill_zombies", GameEventType::NotifyObserved },
-            KnownNotifyName{ "kill_on", GameEventType::NotifyObserved },
-            KnownNotifyName{ "kill_loop", GameEventType::NotifyObserved },
-            KnownNotifyName{ "kill_ug", GameEventType::NotifyObserved },
-            KnownNotifyName{ "kill_ug_on", GameEventType::NotifyObserved },
-            KnownNotifyName{ "kill_ug_time", GameEventType::NotifyObserved },
-            KnownNotifyName{ "kill_over", GameEventType::NotifyObserved },
-            KnownNotifyName{ "killed_players", GameEventType::NotifyObserved },
-            KnownNotifyName{ "zom_kill", GameEventType::NotifyObserved },
-            KnownNotifyName{ "melee_kill", GameEventType::NotifyObserved },
-            KnownNotifyName{ "pers_player_zombie_kill", GameEventType::NotifyObserved },
-            KnownNotifyName{ "zombie_grenade_death", GameEventType::NotifyObserved },
-            KnownNotifyName{ "killed", GameEventType::NotifyObserved }
+            ProductionNotifyTarget{ "start_of_round", GameEventType::StartOfRound, 0, false, true },
+            ProductionNotifyTarget{ "end_of_round", GameEventType::EndOfRound, 0, false, true },
+            ProductionNotifyTarget{ "powerup_grabbed", GameEventType::PowerUpGrabbed, 0, false, false },
+            ProductionNotifyTarget{ "dog_round_starting", GameEventType::DogRoundStarting, 0, false, false },
+            ProductionNotifyTarget{ "power_on", GameEventType::PowerOn, 0, false, false },
+            ProductionNotifyTarget{ "end_game", GameEventType::EndGame, 0, false, false },
+            ProductionNotifyTarget{ "perk_bought", GameEventType::PerkBought, 0, false, false },
+            ProductionNotifyTarget{ "weapon_bought", GameEventType::NotifyObserved, 0, false, false },
+            ProductionNotifyTarget{ "zom_kill", GameEventType::NotifyObserved, 0, false, false },
+            ProductionNotifyTarget{ "chest_accessed", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "user_grabbed_weapon", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "weapon_grabbed", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "randomization_done", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "box_moving", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "weapon_fly_away_start", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "weapon_fly_away_end", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "arrived", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "left", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "opened", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "closed", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "box_hacked_respin", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "box_hacked_rerespin", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "box_locked", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "locked", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "unlocked", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "box_spin_done", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "zbarrier_state_change", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "kill_chest_think", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "unregister_unitrigger_on_kill_think", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "lid_closed", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "kill_weapon_movement", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "kill_respin_think_thread", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "kill_respin_respin_think_thread", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "mb_hostmigration", GameEventType::BoxEvent, 0, false, false },
+            ProductionNotifyTarget{ "stop_open_idle", GameEventType::BoxEvent, 0, false, false }
         };
 
-        SharedSnapshotWriter* activeSnapshotWriter = nullptr;
         VmNotifyFunction originalVmNotify = nullptr;
-        unsigned int lastObservedStringValue = 0;
-        DWORD lastObservedAt = 0;
-        DWORD lastPublishedNotifyAt = 0;
-        std::array<unsigned int, MaxObservedNotifyIds> observedStringValues{};
-        std::size_t observedStringValueCount = 0;
-        std::array<unsigned int, MaxObservedNotifyIds> resolverAttemptedStringValues{};
-        std::size_t resolverAttemptedStringValueCount = 0;
-        std::array<unsigned int, MaxObservedNotifyIds> resolvedStringValues{};
-        std::size_t resolvedStringValueCount = 0;
-        std::array<KnownNotifyId, KnownNotifyNames.size()> knownNotifyIds{};
-        std::size_t knownNotifyIdCount = 0;
 
         bool BytesMatch(const std::uint8_t* address, const std::uint8_t* expected, std::size_t expectedLength);
         bool IsExecutableAddress(const void* address);
+        bool CanReadAddress(const void* address);
 
         bool HasValidatedVmNotifyAddress()
         {
@@ -134,108 +104,17 @@ namespace BO2Monitor
 #endif
         }
 
-        bool HasObservedStringValue(unsigned int stringValue)
+        const ProductionNotifyTarget* FindProductionNotifyTarget(unsigned int stringValue)
         {
-            for (std::size_t index = 0; index < observedStringValueCount; ++index)
+            for (const ProductionNotifyTarget& target : productionNotifyTargets)
             {
-                if (observedStringValues[index] == stringValue)
+                if (target.Resolved && target.StringValue == stringValue)
                 {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        bool RememberStringValue(unsigned int stringValue)
-        {
-            if (observedStringValueCount >= observedStringValues.size())
-            {
-                return false;
-            }
-
-            observedStringValues[observedStringValueCount] = stringValue;
-            ++observedStringValueCount;
-            return true;
-        }
-
-        bool ContainsValue(const std::array<unsigned int, MaxObservedNotifyIds>& values, std::size_t count, unsigned int value)
-        {
-            for (std::size_t index = 0; index < count; ++index)
-            {
-                if (values[index] == value)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        bool TryRememberValue(std::array<unsigned int, MaxObservedNotifyIds>& values, std::size_t& count, unsigned int value)
-        {
-            if (ContainsValue(values, count, value))
-            {
-                return true;
-            }
-
-            if (count >= values.size())
-            {
-                return false;
-            }
-
-            values[count] = value;
-            ++count;
-            return true;
-        }
-
-        const KnownNotifyId* FindKnownNotifyById(unsigned int stringValue)
-        {
-            for (std::size_t index = 0; index < knownNotifyIdCount; ++index)
-            {
-                if (knownNotifyIds[index].StringValue == stringValue)
-                {
-                    return &knownNotifyIds[index];
+                    return &target;
                 }
             }
 
             return nullptr;
-        }
-
-        bool IsScriptNameCharacter(char value)
-        {
-            return (value >= 'a' && value <= 'z')
-                || (value >= '0' && value <= '9')
-                || value == '_';
-        }
-
-        bool TryReadScriptName(const char* candidate, char (&nameBuffer)[MaxResolvedNameBytes])
-        {
-            std::size_t length = 0;
-            while (length < MaxResolvedNameBytes - 1)
-            {
-                const char value = candidate[length];
-                if (value == '\0')
-                {
-                    break;
-                }
-
-                if (!IsScriptNameCharacter(value))
-                {
-                    return false;
-                }
-
-                nameBuffer[length] = value;
-                ++length;
-            }
-
-            if (length < 3 || length >= MaxResolvedNameBytes - 1 || candidate[length] != '\0')
-            {
-                return false;
-            }
-
-            nameBuffer[length] = '\0';
-            return true;
         }
 
         bool SlGetStringOfSizePrologueMatches()
@@ -275,63 +154,72 @@ namespace BO2Monitor
             return true;
         }
 
-        bool TryResolveObservedStringValue(unsigned int stringValue, char (&nameBuffer)[MaxResolvedNameBytes])
+        bool ResolveProductionNotifyTargets()
         {
-            const char* poolStart = reinterpret_cast<const char*>(ScriptStringPoolStart);
-            const char* poolEnd = reinterpret_cast<const char*>(ScriptStringPoolEnd);
-            for (const char* cursor = poolStart; cursor < poolEnd; ++cursor)
+            bool resolvedAnyTarget = false;
+            for (ProductionNotifyTarget& target : productionNotifyTargets)
             {
-                if (!IsScriptNameCharacter(*cursor))
+                target.StringValue = 0;
+                target.Resolved = false;
+
+                unsigned int stringValue = 0;
+                if (!TryResolveStringId(target.Name, stringValue))
                 {
                     continue;
                 }
 
-                if (cursor > poolStart && IsScriptNameCharacter(*(cursor - 1)))
-                {
-                    continue;
-                }
-
-                char candidateName[MaxResolvedNameBytes]{};
-                if (!TryReadScriptName(cursor, candidateName))
-                {
-                    continue;
-                }
-
-                unsigned int resolvedValue = 0;
-                if (TryResolveStringId(candidateName, resolvedValue) && resolvedValue == stringValue)
-                {
-                    std::memcpy(nameBuffer, candidateName, MaxResolvedNameBytes);
-                    return true;
-                }
+                target.StringValue = stringValue;
+                target.Resolved = true;
+                resolvedAnyTarget = true;
             }
 
-            return false;
+            return resolvedAnyTarget;
         }
 
-        void ResolveKnownNotifyIds(SharedSnapshotWriter& snapshotWriter)
+        std::uint32_t SaturateCounter(std::uint64_t value)
         {
-            knownNotifyIdCount = 0;
-            for (const KnownNotifyName& knownName : KnownNotifyNames)
+            constexpr std::uint32_t MaxCounterValue = std::numeric_limits<std::uint32_t>::max();
+            return value > MaxCounterValue ? MaxCounterValue : static_cast<std::uint32_t>(value);
+        }
+
+        bool TryReadRoundValue(std::int32_t& roundValue)
+        {
+            auto* roundAddress = reinterpret_cast<volatile std::int32_t*>(RoundAddress);
+            if (!CanReadAddress(reinterpret_cast<const void*>(RoundAddress)))
             {
-                unsigned int stringValue = 0;
-                if (!TryResolveStringId(knownName.Name, stringValue))
-                {
-                    continue;
-                }
-
-                knownNotifyIds[knownNotifyIdCount] = KnownNotifyId
-                {
-                    knownName.Name,
-                    knownName.EventType,
-                    stringValue
-                };
-                ++knownNotifyIdCount;
-
-                snapshotWriter.PublishEvent(
-                    knownName.EventType,
-                    knownName.Name,
-                    static_cast<std::int32_t>(stringValue));
+                return false;
             }
+
+            const std::int32_t currentValue = *roundAddress;
+            if (currentValue < 1 || currentValue > 255)
+            {
+                return false;
+            }
+
+            roundValue = currentValue;
+            return true;
+        }
+
+        void PublishMatchedNotify(
+            SharedSnapshotWriter& snapshotWriter,
+            const RawNotifyRecord& record)
+        {
+            std::int32_t eventValue = static_cast<std::int32_t>(record.StringValue);
+            if (record.ReadRoundValue)
+            {
+                std::int32_t roundValue = 0;
+                if (TryReadRoundValue(roundValue))
+                {
+                    eventValue = roundValue;
+                }
+            }
+
+            snapshotWriter.PublishEvent(
+                record.EventType,
+                record.EventName,
+                eventValue,
+                record.OwnerId,
+                record.StringValue);
         }
 
         void __cdecl VmNotifyDetour(
@@ -342,46 +230,20 @@ namespace BO2Monitor
         {
             originalVmNotify(inst, notifyListOwnerId, stringValue, top);
 
-            if (activeSnapshotWriter != nullptr)
+            const ProductionNotifyTarget* target = FindProductionNotifyTarget(stringValue);
+            if (target == nullptr)
             {
-                const DWORD now = GetTickCount();
-                if (HasObservedStringValue(stringValue))
-                {
-                    return;
-                }
-
-                if (now - lastPublishedNotifyAt < 250)
-                {
-                    return;
-                }
-
-                if (stringValue == lastObservedStringValue && now - lastObservedAt < 1000)
-                {
-                    return;
-                }
-
-                if (!RememberStringValue(stringValue))
-                {
-                    return;
-                }
-
-                lastObservedStringValue = stringValue;
-                lastObservedAt = now;
-                lastPublishedNotifyAt = now;
-                if (const KnownNotifyId* knownNotify = FindKnownNotifyById(stringValue))
-                {
-                    activeSnapshotWriter->PublishEvent(
-                        knownNotify->EventType,
-                        knownNotify->Name,
-                        static_cast<std::int32_t>(stringValue));
-                    return;
-                }
-
-                activeSnapshotWriter->PublishEvent(
-                    GameEventType::NotifyObserved,
-                    "vm_notify_observed",
-                    static_cast<std::int32_t>(stringValue));
+                return;
             }
+
+            EnqueueMatchedNotify(
+                inst,
+                notifyListOwnerId,
+                stringValue,
+                top,
+                target->EventType,
+                target->Name,
+                target->ReadRoundValue);
         }
 
         bool BytesMatch(const std::uint8_t* address, const std::uint8_t* expected, std::size_t expectedLength)
@@ -607,51 +469,6 @@ namespace BO2Monitor
         }
     }
 
-    GameEventType MapNotifyName(const char* notifyName)
-    {
-        if (notifyName == nullptr)
-        {
-            return GameEventType::Unknown;
-        }
-
-        if (std::strcmp(notifyName, "start_of_round") == 0)
-        {
-            return GameEventType::StartOfRound;
-        }
-
-        if (std::strcmp(notifyName, "end_of_round") == 0)
-        {
-            return GameEventType::EndOfRound;
-        }
-
-        if (std::strcmp(notifyName, "powerup_grabbed") == 0)
-        {
-            return GameEventType::PowerUpGrabbed;
-        }
-
-        if (std::strcmp(notifyName, "dog_round_starting") == 0)
-        {
-            return GameEventType::DogRoundStarting;
-        }
-
-        if (std::strcmp(notifyName, "power_on") == 0)
-        {
-            return GameEventType::PowerOn;
-        }
-
-        if (std::strcmp(notifyName, "end_game") == 0)
-        {
-            return GameEventType::EndGame;
-        }
-
-        if (std::strcmp(notifyName, "perk_bought") == 0)
-        {
-            return GameEventType::PerkBought;
-        }
-
-        return GameEventType::Unknown;
-    }
-
     GameCompatibilityState TryInstallNotifyHook(SharedSnapshotWriter& snapshotWriter)
     {
         PublishDiscoveryEvidence(snapshotWriter);
@@ -671,14 +488,17 @@ namespace BO2Monitor
 
         if (!IsVmNotifyHookEnabled())
         {
+            snapshotWriter.SetCompatibility(GameCompatibilityState::CaptureDisabled);
+            return GameCompatibilityState::CaptureDisabled;
+        }
+
+        ResetNotifyEventQueue();
+        if (!ResolveProductionNotifyTargets())
+        {
             snapshotWriter.SetCompatibility(GameCompatibilityState::UnsupportedVersion);
             return GameCompatibilityState::UnsupportedVersion;
         }
 
-        // Resolve known names up front; unknown notifies still publish raw IDs
-        // so discovery can continue without risking arbitrary string conversion.
-        ResolveKnownNotifyIds(snapshotWriter);
-        activeSnapshotWriter = &snapshotWriter;
         if (!InstallVmNotifyHook())
         {
             snapshotWriter.SetCompatibility(GameCompatibilityState::UnsupportedVersion);
@@ -689,38 +509,38 @@ namespace BO2Monitor
         return GameCompatibilityState::Compatible;
     }
 
-    void ResolveObservedNotifyNames(SharedSnapshotWriter& snapshotWriter)
+    void RunNotifyEventWorker(SharedSnapshotWriter& snapshotWriter)
     {
-        if (!SlGetStringOfSizePrologueMatches())
-        {
-            return;
-        }
+        std::uint64_t publishedNotifyCount = 0;
 
-        const std::size_t observedCount = observedStringValueCount;
-        for (std::size_t index = 0; index < observedCount; ++index)
+        while (true)
         {
-            const unsigned int stringValue = observedStringValues[index];
-            if (FindKnownNotifyById(stringValue) != nullptr
-                || ContainsValue(resolvedStringValues, resolvedStringValueCount, stringValue)
-                || ContainsValue(resolverAttemptedStringValues, resolverAttemptedStringValueCount, stringValue))
+            std::uint32_t processedCount = 0;
+            for (; processedCount < 64; ++processedCount)
             {
-                continue;
+                RawNotifyRecord record{};
+                std::uint64_t droppedSinceLastDrain = 0;
+                if (!TryDequeueMatchedNotify(record, droppedSinceLastDrain))
+                {
+                    break;
+                }
+
+                PublishMatchedNotify(snapshotWriter, record);
+                ++publishedNotifyCount;
             }
 
-            TryRememberValue(resolverAttemptedStringValues, resolverAttemptedStringValueCount, stringValue);
+            snapshotWriter.SetNotifyEventCounters(
+                SaturateCounter(GetDroppedNotifyEventCount()),
+                SaturateCounter(publishedNotifyCount));
 
-            char resolvedName[MaxResolvedNameBytes]{};
-            if (!TryResolveObservedStringValue(stringValue, resolvedName))
+            if (processedCount == 0)
             {
-                continue;
+                Sleep(100);
             }
-
-            TryRememberValue(resolvedStringValues, resolvedStringValueCount, stringValue);
-            snapshotWriter.PublishEvent(
-                MapNotifyName(resolvedName),
-                resolvedName,
-                static_cast<std::int32_t>(stringValue));
-            return;
+            else
+            {
+                Sleep(0);
+            }
         }
     }
 

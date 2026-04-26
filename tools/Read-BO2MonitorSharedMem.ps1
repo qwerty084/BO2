@@ -1,8 +1,8 @@
 $ErrorActionPreference = 'Stop'
 
 $maxEventCount = 128
-$headerSize = 24
-$eventRecordSize = 72
+$headerSize = 36
+$eventRecordSize = 80
 $sharedMemorySize = $headerSize + ($maxEventCount * $eventRecordSize)
 
 $mmf = [System.IO.MemoryMappedFiles.MemoryMappedFile]::OpenExisting('BO2MonitorSharedMem')
@@ -23,28 +23,36 @@ catch {
     }
 }
 try {
-    $bytes = New-Object byte[] 24
+    $bytes = New-Object byte[] $headerSize
     [void]$view.ReadArray(0, $bytes, 0, $bytes.Length)
     $magic = [BitConverter]::ToUInt32($bytes, 0)
     $version = [BitConverter]::ToUInt32($bytes, 4)
     $state = [BitConverter]::ToInt32($bytes, 8)
+    $eventWriteIndex = [BitConverter]::ToUInt32($bytes, 12)
     $dropped = [BitConverter]::ToUInt32($bytes, 16)
     $eventCount = [BitConverter]::ToUInt32($bytes, 20)
-    "magic=0x{0:X8} version={1} state={2} dropped={3} events={4}" -f $magic, $version, $state, $dropped, $eventCount
+    $droppedNotifies = if ($bytes.Length -ge 28) { [BitConverter]::ToUInt32($bytes, 24) } else { 0 }
+    $publishedNotifies = if ($bytes.Length -ge 32) { [BitConverter]::ToUInt32($bytes, 28) } else { 0 }
+    $writeSequence = if ($bytes.Length -ge 36) { [BitConverter]::ToUInt32($bytes, 32) } else { 0 }
+    "magic=0x{0:X8} version={1} state={2} writeIndex={3} summaryDropped={4} notifyDropped={5} notifyPublished={6} writeSeq={7} events={8}" -f $magic, $version, $state, $eventWriteIndex, $dropped, $droppedNotifies, $publishedNotifies, $writeSequence, $eventCount
 
+    $startSlot = if ($eventCount -ge $maxEventCount) { $eventWriteIndex % $maxEventCount } else { 0 }
     for ($index = 0; $index -lt $eventCount -and $index -lt $maxEventCount; $index++) {
-        $offset = $headerSize + ($index * $eventRecordSize)
+        $slot = ($startSlot + $index) % $maxEventCount
+        $offset = $headerSize + ($slot * $eventRecordSize)
         $eventType = $view.ReadInt32($offset)
         $levelTime = $view.ReadInt32($offset + 4)
+        $ownerId = $view.ReadUInt32($offset + 8)
+        $stringValue = $view.ReadUInt32($offset + 12)
         $nameBytes = New-Object byte[] 64
-        [void]$view.ReadArray($offset + 8, $nameBytes, 0, $nameBytes.Length)
+        [void]$view.ReadArray($offset + 16, $nameBytes, 0, $nameBytes.Length)
         $zero = [Array]::IndexOf($nameBytes, [byte]0)
         if ($zero -lt 0) {
             $zero = $nameBytes.Length
         }
 
         $name = [Text.Encoding]::UTF8.GetString($nameBytes, 0, $zero)
-        "event[{0}] type={1} value={2} name={3}" -f $index, $eventType, $levelTime, $name
+        "event[{0}] type={1} value={2} owner={3} id={4} name={5}" -f $index, $eventType, $levelTime, $ownerId, $stringValue, $name
     }
 }
 finally {

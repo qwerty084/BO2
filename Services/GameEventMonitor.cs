@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Text;
+using System.Threading;
 
 namespace BO2.Services
 {
@@ -13,12 +14,14 @@ namespace BO2.Services
         public const string EventHandleName = "BO2MonitorEvent";
 
         internal const uint SnapshotMagic = 0x45324F42; // BO2E
-        internal const uint SnapshotVersion = 1;
+        internal const uint SnapshotVersion = 4;
         internal const int MaxEventCount = 128;
         internal const int MaxEventNameBytes = 64;
-        internal const int HeaderSize = 24;
-        internal const int EventRecordSize = 72;
+        internal const int HeaderSize = 36;
+        internal const int EventRecordSize = 80;
         internal const int SharedMemorySize = HeaderSize + (MaxEventCount * EventRecordSize);
+        internal const int WriteSequenceOffset = 32;
+        private const int StableReadAttempts = 4;
 
         private MemoryMappedFile? _sharedMemory;
 
@@ -36,7 +39,10 @@ namespace BO2.Services
                     0,
                     SharedMemorySize,
                     MemoryMappedFileAccess.Read);
-                accessor.ReadArray(0, snapshot, 0, snapshot.Length);
+                if (!TryReadStableSnapshot(accessor, snapshot))
+                {
+                    return GameEventMonitorStatus.WaitingForMonitor;
+                }
             }
             catch (IOException)
             {
@@ -64,6 +70,8 @@ namespace BO2.Services
                 return new GameEventMonitorStatus(
                     GameCompatibilityState.UnsupportedVersion,
                     0,
+                    0,
+                    0,
                     Array.Empty<GameEvent>());
             }
 
@@ -74,18 +82,27 @@ namespace BO2.Services
                 return new GameEventMonitorStatus(
                     GameCompatibilityState.UnsupportedVersion,
                     0,
+                    0,
+                    0,
                     Array.Empty<GameEvent>());
             }
 
             GameCompatibilityState compatibilityState = ReadCompatibilityState(snapshot[8..12]);
+            uint eventWriteIndex = BinaryPrimitives.ReadUInt32LittleEndian(snapshot[12..16]);
             uint droppedEventCount = BinaryPrimitives.ReadUInt32LittleEndian(snapshot[16..20]);
             uint eventCount = BinaryPrimitives.ReadUInt32LittleEndian(snapshot[20..24]);
+            uint droppedNotifyCount = BinaryPrimitives.ReadUInt32LittleEndian(snapshot[24..28]);
+            uint publishedNotifyCount = BinaryPrimitives.ReadUInt32LittleEndian(snapshot[28..32]);
             int readableEventCount = (int)Math.Min(eventCount, MaxEventCount);
             var events = new List<GameEvent>(readableEventCount);
+            int startSlot = readableEventCount == MaxEventCount
+                ? (int)(eventWriteIndex % MaxEventCount)
+                : 0;
 
             for (int index = 0; index < readableEventCount; index++)
             {
-                int recordOffset = HeaderSize + (index * EventRecordSize);
+                int slot = (startSlot + index) % MaxEventCount;
+                int recordOffset = HeaderSize + (slot * EventRecordSize);
                 if (recordOffset + EventRecordSize > snapshot.Length)
                 {
                     break;
@@ -94,7 +111,9 @@ namespace BO2.Services
                 ReadOnlySpan<byte> record = snapshot.Slice(recordOffset, EventRecordSize);
                 GameEventType eventType = ReadEventType(record[0..4]);
                 int levelTime = BinaryPrimitives.ReadInt32LittleEndian(record[4..8]);
-                string eventName = ReadEventName(record[8..(8 + MaxEventNameBytes)]);
+                uint ownerId = BinaryPrimitives.ReadUInt32LittleEndian(record[8..12]);
+                uint stringValue = BinaryPrimitives.ReadUInt32LittleEndian(record[12..16]);
+                string eventName = ReadEventName(record[16..(16 + MaxEventNameBytes)]);
                 if (string.IsNullOrWhiteSpace(eventName))
                 {
                     continue;
@@ -105,10 +124,15 @@ namespace BO2.Services
                     eventType = MapEventName(eventName);
                 }
 
-                events.Add(new GameEvent(eventType, eventName, levelTime, receivedAt));
+                events.Add(new GameEvent(eventType, eventName, levelTime, ownerId, stringValue, receivedAt));
             }
 
-            return new GameEventMonitorStatus(compatibilityState, droppedEventCount, events);
+            return new GameEventMonitorStatus(
+                compatibilityState,
+                droppedEventCount,
+                droppedNotifyCount,
+                publishedNotifyCount,
+                events);
         }
 
         internal static GameEventType MapEventName(string eventName)
@@ -129,7 +153,37 @@ namespace BO2.Services
                 "vm_notify_candidate_rejected" => GameEventType.NotifyCandidateRejected,
                 "vm_notify_entry_candidate" => GameEventType.NotifyEntryCandidate,
                 "sl_convert_candidate" => GameEventType.StringResolverCandidate,
+                "sl_get_string_of_size_candidate" => GameEventType.StringResolverCandidate,
                 "vm_notify_observed" => GameEventType.NotifyObserved,
+                "notify_log_opened" => GameEventType.NotifyObserved,
+                "weapon_bought" => GameEventType.NotifyObserved,
+                "zom_kill" => GameEventType.NotifyObserved,
+                "chest_accessed"
+                    or "user_grabbed_weapon"
+                    or "weapon_grabbed"
+                    or "randomization_done"
+                    or "box_moving"
+                    or "weapon_fly_away_start"
+                    or "weapon_fly_away_end"
+                    or "arrived"
+                    or "left"
+                    or "opened"
+                    or "closed"
+                    or "box_hacked_respin"
+                    or "box_hacked_rerespin"
+                    or "box_locked"
+                    or "locked"
+                    or "unlocked"
+                    or "box_spin_done"
+                    or "zbarrier_state_change"
+                    or "kill_chest_think"
+                    or "unregister_unitrigger_on_kill_think"
+                    or "lid_closed"
+                    or "kill_weapon_movement"
+                    or "kill_respin_think_thread"
+                    or "kill_respin_respin_think_thread"
+                    or "mb_hostmigration"
+                    or "stop_open_idle" => GameEventType.BoxEvent,
                 _ => GameEventType.Unknown
             };
         }
@@ -155,6 +209,30 @@ namespace BO2.Services
             int terminatorIndex = value.IndexOf((byte)0);
             ReadOnlySpan<byte> nameBytes = terminatorIndex >= 0 ? value[..terminatorIndex] : value;
             return Encoding.UTF8.GetString(nameBytes);
+        }
+
+        private static bool TryReadStableSnapshot(MemoryMappedViewAccessor accessor, byte[] snapshot)
+        {
+            for (int attempt = 0; attempt < StableReadAttempts; attempt++)
+            {
+                accessor.Read(WriteSequenceOffset, out uint beforeSequence);
+                if ((beforeSequence & 1) != 0)
+                {
+                    Thread.Sleep(1);
+                    continue;
+                }
+
+                accessor.ReadArray(0, snapshot, 0, snapshot.Length);
+                accessor.Read(WriteSequenceOffset, out uint afterSequence);
+                if (beforeSequence == afterSequence && (afterSequence & 1) == 0)
+                {
+                    return true;
+                }
+
+                Thread.Sleep(1);
+            }
+
+            return false;
         }
 
         private bool TryEnsureSharedMemory()
