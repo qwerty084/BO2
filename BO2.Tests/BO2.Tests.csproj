@@ -39,6 +39,7 @@
     <Compile Include="..\Services\GameEventMonitor.cs"          Link="Services\GameEventMonitor.cs" />
     <Compile Include="..\Services\GameEventMonitorStatus.cs"    Link="Services\GameEventMonitorStatus.cs" />
     <Compile Include="..\Services\GameEventType.cs"             Link="Services\GameEventType.cs" />
+    <Compile Include="..\Services\WeaponDisplayNameResolver.cs" Link="Services\WeaponDisplayNameResolver.cs" />
     <Compile Include="..\Services\IGameEventMonitor.cs"         Link="Services\IGameEventMonitor.cs" />
     <Compile Include="..\Services\IProcessInfoProvider.cs"      Link="Services\IProcessInfoProvider.cs" />
     <Compile Include="..\Services\IProcessMemoryAccessor.cs"    Link="Services\IProcessMemoryAccessor.cs" />

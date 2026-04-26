@@ -26,11 +26,12 @@ namespace BO2.Services
             string receivedAt = gameEvent.ReceivedAt.ToLocalTime().ToString("HH:mm:ss");
             if (!string.IsNullOrWhiteSpace(gameEvent.WeaponName))
             {
+                string weaponDisplayName = WeaponDisplayNameResolver.FormatForEvent(gameEvent.WeaponName);
                 return AppStrings.Format(
                     "BoxEventWithWeaponFormat",
                     receivedAt,
                     gameEvent.EventName,
-                    gameEvent.WeaponName,
+                    weaponDisplayName,
                     gameEvent.OwnerId,
                     gameEvent.StringValue);
             }

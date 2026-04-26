@@ -7,7 +7,7 @@ namespace BO2.Tests.Services
     public sealed class GameEventFormatterTests
     {
         [Fact]
-        public void FormatRecentBoxEvents_WhenWeaponNameIsPresent_IncludesWeaponName()
+        public void FormatRecentBoxEvents_WhenWeaponNameIsResolved_IncludesDisplayNameAndAlias()
         {
             DateTimeOffset receivedAt = new(2026, 4, 26, 12, 34, 56, TimeSpan.Zero);
             GameEventMonitorStatus status = new(
@@ -17,14 +17,37 @@ namespace BO2.Tests.Services
                 1,
                 new[]
                 {
-                    new GameEvent(GameEventType.BoxEvent, "randomization_done", 0, 7, 1149, receivedAt, "ray_gun_zm")
+                    new GameEvent(GameEventType.BoxEvent, "randomization_done", 0, 7, 1149, receivedAt, "fnfal_zm")
                 });
 
             string text = GameEventFormatter.FormatRecentBoxEvents(status);
 
             Assert.Contains("BoxEventWithWeaponFormat", text);
             Assert.Contains("randomization_done", text);
-            Assert.Contains("ray_gun_zm", text);
+            Assert.Contains("FAL (fnfal_zm)", text);
+            Assert.Contains("7", text);
+            Assert.Contains("1149", text);
+        }
+
+        [Fact]
+        public void FormatRecentBoxEvents_WhenWeaponNameIsUnresolved_IncludesAlias()
+        {
+            DateTimeOffset receivedAt = new(2026, 4, 26, 12, 34, 56, TimeSpan.Zero);
+            GameEventMonitorStatus status = new(
+                GameCompatibilityState.Compatible,
+                0,
+                0,
+                1,
+                new[]
+                {
+                    new GameEvent(GameEventType.BoxEvent, "randomization_done", 0, 7, 1149, receivedAt, "unknown_weapon_zm")
+                });
+
+            string text = GameEventFormatter.FormatRecentBoxEvents(status);
+
+            Assert.Contains("BoxEventWithWeaponFormat", text);
+            Assert.Contains("randomization_done", text);
+            Assert.Contains("unknown_weapon_zm", text);
             Assert.Contains("7", text);
             Assert.Contains("1149", text);
         }
