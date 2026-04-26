@@ -30,8 +30,12 @@
     <Compile Include="..\Services\DllInjectionResult.cs"        Link="Services\DllInjectionResult.cs" />
     <Compile Include="..\Services\DllInjectionState.cs"         Link="Services\DllInjectionState.cs" />
     <Compile Include="..\Services\DllInjector.cs"               Link="Services\DllInjector.cs" />
+    <Compile Include="..\Services\DetectedGameChangedEventArgs.cs" Link="Services\DetectedGameChangedEventArgs.cs" />
     <Compile Include="..\Services\IGameProcessDetector.cs"      Link="Services\IGameProcessDetector.cs" />
+    <Compile Include="..\Services\IProcessLifecycleEventSource.cs" Link="Services\IProcessLifecycleEventSource.cs" />
+    <Compile Include="..\Services\ProcessLifecycleEventArgs.cs" Link="Services\ProcessLifecycleEventArgs.cs" />
     <Compile Include="..\Services\GameProcessDefinition.cs"     Link="Services\GameProcessDefinition.cs" />
+    <Compile Include="..\Services\GameProcessDetectionService.cs" Link="Services\GameProcessDetectionService.cs" />
     <Compile Include="..\Services\GameVariant.cs"               Link="Services\GameVariant.cs" />
     <Compile Include="..\Services\GameCompatibilityState.cs"    Link="Services\GameCompatibilityState.cs" />
     <Compile Include="..\Services\GameEvent.cs"                 Link="Services\GameEvent.cs" />
@@ -50,6 +54,7 @@
     <Compile Include="..\Services\IProcessMemoryAccessor.cs"    Link="Services\IProcessMemoryAccessor.cs" />
     <Compile Include="..\Services\GameMemoryReader.cs"          Link="Services\GameMemoryReader.cs" />
     <Compile Include="..\Services\GameProcessDetector.cs"       Link="Services\GameProcessDetector.cs" />
+    <Compile Include="..\Services\WindowsProcessLifecycleEventSource.cs" Link="Services\WindowsProcessLifecycleEventSource.cs" />
     <Compile Include="..\Services\WindowsProcessInfoProvider.cs" Link="Services\WindowsProcessInfoProvider.cs" />
     <Compile Include="..\Services\WindowsProcessMemoryAccessor.cs" Link="Services\WindowsProcessMemoryAccessor.cs" />
     <Compile Include="..\Services\PlayerStatAddressMap.cs"      Link="Services\PlayerStatAddressMap.cs" />

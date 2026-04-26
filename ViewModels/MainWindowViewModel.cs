@@ -4,6 +4,8 @@ using Microsoft.UI.Xaml;
 using System;
 using System.ComponentModel;
 using System.Linq;
+using System.Management;
+using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,11 +19,17 @@ namespace BO2.ViewModels
 
         private readonly DispatcherQueue _dispatcherQueue;
         private readonly GameMemoryReader _memoryReader = new();
+        private readonly GameProcessDetectionService _processDetectionService = new();
         private readonly DllInjector _dllInjector = new();
         private readonly IGameEventMonitor _eventMonitor = new GameEventMonitor();
+        private readonly SemaphoreSlim _operationSemaphore = new(1, 1);
         private DllInjectionResult _lastInjectionResult = DllInjectionResult.NotAttempted;
         private int? _lastInjectionProcessId;
         private DateTimeOffset? _lastInjectionAttemptedAt;
+        private DetectedGame? _detectedGame;
+        private string? _processWatcherErrorText;
+        private bool _isConnecting;
+        private bool _disposed;
         private string _pointsText = EmptyStatText;
         private string _killsText = EmptyStatText;
         private string _downsText = EmptyStatText;
@@ -42,7 +50,10 @@ namespace BO2.ViewModels
         private string _boxEventsText = AppStrings.Get("RecentEventsEmpty");
         private string _recentGameEventsText = AppStrings.Get("RecentEventsEmpty");
         private string _statusText = AppStrings.Get("GameNotRunning");
+        private string _connectButtonText = AppStrings.Get("ConnectButtonText");
+        private bool _isConnectButtonEnabled;
         private Visibility _connectedStatusVisibility = Visibility.Collapsed;
+        private Visibility _detectedStatusVisibility = Visibility.Collapsed;
         private Visibility _unsupportedStatusVisibility = Visibility.Collapsed;
         private Visibility _disconnectedStatusVisibility = Visibility.Visible;
         private readonly StatFormatter _formatter;
@@ -52,11 +63,27 @@ namespace BO2.ViewModels
         {
             _dispatcherQueue = dispatcherQueue;
             _formatter = new StatFormatter(AppStrings.Get("UnavailableValue"));
+            _processDetectionService.DetectedGameChanged += OnDetectedGameChanged;
+
+            try
+            {
+                _processDetectionService.Start();
+            }
+            catch (Exception ex) when (ex is ManagementException or UnauthorizedAccessException or COMException)
+            {
+                _processWatcherErrorText = AppStrings.Format("ProcessWatcherUnavailableFormat", ex.Message);
+            }
+
+            _detectedGame = _processDetectionService.CurrentGame;
+            ApplyConnectionStatus(_detectedGame);
+            UpdateConnectButtonState(_detectedGame);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
         public event EventHandler<GameEventMonitorStatus>? EventStatusUpdated;
+
+        public event EventHandler? RefreshRequested;
 
         public string PointsText
         {
@@ -86,6 +113,18 @@ namespace BO2.ViewModels
         {
             get => _injectionStatusText;
             private set => SetProperty(ref _injectionStatusText, value);
+        }
+
+        public string ConnectButtonText
+        {
+            get => _connectButtonText;
+            private set => SetProperty(ref _connectButtonText, value);
+        }
+
+        public bool IsConnectButtonEnabled
+        {
+            get => _isConnectButtonEnabled;
+            private set => SetProperty(ref _isConnectButtonEnabled, value);
         }
 
         public string EventMonitorStatusText
@@ -132,6 +171,12 @@ namespace BO2.ViewModels
         {
             get => _connectedStatusVisibility;
             private set => SetProperty(ref _connectedStatusVisibility, value);
+        }
+
+        public Visibility DetectedStatusVisibility
+        {
+            get => _detectedStatusVisibility;
+            private set => SetProperty(ref _detectedStatusVisibility, value);
         }
 
         public Visibility UnsupportedStatusVisibility
@@ -214,32 +259,28 @@ namespace BO2.ViewModels
 
         public async Task RefreshAsync(CancellationToken cancellationToken)
         {
+            await _operationSemaphore.WaitAsync(cancellationToken);
             try
             {
+                DetectedGame? detectedGame = _detectedGame;
                 (
                     PlayerStatsReadResult readResult,
-                    DllInjectionResult injectionResult,
-                    GameEventMonitorStatus eventStatus) = await Task.Run(
+                    GameEventMonitorStatus eventStatus,
+                    DllInjectionResult injectionResult) = await Task.Run(
                     () =>
                     {
-                        PlayerStatsReadResult readResult = _memoryReader.ReadPlayerStats();
-                        DllInjectionResult injectionResult = EnsureMonitorInjected(readResult.DetectedGame);
-                        GameEventMonitorStatus eventStatus = _eventMonitor.ReadStatus(
-                            DateTimeOffset.UtcNow,
-                            readResult.DetectedGame?.ProcessId);
-                        ApplyInjectionRetryPolicy(
-                            readResult.DetectedGame,
-                            injectionResult,
-                            eventStatus,
-                            DateTimeOffset.UtcNow);
-                        return (readResult, injectionResult, eventStatus);
+                        PlayerStatsReadResult readResult = _memoryReader.ReadPlayerStats(detectedGame);
+                        GameEventMonitorStatus eventStatus = ReadEventMonitorStatus(readResult.DetectedGame);
+                        ApplyMonitorReadinessTimeout(readResult.DetectedGame, eventStatus, DateTimeOffset.UtcNow);
+                        return (readResult, eventStatus, _lastInjectionResult);
                     },
                     cancellationToken);
                 await RunOnDispatcherAsync(
                     () =>
                     {
                         ApplyReadResult(readResult);
-                        ApplyEventMonitorStatus(readResult, injectionResult, eventStatus);
+                        ApplyEventMonitorStatus(readResult.DetectedGame, injectionResult, eventStatus);
+                        UpdateConnectButtonState(readResult.DetectedGame);
                     },
                     cancellationToken);
             }
@@ -251,6 +292,88 @@ namespace BO2.ViewModels
             {
                 await TryApplyReadErrorAsync(ex.Message, cancellationToken);
             }
+            finally
+            {
+                _operationSemaphore.Release();
+            }
+        }
+
+        public async Task ConnectAsync(CancellationToken cancellationToken)
+        {
+            await _operationSemaphore.WaitAsync(cancellationToken);
+            try
+            {
+                DetectedGame? detectedGame = _detectedGame;
+                if (detectedGame is null || !CanAttemptConnect(detectedGame))
+                {
+                    await RunOnDispatcherAsync(() => UpdateConnectButtonState(detectedGame), cancellationToken);
+                    return;
+                }
+
+                _isConnecting = true;
+                await RunOnDispatcherAsync(
+                    () =>
+                    {
+                        ApplyConnectionStatus(detectedGame);
+                        InjectionStatusText = AppStrings.Get("DllInjectionConnecting");
+                        EventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForConnect");
+                        UpdateConnectButtonState(detectedGame);
+                    },
+                    cancellationToken);
+
+                DllInjectionResult injectionResult = await Task.Run(
+                    () => _dllInjector.Inject(detectedGame),
+                    cancellationToken);
+                if (!Equals(_detectedGame, detectedGame))
+                {
+                    _isConnecting = false;
+                    await RunOnDispatcherAsync(
+                        () =>
+                        {
+                            ApplyConnectionStatus(_detectedGame);
+                            ApplyEventMonitorStatus(_detectedGame, _lastInjectionResult, GameEventMonitorStatus.WaitingForMonitor);
+                            UpdateConnectButtonState(_detectedGame);
+                        },
+                        cancellationToken);
+                    return;
+                }
+
+                GameEventMonitorStatus eventStatus = GameEventMonitorStatus.WaitingForMonitor;
+                DateTimeOffset? attemptedAt = null;
+                if (IsMonitorLoadedInjectionState(injectionResult.State))
+                {
+                    attemptedAt = DateTimeOffset.UtcNow;
+                    eventStatus = _eventMonitor.ReadStatus(DateTimeOffset.UtcNow, detectedGame.ProcessId);
+                }
+
+                _lastInjectionProcessId = detectedGame.ProcessId;
+                _lastInjectionResult = injectionResult;
+                _lastInjectionAttemptedAt = attemptedAt;
+                _isConnecting = false;
+
+                await RunOnDispatcherAsync(
+                    () =>
+                    {
+                        ApplyConnectionStatus(detectedGame);
+                        ApplyEventMonitorStatus(detectedGame, injectionResult, eventStatus);
+                        UpdateConnectButtonState(detectedGame);
+                    },
+                    cancellationToken);
+            }
+            catch (InvalidOperationException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                _isConnecting = false;
+                await TryApplyReadErrorAsync(ex.Message, cancellationToken);
+            }
+            catch (Win32Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                _isConnecting = false;
+                await TryApplyReadErrorAsync(ex.Message, cancellationToken);
+            }
+            finally
+            {
+                _operationSemaphore.Release();
+            }
         }
 
         public Task TryApplyRefreshErrorAsync(string message, CancellationToken cancellationToken)
@@ -260,8 +383,12 @@ namespace BO2.ViewModels
 
         public void Dispose()
         {
+            _disposed = true;
+            _processDetectionService.DetectedGameChanged -= OnDetectedGameChanged;
+            _processDetectionService.Dispose();
             _eventMonitor.Dispose();
             _memoryReader.Dispose();
+            _operationSemaphore.Dispose();
         }
 
         private static string FormatLine(string labelResourceId, string value)
@@ -335,9 +462,8 @@ namespace BO2.ViewModels
 
         private void ApplyReadResult(PlayerStatsReadResult result)
         {
-            StatusText = result.StatusText;
             DetectedGameText = result.DetectedGame?.DisplayName ?? AppStrings.Get("NoGameDetected");
-            SetConnectionState(result.ConnectionState);
+            ApplyConnectionStatus(result.DetectedGame, result.StatusText);
 
             if (result.Stats is null)
             {
@@ -359,6 +485,47 @@ namespace BO2.ViewModels
             AddressCandidateDetailsText = result.DetectedGame?.AddressMap is PlayerStatAddressMap addressMap
                 ? FormatAddressCandidateDetails(addressMap)
                 : EmptyStatText;
+        }
+
+        private void ApplyConnectionStatus(DetectedGame? detectedGame, string? connectedStatusText = null)
+        {
+            if (detectedGame is null)
+            {
+                StatusText = _processWatcherErrorText ?? AppStrings.Get("GameNotRunning");
+                SetConnectionState(ConnectionState.Disconnected);
+                return;
+            }
+
+            if (!detectedGame.IsStatsSupported)
+            {
+                StatusText = FormatUnsupportedStatus(detectedGame);
+                SetConnectionState(ConnectionState.Unsupported);
+                return;
+            }
+
+            if (_isConnecting)
+            {
+                StatusText = AppStrings.Get("ConnectionStatusConnecting");
+                SetConnectionState(ConnectionState.Detected);
+                return;
+            }
+
+            if (IsMonitorConnectedFor(detectedGame))
+            {
+                StatusText = connectedStatusText ?? AppStrings.Format("ConnectedStatusFormat", detectedGame.DisplayName);
+                SetConnectionState(ConnectionState.Connected);
+                return;
+            }
+
+            StatusText = AppStrings.Format("GameDetectedConnectPromptFormat", detectedGame.DisplayName);
+            SetConnectionState(ConnectionState.Detected);
+        }
+
+        private static string FormatUnsupportedStatus(DetectedGame detectedGame)
+        {
+            return string.IsNullOrWhiteSpace(detectedGame.UnsupportedReason)
+                ? AppStrings.Format("UnsupportedStatusFormat", detectedGame.DisplayName)
+                : AppStrings.Format("UnsupportedStatusWithReasonFormat", detectedGame.DisplayName, detectedGame.UnsupportedReason);
         }
 
         private string FormatPlayerCandidateDetails(PlayerCandidateStats candidates)
@@ -456,39 +623,25 @@ namespace BO2.ViewModels
             return AppStrings.Format("CurrentRoundFormat", sessionEvent.LevelTime, sessionEvent.EventName);
         }
 
-        private DllInjectionResult EnsureMonitorInjected(DetectedGame? detectedGame)
+        private GameEventMonitorStatus ReadEventMonitorStatus(DetectedGame? detectedGame)
         {
-            if (detectedGame is null)
+            if (!IsMonitorConnectedFor(detectedGame))
             {
-                _lastInjectionProcessId = null;
-                _lastInjectionAttemptedAt = null;
-                _lastInjectionResult = DllInjectionResult.NotAttempted;
-                return _lastInjectionResult;
+                return GameEventMonitorStatus.WaitingForMonitor;
             }
 
-            if (_lastInjectionProcessId == detectedGame.ProcessId && IsCachedInjectionResult(_lastInjectionResult.State))
-            {
-                return _lastInjectionResult;
-            }
-
-            _lastInjectionProcessId = detectedGame.ProcessId;
-            _lastInjectionResult = _dllInjector.Inject(detectedGame);
-            _lastInjectionAttemptedAt = _lastInjectionResult.State is DllInjectionState.Loaded or DllInjectionState.AlreadyInjected
-                ? DateTimeOffset.UtcNow
-                : null;
-            return _lastInjectionResult;
+            return _eventMonitor.ReadStatus(DateTimeOffset.UtcNow, detectedGame?.ProcessId);
         }
 
-        private void ApplyInjectionRetryPolicy(
+        private void ApplyMonitorReadinessTimeout(
             DetectedGame? detectedGame,
-            DllInjectionResult injectionResult,
             GameEventMonitorStatus eventStatus,
             DateTimeOffset now)
         {
             if (detectedGame is null
                 || _lastInjectionProcessId != detectedGame.ProcessId
                 || eventStatus.CompatibilityState != GameCompatibilityState.WaitingForMonitor
-                || injectionResult.State is not (DllInjectionState.Loaded or DllInjectionState.AlreadyInjected)
+                || !IsMonitorLoadedInjectionState(_lastInjectionResult.State)
                 || _lastInjectionAttemptedAt is not DateTimeOffset attemptedAt
                 || now - attemptedAt < MonitorReadinessRetryTimeout)
             {
@@ -496,20 +649,38 @@ namespace BO2.ViewModels
             }
 
             _eventMonitor.Dispose();
-            _lastInjectionProcessId = null;
+            _lastInjectionResult = new DllInjectionResult(
+                DllInjectionState.Failed,
+                AppStrings.Get("DllInjectionReadinessTimedOut"));
             _lastInjectionAttemptedAt = null;
-            _lastInjectionResult = DllInjectionResult.NotAttempted;
         }
 
-        private static bool IsCachedInjectionResult(DllInjectionState state)
+        private bool CanAttemptConnect(DetectedGame? detectedGame)
         {
-            return state is DllInjectionState.UnsupportedGame
-                or DllInjectionState.WrongProcessArchitecture
-                or DllInjectionState.AlreadyInjected
-                or DllInjectionState.Loaded
-                or DllInjectionState.MonitorReady
-                or DllInjectionState.PollingFallback
-                or DllInjectionState.UnsupportedVersion;
+            return !_isConnecting
+                && detectedGame is not null
+                && detectedGame.Variant == GameVariant.SteamZombies
+                && detectedGame.IsStatsSupported
+                && !IsMonitorConnectedFor(detectedGame);
+        }
+
+        private bool HasInjectionAttemptFor(DetectedGame? detectedGame)
+        {
+            return detectedGame is not null
+                && _lastInjectionProcessId == detectedGame.ProcessId
+                && _lastInjectionResult.State != DllInjectionState.NotAttempted;
+        }
+
+        private bool IsMonitorConnectedFor(DetectedGame? detectedGame)
+        {
+            return detectedGame is not null
+                && _lastInjectionProcessId == detectedGame.ProcessId
+                && IsMonitorLoadedInjectionState(_lastInjectionResult.State);
+        }
+
+        private static bool IsMonitorLoadedInjectionState(DllInjectionState state)
+        {
+            return state is DllInjectionState.Loaded or DllInjectionState.AlreadyInjected;
         }
 
         private static string FormatInjectionStatus(
@@ -533,15 +704,15 @@ namespace BO2.ViewModels
         }
 
         private void ApplyEventMonitorStatus(
-            PlayerStatsReadResult readResult,
+            DetectedGame? detectedGame,
             DllInjectionResult injectionResult,
             GameEventMonitorStatus eventStatus)
         {
-            InjectionStatusText = FormatInjectionStatus(injectionResult, eventStatus);
             LatestEventStatus = eventStatus;
 
-            if (readResult.DetectedGame is null)
+            if (detectedGame is null)
             {
+                InjectionStatusText = AppStrings.Get("DllInjectionNotAttempted");
                 EventCompatibilityText = AppStrings.Get("NoGameDetected");
                 EventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForMonitor");
                 CurrentRoundText = EmptyStatText;
@@ -550,11 +721,14 @@ namespace BO2.ViewModels
                 return;
             }
 
-            if (readResult.DetectedGame.Variant != GameVariant.SteamZombies || readResult.DetectedGame.AddressMap is null)
+            if (detectedGame.Variant != GameVariant.SteamZombies || detectedGame.AddressMap is null)
             {
+                InjectionStatusText = AppStrings.Format(
+                    "DllInjectionUnsupportedGameFormat",
+                    detectedGame.DisplayName);
                 EventCompatibilityText = AppStrings.Format(
                     "EventMonitorUnsupportedGameFormat",
-                    readResult.DetectedGame.DisplayName);
+                    detectedGame.DisplayName);
                 EventMonitorStatusText = AppStrings.Get("EventMonitorCaptureDisabled");
                 CurrentRoundText = EmptyStatText;
                 BoxEventsText = AppStrings.Get("RecentEventsEmpty");
@@ -562,6 +736,22 @@ namespace BO2.ViewModels
                 return;
             }
 
+            EventCompatibilityText = AppStrings.Get("GameProcessDetectorDisplayNameSteamZombies");
+            if (!IsMonitorConnectedFor(detectedGame))
+            {
+                InjectionStatusText = _isConnecting
+                    ? AppStrings.Get("DllInjectionConnecting")
+                    : HasInjectionAttemptFor(detectedGame)
+                        ? injectionResult.Message
+                        : AppStrings.Get("DllInjectionWaitingForConnect");
+                EventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForConnect");
+                CurrentRoundText = EmptyStatText;
+                BoxEventsText = AppStrings.Get("RecentEventsEmpty");
+                RecentGameEventsText = AppStrings.Get("RecentEventsEmpty");
+                return;
+            }
+
+            InjectionStatusText = FormatInjectionStatus(injectionResult, eventStatus);
             string monitorStatusText = FormatEventCompatibility(eventStatus.CompatibilityState);
             if (eventStatus.DroppedEventCount > 0 || eventStatus.DroppedNotifyCount > 0)
             {
@@ -580,15 +770,68 @@ namespace BO2.ViewModels
                     eventStatus.PublishedNotifyCount);
             }
 
-            EventCompatibilityText = AppStrings.Get("GameProcessDetectorDisplayNameSteamZombies");
             EventMonitorStatusText = monitorStatusText;
             CurrentRoundText = FormatRoundSession(eventStatus);
             BoxEventsText = GameEventFormatter.FormatRecentBoxEvents(eventStatus);
             RecentGameEventsText = GameEventFormatter.FormatRecentGameEvents(eventStatus);
         }
 
+        private void OnDetectedGameChanged(object? sender, DetectedGameChangedEventArgs args)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            if (_dispatcherQueue.HasThreadAccess)
+            {
+                ApplyDetectedGameChanged(args.DetectedGame);
+                return;
+            }
+
+            _dispatcherQueue.TryEnqueue(() =>
+            {
+                if (!_disposed)
+                {
+                    ApplyDetectedGameChanged(args.DetectedGame);
+                }
+            });
+        }
+
+        private void ApplyDetectedGameChanged(DetectedGame? detectedGame)
+        {
+            _detectedGame = detectedGame;
+            ResetMonitorConnectionState();
+            DetectedGameText = detectedGame?.DisplayName ?? AppStrings.Get("NoGameDetected");
+            ApplyConnectionStatus(detectedGame);
+            ApplyEventMonitorStatus(detectedGame, _lastInjectionResult, GameEventMonitorStatus.WaitingForMonitor);
+            UpdateConnectButtonState(detectedGame);
+            ClearStats();
+            RefreshRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void ResetMonitorConnectionState()
+        {
+            _isConnecting = false;
+            _lastInjectionProcessId = null;
+            _lastInjectionAttemptedAt = null;
+            _lastInjectionResult = DllInjectionResult.NotAttempted;
+            _eventMonitor.Dispose();
+        }
+
+        private void UpdateConnectButtonState(DetectedGame? detectedGame)
+        {
+            ConnectButtonText = _isConnecting
+                ? AppStrings.Get("ConnectButtonConnectingText")
+                : IsMonitorConnectedFor(detectedGame)
+                    ? AppStrings.Get("ConnectButtonConnectedText")
+                    : AppStrings.Get("ConnectButtonText");
+            IsConnectButtonEnabled = CanAttemptConnect(detectedGame);
+        }
+
         private void ApplyReadError(string message)
         {
+            _isConnecting = false;
             ClearStats();
             EventCompatibilityText = AppStrings.Get("NoGameDetected");
             InjectionStatusText = AppStrings.Get("DllInjectionNotAttempted");
@@ -599,11 +842,13 @@ namespace BO2.ViewModels
             RecentGameEventsText = AppStrings.Get("RecentEventsEmpty");
             StatusText = message;
             SetConnectionState(ConnectionState.Disconnected);
+            UpdateConnectButtonState(_detectedGame);
         }
 
         private void SetConnectionState(ConnectionState connectionState)
         {
             ConnectedStatusVisibility = connectionState == ConnectionState.Connected ? Visibility.Visible : Visibility.Collapsed;
+            DetectedStatusVisibility = connectionState == ConnectionState.Detected ? Visibility.Visible : Visibility.Collapsed;
             UnsupportedStatusVisibility = connectionState == ConnectionState.Unsupported ? Visibility.Visible : Visibility.Collapsed;
             DisconnectedStatusVisibility = connectionState == ConnectionState.Disconnected ? Visibility.Visible : Visibility.Collapsed;
         }

@@ -5,37 +5,22 @@ namespace BO2.Services
 {
     public sealed class GameMemoryReader : IDisposable
     {
-        private static readonly TimeSpan DetectionCacheDuration = TimeSpan.FromSeconds(2);
-
-        private readonly IGameProcessDetector _processDetector;
         private readonly IProcessMemoryAccessor _processMemoryAccessor;
-        private readonly TimeProvider _timeProvider;
-        private DetectedGame? _cachedDetectedGame;
-        private DateTimeOffset _cachedDetectionAt;
 
         public GameMemoryReader()
-            : this(new GameProcessDetector(), new WindowsProcessMemoryAccessor(), TimeProvider.System)
+            : this(new WindowsProcessMemoryAccessor())
         {
         }
 
-        internal GameMemoryReader(
-            IGameProcessDetector processDetector,
-            IProcessMemoryAccessor processMemoryAccessor,
-            TimeProvider timeProvider)
+        internal GameMemoryReader(IProcessMemoryAccessor processMemoryAccessor)
         {
-            ArgumentNullException.ThrowIfNull(processDetector);
             ArgumentNullException.ThrowIfNull(processMemoryAccessor);
-            ArgumentNullException.ThrowIfNull(timeProvider);
 
-            _processDetector = processDetector;
             _processMemoryAccessor = processMemoryAccessor;
-            _timeProvider = timeProvider;
         }
 
-        public PlayerStatsReadResult ReadPlayerStats()
+        public PlayerStatsReadResult ReadPlayerStats(DetectedGame? detectedGame)
         {
-            DetectedGame? detectedGame = DetectGame();
-
             if (detectedGame is null)
             {
                 _processMemoryAccessor.Close();
@@ -182,28 +167,8 @@ namespace BO2.Services
             return _processMemoryAccessor.ReadSingle(address, valueName);
         }
 
-        private DetectedGame? DetectGame()
-        {
-            DateTimeOffset now = _timeProvider.GetUtcNow();
-            if (now - _cachedDetectionAt <= DetectionCacheDuration)
-            {
-                return _cachedDetectedGame;
-            }
-
-            _cachedDetectedGame = _processDetector.Detect();
-            _cachedDetectionAt = now;
-            return _cachedDetectedGame;
-        }
-
-        private void InvalidateDetectionCache()
-        {
-            _cachedDetectedGame = null;
-            _cachedDetectionAt = DateTimeOffset.MinValue;
-        }
-
         private void HandleReadFailure()
         {
-            InvalidateDetectionCache();
             _processMemoryAccessor.Close();
         }
     }

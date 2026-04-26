@@ -47,6 +47,10 @@
                         <Ellipse
                             AutomationProperties.AccessibilityView="Raw"
                             Fill="{ThemeResource SystemFillColorCautionBrush}"
+                            Visibility="{x:Bind ViewModel.DetectedStatusVisibility, Mode=OneWay}" />
+                        <Ellipse
+                            AutomationProperties.AccessibilityView="Raw"
+                            Fill="{ThemeResource SystemFillColorCautionBrush}"
                             Visibility="{x:Bind ViewModel.UnsupportedStatusVisibility, Mode=OneWay}" />
                         <Ellipse
                             AutomationProperties.AccessibilityView="Raw"
@@ -59,6 +63,14 @@
                         Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
                         TextWrapping="Wrap" />
                 </StackPanel>
+                <Button
+                    x:Name="ConnectButton"
+                    Margin="16,8,0,0"
+                    MinWidth="96"
+                    HorizontalAlignment="Left"
+                    Click="OnConnectButtonClick"
+                    Content="{x:Bind ViewModel.ConnectButtonText, Mode=OneWay}"
+                    IsEnabled="{x:Bind ViewModel.IsConnectButtonEnabled, Mode=OneWay}" />
             </StackPanel>
         </NavigationView.PaneFooter>
 
