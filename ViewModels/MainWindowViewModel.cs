@@ -46,6 +46,7 @@ namespace BO2.ViewModels
         private Visibility _unsupportedStatusVisibility = Visibility.Collapsed;
         private Visibility _disconnectedStatusVisibility = Visibility.Visible;
         private readonly StatFormatter _formatter;
+        private GameEventMonitorStatus _latestEventStatus = GameEventMonitorStatus.WaitingForMonitor;
 
         public MainWindowViewModel(DispatcherQueue dispatcherQueue)
         {
@@ -54,6 +55,8 @@ namespace BO2.ViewModels
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
+
+        public event EventHandler<GameEventMonitorStatus>? EventStatusUpdated;
 
         public string PointsText
         {
@@ -107,6 +110,22 @@ namespace BO2.ViewModels
         {
             get => _boxEventsText;
             private set => SetProperty(ref _boxEventsText, value);
+        }
+
+        public GameEventMonitorStatus LatestEventStatus
+        {
+            get => _latestEventStatus;
+            private set
+            {
+                if (Equals(_latestEventStatus, value))
+                {
+                    return;
+                }
+
+                _latestEventStatus = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LatestEventStatus)));
+                EventStatusUpdated?.Invoke(this, value);
+            }
         }
 
         public Visibility ConnectedStatusVisibility
@@ -415,27 +434,6 @@ namespace BO2.ViewModels
             };
         }
 
-        private static string FormatRecentGameEvents(GameEventMonitorStatus eventStatus)
-        {
-            if (eventStatus.RecentEvents.Count == 0)
-            {
-                return AppStrings.Get("RecentEventsEmpty");
-            }
-
-            return string.Join(
-                Environment.NewLine,
-                eventStatus.RecentEvents
-                    .TakeLast(6)
-                    .Select(gameEvent => AppStrings.Format(
-                        "RecentEventFormat",
-                        gameEvent.ReceivedAt.ToLocalTime().ToString("HH:mm:ss"),
-                        gameEvent.EventType,
-                        gameEvent.EventName,
-                        gameEvent.LevelTime,
-                        gameEvent.OwnerId,
-                        gameEvent.StringValue)));
-        }
-
         private static string FormatRoundSession(GameEventMonitorStatus eventStatus)
         {
             GameEvent? sessionEvent = eventStatus.RecentEvents
@@ -540,6 +538,7 @@ namespace BO2.ViewModels
             GameEventMonitorStatus eventStatus)
         {
             InjectionStatusText = FormatInjectionStatus(injectionResult, eventStatus);
+            LatestEventStatus = eventStatus;
 
             if (readResult.DetectedGame is null)
             {
@@ -585,7 +584,7 @@ namespace BO2.ViewModels
             EventMonitorStatusText = monitorStatusText;
             CurrentRoundText = FormatRoundSession(eventStatus);
             BoxEventsText = GameEventFormatter.FormatRecentBoxEvents(eventStatus);
-            RecentGameEventsText = FormatRecentGameEvents(eventStatus);
+            RecentGameEventsText = GameEventFormatter.FormatRecentGameEvents(eventStatus);
         }
 
         private void ApplyReadError(string message)
@@ -594,6 +593,7 @@ namespace BO2.ViewModels
             EventCompatibilityText = AppStrings.Get("NoGameDetected");
             InjectionStatusText = AppStrings.Get("DllInjectionNotAttempted");
             EventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForMonitor");
+            LatestEventStatus = GameEventMonitorStatus.WaitingForMonitor;
             CurrentRoundText = EmptyStatText;
             BoxEventsText = AppStrings.Get("RecentEventsEmpty");
             RecentGameEventsText = AppStrings.Get("RecentEventsEmpty");

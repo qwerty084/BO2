@@ -390,15 +390,34 @@
 
                     <StackPanel
                         x:Name="SettingsContent"
-                        Spacing="12"
+                        Spacing="16"
                         Visibility="Collapsed">
                         <TextBlock
-                            x:Uid="SettingsTitle"
+                            x:Uid="WidgetsSettingsTitle"
                             AutomationProperties.HeadingLevel="Level2"
                             Style="{ThemeResource SubtitleTextBlockStyle}" />
                         <TextBlock
-                            x:Uid="SettingsDescription"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            x:Uid="WidgetsSettingsDescription"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextWrapping="Wrap" />
+                        <ListView
+                            x:Name="WidgetsListView"
+                            MaxWidth="520"
+                            HorizontalAlignment="Left"
+                            SelectionMode="Single"
+                            SelectedIndex="0">
+                            <ListViewItem>
+                                <CheckBox
+                                    x:Name="BoxTrackerWidgetCheckBox"
+                                    x:Uid="BoxTrackerWidgetCheckBox"
+                                    Checked="OnBoxTrackerWidgetCheckBoxChanged"
+                                    Unchecked="OnBoxTrackerWidgetCheckBoxChanged" />
+                            </ListViewItem>
+                        </ListView>
+                        <Button
+                            x:Name="ConfigureSelectedWidgetButton"
+                            x:Uid="ConfigureSelectedWidgetButton"
+                            Click="OnConfigureSelectedWidgetClick" />
                     </StackPanel>
                 </StackPanel>
             </Grid>

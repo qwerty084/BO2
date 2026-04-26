@@ -351,6 +351,9 @@
   <data name="RecentEventsEmpty" xml:space="preserve">
     <value>No events received</value>
   </data>
+  <data name="BoxTrackerEmpty" xml:space="preserve">
+    <value>Spin the box to track averages</value>
+  </data>
   <data name="RecentEventsLabel.Text" xml:space="preserve">
     <value>Recent events</value>
   </data>
@@ -374,6 +377,48 @@
   </data>
   <data name="SettingsTitle.Text" xml:space="preserve">
     <value>Settings</value>
+  </data>
+  <data name="WidgetsSettingsTitle.Text" xml:space="preserve">
+    <value>Widgets</value>
+  </data>
+  <data name="WidgetsSettingsDescription.Text" xml:space="preserve">
+    <value>Enable separate widget windows for capture tools.</value>
+  </data>
+  <data name="BoxTrackerWidgetCheckBox.Content" xml:space="preserve">
+    <value>Box Tracker</value>
+  </data>
+  <data name="ConfigureSelectedWidgetButton.Content" xml:space="preserve">
+    <value>Configure</value>
+  </data>
+  <data name="BoxTrackerWidgetConfigTitle" xml:space="preserve">
+    <value>Box Tracker Config</value>
+  </data>
+  <data name="WidgetWidthLabel" xml:space="preserve">
+    <value>Width</value>
+  </data>
+  <data name="WidgetHeightLabel" xml:space="preserve">
+    <value>Height</value>
+  </data>
+  <data name="WidgetBackgroundColorLabel" xml:space="preserve">
+    <value>Background color</value>
+  </data>
+  <data name="WidgetTextColorLabel" xml:space="preserve">
+    <value>Text color</value>
+  </data>
+  <data name="WidgetTransparentBackgroundLabel" xml:space="preserve">
+    <value>Transparent background</value>
+  </data>
+  <data name="WidgetAlwaysOnTopLabel" xml:space="preserve">
+    <value>Always on top</value>
+  </data>
+  <data name="WidgetCenterAlignLabel" xml:space="preserve">
+    <value>Center align</value>
+  </data>
+  <data name="WidgetConfigSaveButton" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="WidgetConfigCancelButton" xml:space="preserve">
+    <value>Cancel</value>
   </data>
   <data name="ShortReadFormat" xml:space="preserve">
     <value>Expected to read {0} bytes but read {1} bytes.</value>
