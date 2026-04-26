@@ -2,6 +2,7 @@
 
 #include <array>
 #include <atomic>
+#include <mutex>
 
 namespace BO2Monitor
 {
@@ -16,6 +17,7 @@ namespace BO2Monitor
         };
 
         std::array<NotifyQueueSlot, NotifyEventQueueCapacity> notifyQueue{};
+        std::mutex notifyQueueMutex;
         std::atomic<std::uint64_t> nextWriteSequence{ 0 };
         std::atomic<std::uint64_t> droppedNotifyEventCount{ 0 };
         std::uint64_t nextReadSequence = 0;
@@ -23,6 +25,7 @@ namespace BO2Monitor
 
     void ResetNotifyEventQueue()
     {
+        std::lock_guard<std::mutex> lock(notifyQueueMutex);
         nextWriteSequence.store(0, std::memory_order_relaxed);
         droppedNotifyEventCount.store(0, std::memory_order_relaxed);
         nextReadSequence = 0;
@@ -43,8 +46,16 @@ namespace BO2Monitor
         const char* eventName,
         bool readRoundValue)
     {
+        std::unique_lock<std::mutex> lock(notifyQueueMutex, std::try_to_lock);
+        if (!lock.owns_lock())
+        {
+            droppedNotifyEventCount.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
+
         const std::uint64_t sequence = nextWriteSequence.fetch_add(1, std::memory_order_relaxed);
         NotifyQueueSlot& slot = notifyQueue[sequence % notifyQueue.size()];
+        slot.PublishedSequence.store(0, std::memory_order_release);
         slot.Record = RawNotifyRecord
         {
             sequence,
@@ -63,6 +74,11 @@ namespace BO2Monitor
     bool TryDequeueMatchedNotify(RawNotifyRecord& record, std::uint64_t& droppedSinceLastDrain)
     {
         droppedSinceLastDrain = 0;
+        std::unique_lock<std::mutex> lock(notifyQueueMutex, std::try_to_lock);
+        if (!lock.owns_lock())
+        {
+            return false;
+        }
 
         NotifyQueueSlot& slot = notifyQueue[nextReadSequence % notifyQueue.size()];
         const std::uint64_t expectedPublishedSequence = nextReadSequence + 1;

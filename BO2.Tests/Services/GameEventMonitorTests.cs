@@ -17,10 +17,11 @@ namespace BO2.Tests.Services
                 droppedNotifyCount: 3,
                 publishedNotifyCount: 4,
                 eventCount: 1);
-            WriteEvent(snapshot, 0, GameEventType.Unknown, 12345, "start_of_round");
             DateTimeOffset receivedAt = new(2026, 4, 26, 1, 2, 3, TimeSpan.Zero);
+            const uint receivedAtTick = 1000;
+            WriteEvent(snapshot, 0, GameEventType.Unknown, 12345, "start_of_round", receivedAtTick);
 
-            GameEventMonitorStatus status = GameEventMonitor.DecodeSnapshot(snapshot, receivedAt);
+            GameEventMonitorStatus status = GameEventMonitor.DecodeSnapshot(snapshot, receivedAt, receivedAtTick);
 
             Assert.Equal(GameCompatibilityState.Compatible, status.CompatibilityState);
             Assert.Equal(2u, status.DroppedEventCount);
@@ -158,6 +159,32 @@ namespace BO2.Tests.Services
             Assert.Equal("BO2MonitorEvent-1234", GameEventMonitor.BuildEventHandleName(1234));
         }
 
+        [Fact]
+        public void BuildStopEventHandleName_UsesTargetProcessId()
+        {
+            Assert.Equal("BO2MonitorStopEvent-1234", GameEventMonitor.BuildStopEventHandleName(1234));
+        }
+
+        [Fact]
+        public void DecodeSnapshot_UsesNativeTickForStableEventTimestamp()
+        {
+            byte[] snapshot = CreateSnapshot(
+                GameCompatibilityState.Compatible,
+                droppedEventCount: 0,
+                droppedNotifyCount: 0,
+                publishedNotifyCount: 1,
+                eventCount: 1);
+            WriteEvent(snapshot, 0, GameEventType.StartOfRound, 7, "start_of_round", tick: 98_000);
+            DateTimeOffset firstReadAt = new(2026, 4, 26, 1, 2, 3, TimeSpan.Zero);
+            DateTimeOffset secondReadAt = firstReadAt.AddSeconds(1);
+
+            GameEventMonitorStatus firstStatus = GameEventMonitor.DecodeSnapshot(snapshot, firstReadAt, receivedAtTick: 100_000);
+            GameEventMonitorStatus secondStatus = GameEventMonitor.DecodeSnapshot(snapshot, secondReadAt, receivedAtTick: 101_000);
+
+            Assert.Equal(firstReadAt.AddSeconds(-2), firstStatus.RecentEvents[0].ReceivedAt);
+            Assert.Equal(firstStatus.RecentEvents[0].ReceivedAt, secondStatus.RecentEvents[0].ReceivedAt);
+        }
+
         private static byte[] CreateSnapshot(
             GameCompatibilityState compatibilityState,
             uint droppedEventCount,
@@ -182,16 +209,18 @@ namespace BO2.Tests.Services
             int index,
             GameEventType eventType,
             int levelTime,
-            string eventName)
+            string eventName,
+            uint tick = 1000)
         {
             int offset = GameEventMonitor.HeaderSize + (index * GameEventMonitor.EventRecordSize);
             BinaryPrimitives.WriteInt32LittleEndian(snapshot.AsSpan(offset, 4), (int)eventType);
             BinaryPrimitives.WriteInt32LittleEndian(snapshot.AsSpan(offset + 4, 4), levelTime);
             BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(offset + 8, 4), 7);
             BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(offset + 12, 4), 1149);
+            BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(offset + 16, 4), tick);
             byte[] nameBytes = Encoding.UTF8.GetBytes(eventName);
             nameBytes.AsSpan(0, Math.Min(nameBytes.Length, GameEventMonitor.MaxEventNameBytes))
-                .CopyTo(snapshot.AsSpan(offset + 16, GameEventMonitor.MaxEventNameBytes));
+                .CopyTo(snapshot.AsSpan(offset + GameEventMonitor.EventNameOffset, GameEventMonitor.MaxEventNameBytes));
         }
     }
 }

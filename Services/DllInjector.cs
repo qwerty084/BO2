@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace BO2.Services
 {
@@ -151,32 +152,57 @@ namespace BO2.Services
 
         internal static DllPayloadValidationResult ValidateMonitorDll(string dllPath)
         {
-            string fullDllPath = Path.GetFullPath(dllPath);
+            return ValidatePayloadFile(
+                dllPath,
+                ImageFileMachineI386,
+                "DllInjectionInvalidDllFormat",
+                "DllInjectionInvalidPathFormat",
+                "DllInjectionInvalidMachineFormat");
+        }
+
+        internal static DllPayloadValidationResult ValidateInjectorHelper(string helperPath)
+        {
+            return ValidatePayloadFile(
+                helperPath,
+                ImageFileMachineI386,
+                "DllInjectionInvalidHelperFormat",
+                "DllInjectionInvalidHelperPathFormat",
+                "DllInjectionInvalidHelperMachineFormat");
+        }
+
+        private static DllPayloadValidationResult ValidatePayloadFile(
+            string payloadPath,
+            ushort expectedMachine,
+            string invalidPayloadFormatResourceId,
+            string invalidPathFormatResourceId,
+            string invalidMachineFormatResourceId)
+        {
+            string fullPayloadPath = Path.GetFullPath(payloadPath);
             string appBaseDirectory = Path.GetFullPath(AppContext.BaseDirectory);
             if (!appBaseDirectory.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal))
             {
                 appBaseDirectory += Path.DirectorySeparatorChar;
             }
 
-            if (!fullDllPath.StartsWith(appBaseDirectory, StringComparison.OrdinalIgnoreCase))
+            if (!fullPayloadPath.StartsWith(appBaseDirectory, StringComparison.OrdinalIgnoreCase))
             {
                 return DllPayloadValidationResult.Invalid(
-                    AppStrings.Format("DllInjectionInvalidPathFormat", fullDllPath));
+                    AppStrings.Format(invalidPathFormatResourceId, fullPayloadPath));
             }
 
             try
             {
-                FileAttributes attributes = File.GetAttributes(fullDllPath);
+                FileAttributes attributes = File.GetAttributes(fullPayloadPath);
                 if ((attributes & FileAttributes.Directory) != 0)
                 {
                     return DllPayloadValidationResult.Invalid(
-                        AppStrings.Format("DllInjectionInvalidDllFormat", fullDllPath));
+                        AppStrings.Format(invalidPayloadFormatResourceId, fullPayloadPath));
                 }
 
-                if (!HasExpectedPeMachine(fullDllPath, ImageFileMachineI386))
+                if (!HasExpectedPeMachine(fullPayloadPath, expectedMachine))
                 {
                     return DllPayloadValidationResult.Invalid(
-                        AppStrings.Format("DllInjectionInvalidMachineFormat", fullDllPath));
+                        AppStrings.Format(invalidMachineFormatResourceId, fullPayloadPath));
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or BadImageFormatException)
@@ -414,6 +440,14 @@ namespace BO2.Services
                 throw new WrongProcessArchitectureException(AppStrings.Get("DllInjectionMissingHelper"));
             }
 
+            DllPayloadValidationResult validationResult = ValidateInjectorHelper(helperPath);
+            if (!validationResult.IsValid)
+            {
+                throw new InvalidOperationException(AppStrings.Format(
+                    "DllInjectionInvalidHelperFormat",
+                    validationResult.Message ?? AppStrings.Get("EventMonitorUnknown")));
+            }
+
             var startInfo = new ProcessStartInfo
             {
                 FileName = helperPath,
@@ -427,21 +461,24 @@ namespace BO2.Services
 
             using Process process = Process.Start(startInfo)
                 ?? throw new WrongProcessArchitectureException(AppStrings.Get("DllInjectionMissingHelper"));
-            string standardOutput = process.StandardOutput.ReadToEnd();
-            string standardError = process.StandardError.ReadToEnd();
+            Task<string> standardOutputTask = process.StandardOutput.ReadToEndAsync();
+            Task<string> standardErrorTask = process.StandardError.ReadToEndAsync();
             if (!process.WaitForExit(15000))
             {
                 try
                 {
-                    process.Kill();
+                    process.Kill(entireProcessTree: true);
+                    process.WaitForExit(5000);
                 }
-                catch (InvalidOperationException)
+                catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
                 {
                 }
 
                 throw new InvalidOperationException(AppStrings.Format("DllInjectionWaitFailedFormat", "timeout"));
             }
 
+            string standardOutput = standardOutputTask.GetAwaiter().GetResult();
+            string standardError = standardErrorTask.GetAwaiter().GetResult();
             if (process.ExitCode != 0)
             {
                 string message = string.IsNullOrWhiteSpace(standardError) ? standardOutput : standardError;

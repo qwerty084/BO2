@@ -13,6 +13,7 @@ namespace BO2.ViewModels
     public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     {
         private const string EmptyStatText = "--";
+        private static readonly TimeSpan MonitorReadinessRetryTimeout = TimeSpan.FromSeconds(15);
 
         private readonly DispatcherQueue _dispatcherQueue;
         private readonly GameMemoryReader _memoryReader = new();
@@ -20,6 +21,7 @@ namespace BO2.ViewModels
         private readonly IGameEventMonitor _eventMonitor = new GameEventMonitor();
         private DllInjectionResult _lastInjectionResult = DllInjectionResult.NotAttempted;
         private int? _lastInjectionProcessId;
+        private DateTimeOffset? _lastInjectionAttemptedAt;
         private string _pointsText = EmptyStatText;
         private string _killsText = EmptyStatText;
         private string _downsText = EmptyStatText;
@@ -206,6 +208,11 @@ namespace BO2.ViewModels
                         GameEventMonitorStatus eventStatus = _eventMonitor.ReadStatus(
                             DateTimeOffset.UtcNow,
                             readResult.DetectedGame?.ProcessId);
+                        ApplyInjectionRetryPolicy(
+                            readResult.DetectedGame,
+                            injectionResult,
+                            eventStatus,
+                            DateTimeOffset.UtcNow);
                         return (readResult, injectionResult, eventStatus);
                     },
                     cancellationToken);
@@ -477,6 +484,7 @@ namespace BO2.ViewModels
             if (detectedGame is null)
             {
                 _lastInjectionProcessId = null;
+                _lastInjectionAttemptedAt = null;
                 _lastInjectionResult = DllInjectionResult.NotAttempted;
                 return _lastInjectionResult;
             }
@@ -488,7 +496,32 @@ namespace BO2.ViewModels
 
             _lastInjectionProcessId = detectedGame.ProcessId;
             _lastInjectionResult = _dllInjector.Inject(detectedGame);
+            _lastInjectionAttemptedAt = _lastInjectionResult.State is DllInjectionState.Loaded or DllInjectionState.AlreadyInjected
+                ? DateTimeOffset.UtcNow
+                : null;
             return _lastInjectionResult;
+        }
+
+        private void ApplyInjectionRetryPolicy(
+            DetectedGame? detectedGame,
+            DllInjectionResult injectionResult,
+            GameEventMonitorStatus eventStatus,
+            DateTimeOffset now)
+        {
+            if (detectedGame is null
+                || _lastInjectionProcessId != detectedGame.ProcessId
+                || eventStatus.CompatibilityState != GameCompatibilityState.WaitingForMonitor
+                || injectionResult.State is not (DllInjectionState.Loaded or DllInjectionState.AlreadyInjected)
+                || _lastInjectionAttemptedAt is not DateTimeOffset attemptedAt
+                || now - attemptedAt < MonitorReadinessRetryTimeout)
+            {
+                return;
+            }
+
+            _eventMonitor.Dispose();
+            _lastInjectionProcessId = null;
+            _lastInjectionAttemptedAt = null;
+            _lastInjectionResult = DllInjectionResult.NotAttempted;
         }
 
         private static bool IsCachedInjectionResult(DllInjectionState state)

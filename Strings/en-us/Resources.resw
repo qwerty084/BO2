@@ -78,6 +78,15 @@
   <data name="DllInjectionInvalidMachineFormat" xml:space="preserve">
     <value>BO2Monitor.dll is not a 32-bit Windows DLL: {0}</value>
   </data>
+  <data name="DllInjectionInvalidHelperFormat" xml:space="preserve">
+    <value>BO2InjectorHelper.exe failed validation: {0}</value>
+  </data>
+  <data name="DllInjectionInvalidHelperMachineFormat" xml:space="preserve">
+    <value>BO2InjectorHelper.exe is not a 32-bit Windows executable: {0}</value>
+  </data>
+  <data name="DllInjectionInvalidHelperPathFormat" xml:space="preserve">
+    <value>BO2InjectorHelper.exe is outside the app directory: {0}</value>
+  </data>
   <data name="DllInjectionInvalidPathFormat" xml:space="preserve">
     <value>BO2Monitor.dll is outside the app directory: {0}</value>
   </data>

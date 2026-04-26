@@ -9,8 +9,9 @@ namespace BO2Monitor
 {
     constexpr wchar_t SharedMemoryNamePrefix[] = L"BO2MonitorSharedMem-";
     constexpr wchar_t EventHandleNamePrefix[] = L"BO2MonitorEvent-";
+    constexpr wchar_t StopEventHandleNamePrefix[] = L"BO2MonitorStopEvent-";
     constexpr std::uint32_t SnapshotMagic = 0x45324F42; // BO2E
-    constexpr std::uint32_t SnapshotVersion = 4;
+    constexpr std::uint32_t SnapshotVersion = 5;
     constexpr std::size_t MaxEventCount = 128;
     constexpr std::size_t MaxEventNameBytes = 64;
 
@@ -52,6 +53,7 @@ namespace BO2Monitor
         std::int32_t LevelTime;
         std::uint32_t OwnerId;
         std::uint32_t StringValue;
+        std::uint32_t Tick;
         char EventName[MaxEventNameBytes];
     };
 
@@ -70,11 +72,12 @@ namespace BO2Monitor
     };
 #pragma pack(pop)
 
-    static_assert(sizeof(GameEventRecord) == 80);
-    static_assert(sizeof(SharedSnapshot) == 10276);
+    static_assert(sizeof(GameEventRecord) == 84);
+    static_assert(sizeof(SharedSnapshot) == 10788);
 
     std::wstring BuildSharedMemoryName(DWORD processId);
     std::wstring BuildEventHandleName(DWORD processId);
+    std::wstring BuildStopEventHandleName(DWORD processId);
 
     class SharedSnapshotWriter
     {
@@ -92,7 +95,9 @@ namespace BO2Monitor
             const char* eventName,
             std::int32_t levelTime,
             std::uint32_t ownerId = 0,
-            std::uint32_t stringValue = 0);
+            std::uint32_t stringValue = 0,
+            std::uint32_t tick = 0);
+        bool WaitForStop(DWORD milliseconds) const;
 
     private:
         void InitializeSnapshot();
@@ -101,6 +106,7 @@ namespace BO2Monitor
 
         HANDLE mappingHandle_ = nullptr;
         HANDLE eventHandle_ = nullptr;
+        HANDLE stopEventHandle_ = nullptr;
         SharedSnapshot* snapshot_ = nullptr;
     };
 }

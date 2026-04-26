@@ -199,7 +199,8 @@ namespace BO2Monitor
                 record.EventName,
                 eventValue,
                 record.OwnerId,
-                record.StringValue);
+                record.StringValue,
+                record.Tick);
         }
 
         void __cdecl VmNotifyDetour(
@@ -467,7 +468,7 @@ namespace BO2Monitor
     {
         std::uint64_t publishedNotifyCount = 0;
 
-        while (true)
+        while (!snapshotWriter.WaitForStop(0))
         {
             std::uint32_t processedCount = 0;
             for (; processedCount < 64; ++processedCount)
@@ -489,13 +490,20 @@ namespace BO2Monitor
 
             if (processedCount == 0)
             {
-                Sleep(100);
+                snapshotWriter.WaitForStop(100);
             }
             else
             {
+                if (snapshotWriter.WaitForStop(0))
+                {
+                    break;
+                }
+
                 Sleep(0);
             }
         }
+
+        UninstallVmNotifyHook();
     }
 
     void RunPollingFallback(SharedSnapshotWriter& snapshotWriter)
@@ -503,6 +511,7 @@ namespace BO2Monitor
         if (!ArePollingAddressesReadable())
         {
             snapshotWriter.SetCompatibility(GameCompatibilityState::UnsupportedVersion);
+            snapshotWriter.WaitForStop(INFINITE);
             return;
         }
 
@@ -517,9 +526,8 @@ namespace BO2Monitor
         std::int32_t previousKills = *killsValue;
         std::int32_t previousDowns = *downsValue;
 
-        while (true)
+        while (!snapshotWriter.WaitForStop(250))
         {
-            Sleep(250);
             PublishIfChanged(snapshotWriter, roundValue, previousRound, GameEventType::RoundChanged, "round_changed", true, 2, 255);
             PublishIfChanged(snapshotWriter, pointsValue, previousPoints, GameEventType::PointsChanged, "points_changed", false, 0, 2000000);
             PublishIfChanged(snapshotWriter, killsValue, previousKills, GameEventType::KillsChanged, "kills_changed", true, 0, 100000);

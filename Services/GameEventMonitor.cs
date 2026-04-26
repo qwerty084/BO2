@@ -12,13 +12,15 @@ namespace BO2.Services
     {
         public const string SharedMemoryNamePrefix = "BO2MonitorSharedMem-";
         public const string EventHandleNamePrefix = "BO2MonitorEvent-";
+        public const string StopEventHandleNamePrefix = "BO2MonitorStopEvent-";
 
         internal const uint SnapshotMagic = 0x45324F42; // BO2E
-        internal const uint SnapshotVersion = 4;
+        internal const uint SnapshotVersion = 5;
         internal const int MaxEventCount = 128;
         internal const int MaxEventNameBytes = 64;
         internal const int HeaderSize = 36;
-        internal const int EventRecordSize = 80;
+        internal const int EventRecordSize = 84;
+        internal const int EventNameOffset = 20;
         internal const int SharedMemorySize = HeaderSize + (MaxEventCount * EventRecordSize);
         internal const int WriteSequenceOffset = 32;
         private const int StableReadAttempts = 4;
@@ -26,20 +28,21 @@ namespace BO2.Services
         private int? _targetProcessId;
         private MemoryMappedFile? _sharedMemory;
         private EventWaitHandle? _eventHandle;
+        private EventWaitHandle? _stopEventHandle;
         private bool _readinessSignalObserved;
 
         public GameEventMonitorStatus ReadStatus(DateTimeOffset receivedAt, int? targetProcessId)
         {
             if (targetProcessId is null or <= 0)
             {
-                ResetSharedMemory();
+                ResetSharedMemory(signalStop: true);
                 _targetProcessId = null;
                 return GameEventMonitorStatus.WaitingForMonitor;
             }
 
             if (_targetProcessId != targetProcessId)
             {
-                ResetSharedMemory();
+                ResetSharedMemory(signalStop: true);
                 _targetProcessId = targetProcessId;
             }
 
@@ -89,10 +92,18 @@ namespace BO2.Services
 
         public void Dispose()
         {
-            ResetSharedMemory();
+            ResetSharedMemory(signalStop: true);
         }
 
         internal static GameEventMonitorStatus DecodeSnapshot(ReadOnlySpan<byte> snapshot, DateTimeOffset receivedAt)
+        {
+            return DecodeSnapshot(snapshot, receivedAt, unchecked((uint)Environment.TickCount64));
+        }
+
+        internal static GameEventMonitorStatus DecodeSnapshot(
+            ReadOnlySpan<byte> snapshot,
+            DateTimeOffset receivedAt,
+            uint receivedAtTick)
         {
             if (snapshot.Length < HeaderSize)
             {
@@ -142,7 +153,8 @@ namespace BO2.Services
                 int levelTime = BinaryPrimitives.ReadInt32LittleEndian(record[4..8]);
                 uint ownerId = BinaryPrimitives.ReadUInt32LittleEndian(record[8..12]);
                 uint stringValue = BinaryPrimitives.ReadUInt32LittleEndian(record[12..16]);
-                string eventName = ReadEventName(record[16..(16 + MaxEventNameBytes)]);
+                uint eventTick = BinaryPrimitives.ReadUInt32LittleEndian(record[16..20]);
+                string eventName = ReadEventName(record[EventNameOffset..(EventNameOffset + MaxEventNameBytes)]);
                 if (string.IsNullOrWhiteSpace(eventName))
                 {
                     continue;
@@ -153,7 +165,8 @@ namespace BO2.Services
                     eventType = MapEventName(eventName);
                 }
 
-                events.Add(new GameEvent(eventType, eventName, levelTime, ownerId, stringValue, receivedAt));
+                DateTimeOffset eventReceivedAt = ConvertNativeTickToReceivedAt(receivedAt, receivedAtTick, eventTick);
+                events.Add(new GameEvent(eventType, eventName, levelTime, ownerId, stringValue, eventReceivedAt));
             }
 
             return new GameEventMonitorStatus(
@@ -195,6 +208,15 @@ namespace BO2.Services
             };
         }
 
+        internal static DateTimeOffset ConvertNativeTickToReceivedAt(
+            DateTimeOffset snapshotReceivedAt,
+            uint snapshotTick,
+            uint eventTick)
+        {
+            uint elapsedMilliseconds = unchecked(snapshotTick - eventTick);
+            return snapshotReceivedAt - TimeSpan.FromMilliseconds(elapsedMilliseconds);
+        }
+
         private static GameCompatibilityState ReadCompatibilityState(ReadOnlySpan<byte> value)
         {
             int rawValue = BinaryPrimitives.ReadInt32LittleEndian(value);
@@ -226,6 +248,11 @@ namespace BO2.Services
         internal static string BuildEventHandleName(int processId)
         {
             return EventHandleNamePrefix + processId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        internal static string BuildStopEventHandleName(int processId)
+        {
+            return StopEventHandleNamePrefix + processId.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private static bool TryReadStableSnapshot(MemoryMappedViewAccessor accessor, byte[] snapshot)
@@ -262,6 +289,7 @@ namespace BO2.Services
             try
             {
                 _eventHandle ??= EventWaitHandle.OpenExisting(BuildEventHandleName(targetProcessId));
+                _stopEventHandle ??= EventWaitHandle.OpenExisting(BuildStopEventHandleName(targetProcessId));
                 _sharedMemory ??= MemoryMappedFile.OpenExisting(
                     BuildSharedMemoryName(targetProcessId),
                     MemoryMappedFileRights.Read);
@@ -289,12 +317,25 @@ namespace BO2.Services
             }
         }
 
-        private void ResetSharedMemory()
+        private void ResetSharedMemory(bool signalStop = false)
         {
+            if (signalStop)
+            {
+                try
+                {
+                    _stopEventHandle?.Set();
+                }
+                catch (ObjectDisposedException)
+                {
+                }
+            }
+
             _sharedMemory?.Dispose();
             _sharedMemory = null;
             _eventHandle?.Dispose();
             _eventHandle = null;
+            _stopEventHandle?.Dispose();
+            _stopEventHandle = null;
             _readinessSignalObserved = false;
         }
     }

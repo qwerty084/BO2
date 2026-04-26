@@ -15,7 +15,7 @@ if ($ProcessId -le 0) {
 
 $maxEventCount = 128
 $headerSize = 36
-$eventRecordSize = 80
+$eventRecordSize = 84
 $sharedMemorySize = $headerSize + ($maxEventCount * $eventRecordSize)
 
 $sharedMemoryName = "BO2MonitorSharedMem-$ProcessId"
@@ -58,15 +58,16 @@ try {
         $levelTime = $view.ReadInt32($offset + 4)
         $ownerId = $view.ReadUInt32($offset + 8)
         $stringValue = $view.ReadUInt32($offset + 12)
+        $tick = $view.ReadUInt32($offset + 16)
         $nameBytes = New-Object byte[] 64
-        [void]$view.ReadArray($offset + 16, $nameBytes, 0, $nameBytes.Length)
+        [void]$view.ReadArray($offset + 20, $nameBytes, 0, $nameBytes.Length)
         $zero = [Array]::IndexOf($nameBytes, [byte]0)
         if ($zero -lt 0) {
             $zero = $nameBytes.Length
         }
 
         $name = [Text.Encoding]::UTF8.GetString($nameBytes, 0, $zero)
-        "event[{0}] type={1} value={2} owner={3} id={4} name={5}" -f $index, $eventType, $levelTime, $ownerId, $stringValue, $name
+        "event[{0}] type={1} value={2} owner={3} id={4} tick={5} name={6}" -f $index, $eventType, $levelTime, $ownerId, $stringValue, $tick, $name
     }
 }
 finally {

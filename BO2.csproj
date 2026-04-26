@@ -5,14 +5,28 @@
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>BO2</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Platforms>x86;x64;ARM64</Platforms>
-    <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+    <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x86</Platform>
+    <Platforms>x86</Platforms>
+    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
     <PublishProfile>win-$(Platform).pubxml</PublishProfile>
     <UseWinUI>true</UseWinUI>
     <WinUISDKReferences>false</WinUISDKReferences>
     <EnableMsixTooling>true</EnableMsixTooling>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <NativeMSBuildExe Condition="'$(NativeMSBuildExe)'=='' and Exists('$(ProgramFiles)\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe')">$(ProgramFiles)\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe</NativeMSBuildExe>
+    <NativeMSBuildExe Condition="'$(NativeMSBuildExe)'=='' and Exists('$(ProgramFiles)\Microsoft Visual Studio\18\Professional\MSBuild\Current\Bin\MSBuild.exe')">$(ProgramFiles)\Microsoft Visual Studio\18\Professional\MSBuild\Current\Bin\MSBuild.exe</NativeMSBuildExe>
+    <NativeMSBuildExe Condition="'$(NativeMSBuildExe)'=='' and Exists('$(ProgramFiles)\Microsoft Visual Studio\18\Enterprise\MSBuild\Current\Bin\MSBuild.exe')">$(ProgramFiles)\Microsoft Visual Studio\18\Enterprise\MSBuild\Current\Bin\MSBuild.exe</NativeMSBuildExe>
+    <NativeMSBuildExe Condition="'$(NativeMSBuildExe)'=='' and Exists('$(ProgramFiles)\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe')">$(ProgramFiles)\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe</NativeMSBuildExe>
+    <NativeMSBuildExe Condition="'$(NativeMSBuildExe)'=='' and Exists('$(ProgramFiles)\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\MSBuild.exe')">$(ProgramFiles)\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\MSBuild.exe</NativeMSBuildExe>
+    <NativeMSBuildExe Condition="'$(NativeMSBuildExe)'=='' and Exists('$(ProgramFiles)\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe')">$(ProgramFiles)\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe</NativeMSBuildExe>
+  </PropertyGroup>
+
+  <Target Name="FailUnsupportedPlatform" BeforeTargets="PrepareForBuild" Condition="'$(Platform)' != 'x86'">
+    <Error Text="BO2 only supports 32-bit Windows builds. Use -p:Platform=x86." />
+  </Target>
 
   <ItemGroup>
     <!-- Exclude the sibling test project from this app's compile glob -->
@@ -64,18 +78,43 @@
     <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
   </PropertyGroup>
 
-  <Target Name="BuildBO2MonitorDll" BeforeTargets="CopyBO2MonitorDll" Condition="'$(Platform)'!='ARM64'">
+  <Target Name="BuildBO2MonitorDll" BeforeTargets="CopyBO2MonitorDll">
+    <Error
+      Condition="'$(MSBuildRuntimeType)'=='Core' and '$(NativeMSBuildExe)'==''"
+      Text="Visual C++ MSBuild targets are required to build BO2Monitor.dll. Install Visual C++ build tools or pass NativeMSBuildExe to a native MSBuild.exe path." />
+    <Exec
+      Condition="'$(MSBuildRuntimeType)'=='Core'"
+      Command="&quot;$(NativeMSBuildExe)&quot; &quot;$(MSBuildProjectDirectory)\BO2Monitor\BO2Monitor.vcxproj&quot; /t:Build /p:Configuration=Production /p:Platform=Win32 /p:EnableVmNotifyHook=true /v:minimal" />
     <MSBuild
+      Condition="'$(MSBuildRuntimeType)'!='Core'"
       Projects="$(MSBuildProjectDirectory)\BO2Monitor\BO2Monitor.vcxproj"
       Targets="Build"
       Properties="Configuration=Production;Platform=Win32;EnableVmNotifyHook=true" />
   </Target>
 
-  <Target Name="BuildBO2InjectorHelper" BeforeTargets="CopyBO2InjectorHelper" Condition="'$(Platform)'!='ARM64'">
+  <Target Name="BuildBO2InjectorHelper" BeforeTargets="CopyBO2InjectorHelper">
+    <Error
+      Condition="'$(MSBuildRuntimeType)'=='Core' and '$(NativeMSBuildExe)'==''"
+      Text="Visual C++ MSBuild targets are required to build BO2InjectorHelper.exe. Install Visual C++ build tools or pass NativeMSBuildExe to a native MSBuild.exe path." />
+    <Exec
+      Condition="'$(MSBuildRuntimeType)'=='Core'"
+      Command="&quot;$(NativeMSBuildExe)&quot; &quot;$(MSBuildProjectDirectory)\BO2InjectorHelper\BO2InjectorHelper.vcxproj&quot; /t:Build /p:Configuration=Production /p:Platform=Win32 /v:minimal" />
     <MSBuild
+      Condition="'$(MSBuildRuntimeType)'!='Core'"
       Projects="$(MSBuildProjectDirectory)\BO2InjectorHelper\BO2InjectorHelper.vcxproj"
       Targets="Build"
       Properties="Configuration=Production;Platform=Win32" />
+  </Target>
+
+  <Target Name="AddBO2NativePackagePayload" BeforeTargets="_ComputeAppxPackagePayload" DependsOnTargets="BuildBO2MonitorDll;BuildBO2InjectorHelper">
+    <ItemGroup>
+      <AppxPackagePayload Include="$(MSBuildProjectDirectory)\BO2Monitor\bin\Win32\Production\BO2Monitor.dll">
+        <TargetPath>BO2Monitor.dll</TargetPath>
+      </AppxPackagePayload>
+      <AppxPackagePayload Include="$(MSBuildProjectDirectory)\BO2InjectorHelper\bin\Win32\Production\BO2InjectorHelper.exe">
+        <TargetPath>BO2InjectorHelper.exe</TargetPath>
+      </AppxPackagePayload>
+    </ItemGroup>
   </Target>
 
   <Target Name="CopyBO2MonitorDll" AfterTargets="Build">
@@ -83,8 +122,10 @@
       <BO2MonitorDll Include="$(MSBuildProjectDirectory)\BO2Monitor\bin\Win32\Production\BO2Monitor.dll" Condition="Exists('$(MSBuildProjectDirectory)\BO2Monitor\bin\Win32\Production\BO2Monitor.dll')" />
       <BO2MonitorDll Include="$(MSBuildProjectDirectory)\BO2Monitor\bin\Win32\$(Configuration)\BO2Monitor.dll" Condition="!Exists('$(MSBuildProjectDirectory)\BO2Monitor\bin\Win32\Production\BO2Monitor.dll') and Exists('$(MSBuildProjectDirectory)\BO2Monitor\bin\Win32\$(Configuration)\BO2Monitor.dll')" />
     </ItemGroup>
+    <Error
+      Condition="'@(BO2MonitorDll)'==''"
+      Text="BO2Monitor.dll was not produced. Install Visual C++ build tools or build BO2Monitor\BO2Monitor.vcxproj with native MSBuild before building BO2." />
     <Copy SourceFiles="@(BO2MonitorDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
-    <Copy SourceFiles="@(BO2MonitorDll)" DestinationFolder="$(OutDir)AppX\" SkipUnchangedFiles="true" Condition="Exists('$(OutDir)AppX')" />
   </Target>
 
   <Target Name="CopyBO2InjectorHelper" AfterTargets="Build">
@@ -92,7 +133,9 @@
       <BO2InjectorHelper Include="$(MSBuildProjectDirectory)\BO2InjectorHelper\bin\Win32\Production\BO2InjectorHelper.exe" Condition="Exists('$(MSBuildProjectDirectory)\BO2InjectorHelper\bin\Win32\Production\BO2InjectorHelper.exe')" />
       <BO2InjectorHelper Include="$(MSBuildProjectDirectory)\BO2InjectorHelper\bin\Win32\$(Configuration)\BO2InjectorHelper.exe" Condition="!Exists('$(MSBuildProjectDirectory)\BO2InjectorHelper\bin\Win32\Production\BO2InjectorHelper.exe') and Exists('$(MSBuildProjectDirectory)\BO2InjectorHelper\bin\Win32\$(Configuration)\BO2InjectorHelper.exe')" />
     </ItemGroup>
+    <Error
+      Condition="'@(BO2InjectorHelper)'==''"
+      Text="BO2InjectorHelper.exe was not produced. Install Visual C++ build tools or build BO2InjectorHelper\BO2InjectorHelper.vcxproj with native MSBuild before building BO2." />
     <Copy SourceFiles="@(BO2InjectorHelper)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
-    <Copy SourceFiles="@(BO2InjectorHelper)" DestinationFolder="$(OutDir)AppX\" SkipUnchangedFiles="true" Condition="Exists('$(OutDir)AppX')" />
   </Target>
 </Project>

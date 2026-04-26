@@ -3,7 +3,7 @@
 ## Build, test, and lint
 
 - Build the solution with `dotnet build .\BO2.slnx`.
-- Build arch with `dotnet build .\BO2.csproj -p:Platform=x64`; platforms: `x86`, `x64`, `ARM64`.
+- Build the 32-bit Windows app with `dotnet build .\BO2.csproj -p:Platform=x86`.
 - Run non-UI unit tests with: `dotnet test BO2.Tests\BO2.Tests.csproj`
 - Tests are pure xUnit (no WinAppSDK runtime); target `net8.0-windows10.0.19041.0` but do NOT reference WinUI.
 - No repo-specific lint or format command/config checked in.
@@ -31,4 +31,4 @@
 - Add shared styles, brushes, app-wide resources in `App.xaml`, not directly in `MainWindow.xaml`.
 - Packaging assets: keep manifest asset basenames stable. `Package.appxmanifest` references `Assets\Square150x150Logo.png`; physical files in `Assets\` use scale-qualified filenames such as `.scale-200.png`.
 - Be careful with manifest capabilities and packaging settings. App declares both `runFullTrust` and `systemAIModels`.
-- If change depends on output architecture or native/runtime packaging behavior, specify `Platform`; project builds for `x86`, `x64`, `ARM64`.
+- If change depends on output architecture or native/runtime packaging behavior, specify `Platform=x86`; the app only supports 32-bit Windows builds.

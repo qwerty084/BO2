@@ -15,6 +15,11 @@ namespace BO2Monitor
         return std::wstring(EventHandleNamePrefix) + std::to_wstring(processId);
     }
 
+    std::wstring BuildStopEventHandleName(DWORD processId)
+    {
+        return std::wstring(StopEventHandleNamePrefix) + std::to_wstring(processId);
+    }
+
     SharedSnapshotWriter::~SharedSnapshotWriter()
     {
         if (snapshot_ != nullptr)
@@ -29,6 +34,12 @@ namespace BO2Monitor
             eventHandle_ = nullptr;
         }
 
+        if (stopEventHandle_ != nullptr)
+        {
+            CloseHandle(stopEventHandle_);
+            stopEventHandle_ = nullptr;
+        }
+
         if (mappingHandle_ != nullptr)
         {
             CloseHandle(mappingHandle_);
@@ -41,6 +52,7 @@ namespace BO2Monitor
         const DWORD processId = GetCurrentProcessId();
         const std::wstring sharedMemoryName = BuildSharedMemoryName(processId);
         const std::wstring eventHandleName = BuildEventHandleName(processId);
+        const std::wstring stopEventHandleName = BuildStopEventHandleName(processId);
         mappingHandle_ = CreateFileMappingW(
             INVALID_HANDLE_VALUE,
             nullptr,
@@ -66,6 +78,12 @@ namespace BO2Monitor
 
         eventHandle_ = CreateEventW(nullptr, FALSE, FALSE, eventHandleName.c_str());
         if (eventHandle_ == nullptr)
+        {
+            return false;
+        }
+
+        stopEventHandle_ = CreateEventW(nullptr, TRUE, FALSE, stopEventHandleName.c_str());
+        if (stopEventHandle_ == nullptr)
         {
             return false;
         }
@@ -108,7 +126,8 @@ namespace BO2Monitor
         const char* eventName,
         std::int32_t levelTime,
         std::uint32_t ownerId,
-        std::uint32_t stringValue)
+        std::uint32_t stringValue,
+        std::uint32_t tick)
     {
         if (snapshot_ == nullptr || eventName == nullptr)
         {
@@ -123,6 +142,7 @@ namespace BO2Monitor
         record.LevelTime = levelTime;
         record.OwnerId = ownerId;
         record.StringValue = stringValue;
+        record.Tick = tick == 0 ? GetTickCount() : tick;
         std::memset(record.EventName, 0, sizeof(record.EventName));
         const std::size_t sourceLength = std::strlen(eventName);
         const std::size_t copyLength = std::min(sourceLength, MaxEventNameBytes - 1);
@@ -144,6 +164,12 @@ namespace BO2Monitor
         {
             SetEvent(eventHandle_);
         }
+    }
+
+    bool SharedSnapshotWriter::WaitForStop(DWORD milliseconds) const
+    {
+        return stopEventHandle_ != nullptr
+            && WaitForSingleObject(stopEventHandle_, milliseconds) == WAIT_OBJECT_0;
     }
 
     void SharedSnapshotWriter::InitializeSnapshot()

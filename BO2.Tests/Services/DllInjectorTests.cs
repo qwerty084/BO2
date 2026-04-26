@@ -200,6 +200,43 @@ namespace BO2.Tests.Services
             }
         }
 
+        [Fact]
+        public void ValidateInjectorHelper_WhenMachineMatches_ReturnsValid()
+        {
+            string path = Path.Combine(AppContext.BaseDirectory, Guid.NewGuid() + ".exe");
+            try
+            {
+                File.WriteAllBytes(path, CreateMinimalPe(machine: 0x014c));
+
+                DllInjector.DllPayloadValidationResult result = DllInjector.ValidateInjectorHelper(path);
+
+                Assert.True(result.IsValid);
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public void ValidateInjectorHelper_WhenMachineDiffers_ReturnsInvalid()
+        {
+            string path = Path.Combine(AppContext.BaseDirectory, Guid.NewGuid() + ".exe");
+            try
+            {
+                File.WriteAllBytes(path, CreateMinimalPe(machine: 0x8664));
+
+                DllInjector.DllPayloadValidationResult result = DllInjector.ValidateInjectorHelper(path);
+
+                Assert.False(result.IsValid);
+                Assert.Contains("DllInjectionInvalidHelperMachineFormat", result.Message, StringComparison.Ordinal);
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
         private static DetectedGame CreateSupportedGame()
         {
             return new DetectedGame(
