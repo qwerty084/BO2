@@ -127,7 +127,8 @@ namespace BO2Monitor
         std::int32_t levelTime,
         std::uint32_t ownerId,
         std::uint32_t stringValue,
-        std::uint32_t tick)
+        std::uint32_t tick,
+        const char* weaponName)
     {
         if (snapshot_ == nullptr || eventName == nullptr)
         {
@@ -147,6 +148,13 @@ namespace BO2Monitor
         const std::size_t sourceLength = std::strlen(eventName);
         const std::size_t copyLength = std::min(sourceLength, MaxEventNameBytes - 1);
         std::memcpy(record.EventName, eventName, copyLength);
+        std::memset(record.WeaponName, 0, sizeof(record.WeaponName));
+        if (weaponName != nullptr)
+        {
+            const std::size_t weaponNameLength = std::strlen(weaponName);
+            const std::size_t weaponNameCopyLength = std::min(weaponNameLength, MaxWeaponNameBytes - 1);
+            std::memcpy(record.WeaponName, weaponName, weaponNameCopyLength);
+        }
 
         snapshot_->EventWriteIndex = (snapshot_->EventWriteIndex + 1) % MaxEventCount;
 

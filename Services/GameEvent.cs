@@ -8,5 +8,6 @@ namespace BO2.Services
         int LevelTime,
         uint OwnerId,
         uint StringValue,
-        DateTimeOffset ReceivedAt);
+        DateTimeOffset ReceivedAt,
+        string? WeaponName = null);
 }

@@ -15,12 +15,14 @@ namespace BO2.Services
         public const string StopEventHandleNamePrefix = "BO2MonitorStopEvent-";
 
         internal const uint SnapshotMagic = 0x45324F42; // BO2E
-        internal const uint SnapshotVersion = 5;
+        internal const uint SnapshotVersion = 6;
         internal const int MaxEventCount = 128;
         internal const int MaxEventNameBytes = 64;
+        internal const int MaxWeaponNameBytes = 64;
         internal const int HeaderSize = 36;
-        internal const int EventRecordSize = 84;
+        internal const int EventRecordSize = 148;
         internal const int EventNameOffset = 20;
+        internal const int WeaponNameOffset = EventNameOffset + MaxEventNameBytes;
         internal const int SharedMemorySize = HeaderSize + (MaxEventCount * EventRecordSize);
         internal const int WriteSequenceOffset = 32;
         private const int StableReadAttempts = 4;
@@ -155,6 +157,7 @@ namespace BO2.Services
                 uint stringValue = BinaryPrimitives.ReadUInt32LittleEndian(record[12..16]);
                 uint eventTick = BinaryPrimitives.ReadUInt32LittleEndian(record[16..20]);
                 string eventName = ReadEventName(record[EventNameOffset..(EventNameOffset + MaxEventNameBytes)]);
+                string weaponName = ReadEventName(record[WeaponNameOffset..(WeaponNameOffset + MaxWeaponNameBytes)]);
                 if (string.IsNullOrWhiteSpace(eventName))
                 {
                     continue;
@@ -166,7 +169,14 @@ namespace BO2.Services
                 }
 
                 DateTimeOffset eventReceivedAt = ConvertNativeTickToReceivedAt(receivedAt, receivedAtTick, eventTick);
-                events.Add(new GameEvent(eventType, eventName, levelTime, ownerId, stringValue, eventReceivedAt));
+                events.Add(new GameEvent(
+                    eventType,
+                    eventName,
+                    levelTime,
+                    ownerId,
+                    stringValue,
+                    eventReceivedAt,
+                    string.IsNullOrWhiteSpace(weaponName) ? null : weaponName));
             }
 
             return new GameEventMonitorStatus(

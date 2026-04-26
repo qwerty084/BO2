@@ -35,6 +35,7 @@
     <Compile Include="..\Services\GameVariant.cs"               Link="Services\GameVariant.cs" />
     <Compile Include="..\Services\GameCompatibilityState.cs"    Link="Services\GameCompatibilityState.cs" />
     <Compile Include="..\Services\GameEvent.cs"                 Link="Services\GameEvent.cs" />
+    <Compile Include="..\Services\GameEventFormatter.cs"        Link="Services\GameEventFormatter.cs" />
     <Compile Include="..\Services\GameEventMonitor.cs"          Link="Services\GameEventMonitor.cs" />
     <Compile Include="..\Services\GameEventMonitorStatus.cs"    Link="Services\GameEventMonitorStatus.cs" />
     <Compile Include="..\Services\GameEventType.cs"             Link="Services\GameEventType.cs" />

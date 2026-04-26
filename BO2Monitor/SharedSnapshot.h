@@ -11,9 +11,10 @@ namespace BO2Monitor
     constexpr wchar_t EventHandleNamePrefix[] = L"BO2MonitorEvent-";
     constexpr wchar_t StopEventHandleNamePrefix[] = L"BO2MonitorStopEvent-";
     constexpr std::uint32_t SnapshotMagic = 0x45324F42; // BO2E
-    constexpr std::uint32_t SnapshotVersion = 5;
+    constexpr std::uint32_t SnapshotVersion = 6;
     constexpr std::size_t MaxEventCount = 128;
     constexpr std::size_t MaxEventNameBytes = 64;
+    constexpr std::size_t MaxWeaponNameBytes = 64;
 
     enum class GameCompatibilityState : std::int32_t
     {
@@ -55,6 +56,7 @@ namespace BO2Monitor
         std::uint32_t StringValue;
         std::uint32_t Tick;
         char EventName[MaxEventNameBytes];
+        char WeaponName[MaxWeaponNameBytes];
     };
 
     struct SharedSnapshot
@@ -72,8 +74,8 @@ namespace BO2Monitor
     };
 #pragma pack(pop)
 
-    static_assert(sizeof(GameEventRecord) == 84);
-    static_assert(sizeof(SharedSnapshot) == 10788);
+    static_assert(sizeof(GameEventRecord) == 148);
+    static_assert(sizeof(SharedSnapshot) == 18980);
 
     std::wstring BuildSharedMemoryName(DWORD processId);
     std::wstring BuildEventHandleName(DWORD processId);
@@ -96,7 +98,8 @@ namespace BO2Monitor
             std::int32_t levelTime,
             std::uint32_t ownerId = 0,
             std::uint32_t stringValue = 0,
-            std::uint32_t tick = 0);
+            std::uint32_t tick = 0,
+            const char* weaponName = nullptr);
         bool WaitForStop(DWORD milliseconds) const;
 
     private:

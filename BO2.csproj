@@ -126,6 +126,7 @@
       Condition="'@(BO2MonitorDll)'==''"
       Text="BO2Monitor.dll was not produced. Install Visual C++ build tools or build BO2Monitor\BO2Monitor.vcxproj with native MSBuild before building BO2." />
     <Copy SourceFiles="@(BO2MonitorDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(BO2MonitorDll)" DestinationFolder="$(OutDir)AppX\" SkipUnchangedFiles="true" Condition="Exists('$(OutDir)AppX')" />
   </Target>
 
   <Target Name="CopyBO2InjectorHelper" AfterTargets="Build">
@@ -137,5 +138,6 @@
       Condition="'@(BO2InjectorHelper)'==''"
       Text="BO2InjectorHelper.exe was not produced. Install Visual C++ build tools or build BO2InjectorHelper\BO2InjectorHelper.vcxproj with native MSBuild before building BO2." />
     <Copy SourceFiles="@(BO2InjectorHelper)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(BO2InjectorHelper)" DestinationFolder="$(OutDir)AppX\" SkipUnchangedFiles="true" Condition="Exists('$(OutDir)AppX')" />
   </Target>
 </Project>

@@ -17,6 +17,7 @@ namespace BO2Monitor
         std::uintptr_t Top;
         GameEventType EventType;
         const char* EventName;
+        char WeaponName[MaxWeaponNameBytes];
         bool ReadRoundValue;
     };
 
@@ -28,6 +29,7 @@ namespace BO2Monitor
         void* top,
         GameEventType eventType,
         const char* eventName,
+        const char* weaponName,
         bool readRoundValue);
     bool TryDequeueMatchedNotify(RawNotifyRecord& record, std::uint64_t& droppedSinceLastDrain);
     std::uint64_t GetDroppedNotifyEventCount();

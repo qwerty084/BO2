@@ -5,6 +5,7 @@
 #include <Windows.h>
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstring>
 #include <limits>
 
@@ -22,8 +23,22 @@ namespace BO2Monitor
         constexpr std::array<std::uint8_t, ExpectedLocalVmNotifyEntryPrologue.size()> ExpectedVmNotifyPrologue =
             ExpectedLocalVmNotifyEntryPrologue;
         constexpr std::size_t VmNotifyStolenByteCount = ExpectedVmNotifyPrologue.size();
-        constexpr std::uintptr_t PublicT6SlConvertCandidate = 0x00532230;
         constexpr std::uintptr_t SlGetStringOfSizeCandidate = 0x00418B40;
+        constexpr std::uintptr_t ScrVarGlobCandidate = 0x02DEA400;
+        constexpr std::uintptr_t ScriptStringDataPointer = 0x02BF83A4;
+        constexpr std::size_t MaxScriptObjectVariableCount = 16384;
+        constexpr std::size_t MaxScriptChildVariableCount = 0x20000;
+        constexpr std::size_t MaxScriptFieldWalkCount = 1024;
+        constexpr std::size_t MaxScriptStringCount = 0x40000;
+        constexpr std::size_t ScriptStringDataStride = 0x18;
+        constexpr std::size_t ScriptStringTextOffset = 4;
+        constexpr std::uintptr_t ChildBucketsPointerSlotBase = 0x02DEFB00;
+        constexpr std::uintptr_t ChildVariablesPointerSlotBase = 0x02DEFB80;
+        constexpr std::uintptr_t ScriptInstancePointerStride = 0x200;
+        constexpr std::uintptr_t MinimumUserModePointer = 0x00100000;
+        constexpr unsigned int ScriptChildHashMask = 0x1FFFF;
+        constexpr unsigned int EncodedScriptFieldBase = 0x10000;
+        constexpr int MaxScriptInstanceCount = 2;
         constexpr std::array<std::uint8_t, 7> ExpectedSlGetStringOfSizePrologue =
         {
             0x83, 0xEC, 0x0C, 0x8B, 0x54, 0x24, 0x10
@@ -36,6 +51,68 @@ namespace BO2Monitor
         using VmNotifyFunction = void(__cdecl*)(std::int32_t, unsigned int, unsigned int, void*);
         using SlGetStringOfSizeFunction = unsigned int(__cdecl*)(const char*, std::int32_t, unsigned int, std::int32_t);
 
+        enum ScriptValueType : std::uint8_t
+        {
+            ScriptPointer = 1,
+            ScriptString = 2,
+            ScriptIString = 3,
+            ScriptObject = 18,
+            ScriptEntity = 20,
+            ScriptArray = 21
+        };
+
+        union VariableUnion
+        {
+            std::int32_t IntValue;
+            std::uint32_t UIntValue;
+            float FloatValue;
+            std::uint32_t StringValue;
+            const float* VectorValue;
+            const char* CodePosValue;
+            std::uint32_t PointerValue;
+            void* StackValue;
+            std::uint32_t EntityOffset;
+        };
+
+        union ChildBucketMatchKeys
+        {
+            struct
+            {
+                std::uint16_t NameHi;
+                std::uint16_t ParentId;
+            } Keys;
+            std::uint32_t Match;
+        };
+
+        struct ChildVariableValue
+        {
+            VariableUnion Value;
+            std::uint32_t SiblingOrHash;
+            std::uint32_t Next;
+            std::uint8_t Type;
+            std::uint8_t NameLo;
+            std::uint16_t Flags;
+            ChildBucketMatchKeys Key;
+            std::uint32_t NextSibling;
+            std::uint32_t PrevSibling;
+        };
+
+        static_assert(sizeof(VariableUnion) == 4);
+        static_assert(sizeof(ChildVariableValue) == 0x1C);
+
+        struct ScriptFieldValue
+        {
+            std::uint8_t Type;
+            VariableUnion Value;
+        };
+
+        enum class ScriptFieldReadStatus
+        {
+            Unavailable,
+            NotFound,
+            Found
+        };
+
         struct ProductionNotifyTarget
         {
             const char* Name;
@@ -43,6 +120,15 @@ namespace BO2Monitor
             unsigned int StringValue;
             bool Resolved;
             bool ReadRoundValue;
+        };
+
+        struct BoxScriptFieldIds
+        {
+            unsigned int WeaponString = 0;
+            unsigned int GrabWeaponName = 0;
+            unsigned int Zbarrier = 0;
+            unsigned int TagBolt = 0;
+            bool Resolved = false;
         };
 
         std::array<ProductionNotifyTarget, 13> productionNotifyTargets =
@@ -65,10 +151,25 @@ namespace BO2Monitor
         VmNotifyFunction originalVmNotify = nullptr;
         bool minHookInitialized = false;
         bool vmNotifyHookCreated = false;
+        BoxScriptFieldIds boxScriptFieldIds{};
 
         bool BytesMatch(const std::uint8_t* address, const std::uint8_t* expected, std::size_t expectedLength);
         bool IsExecutableAddress(const void* address);
         bool CanReadAddress(const void* address);
+        bool ResolveBoxScriptFieldIds();
+        void PublishBoxScriptFieldEvidence(SharedSnapshotWriter& snapshotWriter);
+        ScriptFieldReadStatus TryReadBoxWeaponName(
+            std::int32_t inst,
+            const ProductionNotifyTarget& target,
+            unsigned int ownerId,
+            char (&weaponName)[MaxWeaponNameBytes]);
+        unsigned int CountScriptFieldMatches(unsigned int fieldName);
+        void EnqueueBoxWeaponDiagnostic(
+            std::int32_t inst,
+            unsigned int ownerId,
+            void* top,
+            const char* eventName,
+            unsigned int value);
 
         bool HasValidatedVmNotifyAddress()
         {
@@ -156,6 +257,585 @@ namespace BO2Monitor
             return resolvedAnyTarget;
         }
 
+        bool ResolveBoxScriptFieldIds()
+        {
+            boxScriptFieldIds = BoxScriptFieldIds{};
+
+            unsigned int weaponString = 0;
+            unsigned int grabWeaponName = 0;
+            unsigned int zbarrier = 0;
+            unsigned int tagBolt = 0;
+            if (!TryResolveStringId("weapon_string", weaponString)
+                || !TryResolveStringId("grab_weapon_name", grabWeaponName)
+                || !TryResolveStringId("zbarrier", zbarrier)
+                || !TryResolveStringId("tag_bolt", tagBolt))
+            {
+                return false;
+            }
+
+            boxScriptFieldIds.WeaponString = weaponString;
+            boxScriptFieldIds.GrabWeaponName = grabWeaponName;
+            boxScriptFieldIds.Zbarrier = zbarrier;
+            boxScriptFieldIds.TagBolt = tagBolt;
+            boxScriptFieldIds.Resolved = true;
+            return true;
+        }
+
+        void PublishBoxScriptFieldEvidence(SharedSnapshotWriter& snapshotWriter)
+        {
+            if (!boxScriptFieldIds.Resolved)
+            {
+                snapshotWriter.PublishEvent(
+                    GameEventType::StringResolverCandidate,
+                    "box_field_resolve_failed",
+                    0);
+                return;
+            }
+
+            snapshotWriter.PublishEvent(
+                GameEventType::StringResolverCandidate,
+                "box_field_weapon_string_id",
+                static_cast<std::int32_t>(boxScriptFieldIds.WeaponString));
+            snapshotWriter.PublishEvent(
+                GameEventType::StringResolverCandidate,
+                "box_field_grab_weapon_name_id",
+                static_cast<std::int32_t>(boxScriptFieldIds.GrabWeaponName));
+            snapshotWriter.PublishEvent(
+                GameEventType::StringResolverCandidate,
+                "box_field_zbarrier_id",
+                static_cast<std::int32_t>(boxScriptFieldIds.Zbarrier));
+            snapshotWriter.PublishEvent(
+                GameEventType::StringResolverCandidate,
+                "box_field_tag_bolt_id",
+                static_cast<std::int32_t>(boxScriptFieldIds.TagBolt));
+        }
+
+        bool AreScriptFieldHelpersAvailable()
+        {
+            return boxScriptFieldIds.Resolved
+                && CanReadAddress(reinterpret_cast<const void*>(ChildBucketsPointerSlotBase))
+                && CanReadAddress(reinterpret_cast<const void*>(ChildVariablesPointerSlotBase))
+                && CanReadAddress(reinterpret_cast<const void*>(ScriptStringDataPointer));
+        }
+
+        template <typename T>
+        bool TryReadPointer(std::uintptr_t address, T*& pointer)
+        {
+            pointer = nullptr;
+            __try
+            {
+                pointer = *reinterpret_cast<T**>(address);
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER)
+            {
+                return false;
+            }
+
+            return reinterpret_cast<std::uintptr_t>(pointer) >= MinimumUserModePointer
+                && CanReadAddress(pointer);
+        }
+
+        std::uint32_t* ResolveChildBuckets(std::int32_t inst)
+        {
+            if (inst < 0 || inst >= MaxScriptInstanceCount)
+            {
+                return nullptr;
+            }
+
+            std::uint32_t* childBuckets = nullptr;
+            const std::uintptr_t pointerSlot =
+                ChildBucketsPointerSlotBase + (static_cast<std::uintptr_t>(inst) * ScriptInstancePointerStride);
+            return TryReadPointer(pointerSlot, childBuckets) ? childBuckets : nullptr;
+        }
+
+        ChildVariableValue* ResolveChildVariables(std::int32_t inst)
+        {
+            if (inst < 0 || inst >= MaxScriptInstanceCount)
+            {
+                return nullptr;
+            }
+
+            ChildVariableValue* childVariables = nullptr;
+            const std::uintptr_t pointerSlot =
+                ChildVariablesPointerSlotBase + (static_cast<std::uintptr_t>(inst) * ScriptInstancePointerStride);
+            return TryReadPointer(pointerSlot, childVariables) ? childVariables : nullptr;
+        }
+
+        bool TryReadChildVariable(std::int32_t inst, unsigned int childIndex, ChildVariableValue& child)
+        {
+            if (childIndex == 0 || childIndex >= MaxScriptChildVariableCount)
+            {
+                return false;
+            }
+
+            __try
+            {
+                auto* childVariables = ResolveChildVariables(inst);
+                if (childVariables == nullptr)
+                {
+                    return false;
+                }
+
+                child = childVariables[childIndex];
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        unsigned int GetChildFieldName(const ChildVariableValue& child)
+        {
+            return static_cast<unsigned int>(child.NameLo)
+                | (static_cast<unsigned int>(child.Key.Keys.NameHi) << 8);
+        }
+
+        unsigned int EncodeObjectFieldName(unsigned int scriptStringId)
+        {
+            return scriptStringId == 0 ? 0 : scriptStringId + EncodedScriptFieldBase;
+        }
+
+        ScriptFieldReadStatus TryReadScriptFieldValue(
+            std::int32_t inst,
+            unsigned int ownerId,
+            unsigned int fieldName,
+            ScriptFieldValue& fieldValue)
+        {
+            fieldValue = ScriptFieldValue{};
+            if (!AreScriptFieldHelpersAvailable())
+            {
+                return ScriptFieldReadStatus::Unavailable;
+            }
+
+            if (ownerId == 0 || fieldName == 0)
+            {
+                return ScriptFieldReadStatus::NotFound;
+            }
+
+            if (ownerId >= MaxScriptObjectVariableCount)
+            {
+                return ScriptFieldReadStatus::Unavailable;
+            }
+
+            auto* childBuckets = ResolveChildBuckets(inst);
+            if (childBuckets == nullptr)
+            {
+                return ScriptFieldReadStatus::Unavailable;
+            }
+
+            const unsigned int bucketIndex =
+                ((ownerId * 0x65u) + fieldName) & ScriptChildHashMask;
+            unsigned int childIndex = 0;
+            __try
+            {
+                childIndex = childBuckets[bucketIndex];
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER)
+            {
+                return ScriptFieldReadStatus::Unavailable;
+            }
+
+            const auto ownerKey = static_cast<std::uint16_t>(ownerId);
+            const unsigned int expectedKey =
+                (static_cast<unsigned int>(ownerKey) << 16)
+                | ((fieldName >> 8) & 0xFFFFu);
+            for (std::size_t walked = 0; childIndex != 0 && walked < MaxScriptFieldWalkCount; ++walked)
+            {
+                if (childIndex >= MaxScriptChildVariableCount)
+                {
+                    return ScriptFieldReadStatus::Unavailable;
+                }
+
+                ChildVariableValue child{};
+                if (!TryReadChildVariable(inst, childIndex, child))
+                {
+                    return ScriptFieldReadStatus::Unavailable;
+                }
+
+                const unsigned int nextChildIndex = child.Next;
+                if (child.Type != 0
+                    && child.Key.Match == expectedKey
+                    && GetChildFieldName(child) == fieldName)
+                {
+                    fieldValue.Type = child.Type & 0x7F;
+                    fieldValue.Value = child.Value;
+                    return ScriptFieldReadStatus::Found;
+                }
+
+                childIndex = nextChildIndex;
+            }
+
+            return ScriptFieldReadStatus::NotFound;
+        }
+
+        bool CopyScriptStringValue(unsigned int stringValue, char (&destination)[MaxWeaponNameBytes])
+        {
+            std::memset(destination, 0, MaxWeaponNameBytes);
+            if (stringValue == 0 || stringValue >= MaxScriptStringCount)
+            {
+                return false;
+            }
+
+            const char* source = nullptr;
+            __try
+            {
+                const auto stringData = *reinterpret_cast<const std::uint8_t* const*>(ScriptStringDataPointer);
+                if (stringData == nullptr)
+                {
+                    return false;
+                }
+
+                const std::uintptr_t sourceAddress =
+                    reinterpret_cast<std::uintptr_t>(stringData)
+                    + (static_cast<std::uintptr_t>(stringValue) * ScriptStringDataStride)
+                    + ScriptStringTextOffset;
+                source = reinterpret_cast<const char*>(sourceAddress);
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER)
+            {
+                return false;
+            }
+
+            if (source == nullptr || !CanReadAddress(source))
+            {
+                return false;
+            }
+
+            std::size_t index = 0;
+            __try
+            {
+                for (; index < MaxWeaponNameBytes - 1; ++index)
+                {
+                    const char character = source[index];
+                    if (character == '\0')
+                    {
+                        break;
+                    }
+
+                    if (character < 0x20 || character > 0x7E)
+                    {
+                        return false;
+                    }
+
+                    destination[index] = character;
+                }
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER)
+            {
+                std::memset(destination, 0, MaxWeaponNameBytes);
+                return false;
+            }
+
+            destination[index] = '\0';
+            return index > 0;
+        }
+
+        bool IsLikelyZombieWeaponAlias(const char* value)
+        {
+            if (value == nullptr)
+            {
+                return false;
+            }
+
+            std::size_t length = 0;
+            for (; length < MaxWeaponNameBytes && value[length] != '\0'; ++length)
+            {
+                const char character = value[length];
+                const bool allowed = (character >= 'a' && character <= 'z')
+                    || (character >= '0' && character <= '9')
+                    || character == '_';
+                if (!allowed)
+                {
+                    return false;
+                }
+            }
+
+            return length > 3
+                && length < MaxWeaponNameBytes
+                && value[length - 3] == '_'
+                && value[length - 2] == 'z'
+                && value[length - 1] == 'm';
+        }
+
+        ScriptFieldReadStatus TryReadScriptStringField(
+            std::int32_t inst,
+            unsigned int ownerId,
+            unsigned int fieldName,
+            char (&weaponName)[MaxWeaponNameBytes])
+        {
+            ScriptFieldValue fieldValue{};
+            ScriptFieldReadStatus status = TryReadScriptFieldValue(inst, ownerId, fieldName, fieldValue);
+            if (status != ScriptFieldReadStatus::Found)
+            {
+                return status;
+            }
+
+            if (fieldValue.Type != ScriptString && fieldValue.Type != ScriptIString)
+            {
+                return ScriptFieldReadStatus::NotFound;
+            }
+
+            return CopyScriptStringValue(fieldValue.Value.StringValue, weaponName)
+                ? ScriptFieldReadStatus::Found
+                : ScriptFieldReadStatus::NotFound;
+        }
+
+        ScriptFieldReadStatus TryReadOwnerWeaponAliasField(
+            std::int32_t inst,
+            unsigned int ownerId,
+            char (&weaponName)[MaxWeaponNameBytes])
+        {
+            std::memset(weaponName, 0, MaxWeaponNameBytes);
+            if (!AreScriptFieldHelpersAvailable())
+            {
+                return ScriptFieldReadStatus::Unavailable;
+            }
+
+            if (ownerId == 0 || ownerId >= MaxScriptObjectVariableCount)
+            {
+                return ScriptFieldReadStatus::NotFound;
+            }
+
+            auto* childVariables = ResolveChildVariables(inst);
+            if (childVariables == nullptr)
+            {
+                return ScriptFieldReadStatus::Unavailable;
+            }
+
+            for (unsigned int childIndex = 1; childIndex < MaxScriptChildVariableCount; ++childIndex)
+            {
+                ChildVariableValue child{};
+                __try
+                {
+                    child = childVariables[childIndex];
+                }
+                __except (EXCEPTION_EXECUTE_HANDLER)
+                {
+                    return ScriptFieldReadStatus::Unavailable;
+                }
+
+                const std::uint8_t childType = child.Type & 0x7F;
+                if (child.Type == 0
+                    || child.Key.Keys.ParentId != static_cast<std::uint16_t>(ownerId)
+                    || (childType != ScriptString && childType != ScriptIString))
+                {
+                    continue;
+                }
+
+                char candidate[MaxWeaponNameBytes]{};
+                if (CopyScriptStringValue(child.Value.StringValue, candidate)
+                    && IsLikelyZombieWeaponAlias(candidate))
+                {
+                    std::memcpy(weaponName, candidate, MaxWeaponNameBytes);
+                    return ScriptFieldReadStatus::Found;
+                }
+            }
+
+            return ScriptFieldReadStatus::NotFound;
+        }
+
+        ScriptFieldReadStatus TryReadAnyScriptStringField(
+            std::int32_t inst,
+            unsigned int fieldName,
+            char (&weaponName)[MaxWeaponNameBytes])
+        {
+            if (!AreScriptFieldHelpersAvailable())
+            {
+                return ScriptFieldReadStatus::Unavailable;
+            }
+
+            for (unsigned int childIndex = 1; childIndex < MaxScriptChildVariableCount; ++childIndex)
+            {
+                ChildVariableValue child{};
+                if (!TryReadChildVariable(inst, childIndex, child))
+                {
+                    return ScriptFieldReadStatus::Unavailable;
+                }
+
+                const std::uint8_t childType = child.Type & 0x7F;
+                if (child.Type == 0
+                    || GetChildFieldName(child) != fieldName
+                    || (childType != ScriptString && childType != ScriptIString))
+                {
+                    continue;
+                }
+
+                if (CopyScriptStringValue(child.Value.StringValue, weaponName))
+                {
+                    return ScriptFieldReadStatus::Found;
+                }
+            }
+
+            return ScriptFieldReadStatus::NotFound;
+        }
+
+        unsigned int CountScriptFieldMatches(unsigned int fieldName)
+        {
+            if (!AreScriptFieldHelpersAvailable() || fieldName == 0)
+            {
+                return 0;
+            }
+
+            unsigned int count = 0;
+            for (std::int32_t inst = 0; inst < MaxScriptInstanceCount; ++inst)
+            {
+                auto* childVariables = ResolveChildVariables(inst);
+                if (childVariables == nullptr)
+                {
+                    continue;
+                }
+
+                for (unsigned int childIndex = 1; childIndex < MaxScriptChildVariableCount; ++childIndex)
+                {
+                    ChildVariableValue child{};
+                    __try
+                    {
+                        child = childVariables[childIndex];
+                    }
+                    __except (EXCEPTION_EXECUTE_HANDLER)
+                    {
+                        return 0;
+                    }
+
+                    if (child.Type != 0 && GetChildFieldName(child) == fieldName)
+                    {
+                        ++count;
+                    }
+                }
+            }
+
+            return count;
+        }
+
+        ScriptFieldReadStatus TryReadScriptObjectField(
+            std::int32_t inst,
+            unsigned int ownerId,
+            unsigned int fieldName,
+            unsigned int& objectId)
+        {
+            objectId = 0;
+            ScriptFieldValue fieldValue{};
+            ScriptFieldReadStatus status = TryReadScriptFieldValue(inst, ownerId, fieldName, fieldValue);
+            if (status != ScriptFieldReadStatus::Found)
+            {
+                return status;
+            }
+
+            if (fieldValue.Type != ScriptPointer
+                && fieldValue.Type != ScriptObject
+                && fieldValue.Type != ScriptEntity
+                && fieldValue.Type != ScriptArray)
+            {
+                return ScriptFieldReadStatus::NotFound;
+            }
+
+            if (fieldValue.Value.PointerValue == 0)
+            {
+                return ScriptFieldReadStatus::NotFound;
+            }
+
+            objectId = fieldValue.Value.PointerValue;
+            return ScriptFieldReadStatus::Found;
+        }
+
+        ScriptFieldReadStatus TryReadBoxWeaponName(
+            std::int32_t inst,
+            const ProductionNotifyTarget& target,
+            unsigned int ownerId,
+            char (&weaponName)[MaxWeaponNameBytes])
+        {
+            std::memset(weaponName, 0, MaxWeaponNameBytes);
+            if (std::strcmp(target.Name, "randomization_done") == 0)
+            {
+                ScriptFieldReadStatus status = TryReadScriptStringField(
+                    inst,
+                    ownerId,
+                    EncodeObjectFieldName(boxScriptFieldIds.WeaponString),
+                    weaponName);
+                if (status == ScriptFieldReadStatus::Found || status == ScriptFieldReadStatus::Unavailable)
+                {
+                    return status;
+                }
+
+                status = TryReadScriptStringField(inst, ownerId, boxScriptFieldIds.WeaponString, weaponName);
+                if (status == ScriptFieldReadStatus::Found || status == ScriptFieldReadStatus::Unavailable)
+                {
+                    return status;
+                }
+
+                status = TryReadScriptStringField(inst, ownerId, boxScriptFieldIds.TagBolt, weaponName);
+                if (status == ScriptFieldReadStatus::Found || status == ScriptFieldReadStatus::Unavailable)
+                {
+                    return status;
+                }
+
+                return TryReadOwnerWeaponAliasField(inst, ownerId, weaponName);
+            }
+
+            if (std::strcmp(target.Name, "user_grabbed_weapon") != 0)
+            {
+                return ScriptFieldReadStatus::NotFound;
+            }
+
+            ScriptFieldReadStatus status = TryReadScriptStringField(
+                inst,
+                ownerId,
+                EncodeObjectFieldName(boxScriptFieldIds.GrabWeaponName),
+                weaponName);
+            if (status == ScriptFieldReadStatus::Found || status == ScriptFieldReadStatus::Unavailable)
+            {
+                return status;
+            }
+
+            status = TryReadScriptStringField(
+                inst,
+                ownerId,
+                boxScriptFieldIds.GrabWeaponName,
+                weaponName);
+            if (status == ScriptFieldReadStatus::Found || status == ScriptFieldReadStatus::Unavailable)
+            {
+                return status;
+            }
+
+            unsigned int zbarrierObjectId = 0;
+            status = TryReadScriptObjectField(
+                inst,
+                ownerId,
+                EncodeObjectFieldName(boxScriptFieldIds.Zbarrier),
+                zbarrierObjectId);
+            if (status == ScriptFieldReadStatus::NotFound)
+            {
+                status = TryReadScriptObjectField(inst, ownerId, boxScriptFieldIds.Zbarrier, zbarrierObjectId);
+            }
+            if (status == ScriptFieldReadStatus::Unavailable)
+            {
+                return status;
+            }
+
+            if (status == ScriptFieldReadStatus::Found)
+            {
+                status = TryReadScriptStringField(
+                    inst,
+                    zbarrierObjectId,
+                    EncodeObjectFieldName(boxScriptFieldIds.WeaponString),
+                    weaponName);
+                if (status == ScriptFieldReadStatus::Found || status == ScriptFieldReadStatus::Unavailable)
+                {
+                    return status;
+                }
+
+                status = TryReadScriptStringField(inst, zbarrierObjectId, boxScriptFieldIds.WeaponString, weaponName);
+                if (status == ScriptFieldReadStatus::Found || status == ScriptFieldReadStatus::Unavailable)
+                {
+                    return status;
+                }
+            }
+
+            return ScriptFieldReadStatus::NotFound;
+        }
+
         std::uint32_t SaturateCounter(std::uint64_t value)
         {
             constexpr std::uint32_t MaxCounterValue = std::numeric_limits<std::uint32_t>::max();
@@ -200,7 +880,26 @@ namespace BO2Monitor
                 eventValue,
                 record.OwnerId,
                 record.StringValue,
-                record.Tick);
+                record.Tick,
+                record.WeaponName[0] == '\0' ? nullptr : record.WeaponName);
+        }
+
+        void EnqueueBoxWeaponDiagnostic(
+            std::int32_t inst,
+            unsigned int ownerId,
+            void* top,
+            const char* eventName,
+            unsigned int value)
+        {
+            EnqueueMatchedNotify(
+                inst,
+                ownerId,
+                value,
+                top,
+                GameEventType::StringResolverCandidate,
+                eventName,
+                nullptr,
+                false);
         }
 
         void __cdecl VmNotifyDetour(
@@ -209,10 +908,96 @@ namespace BO2Monitor
             unsigned int stringValue,
             void* top)
         {
-            originalVmNotify(inst, notifyListOwnerId, stringValue, top);
-
             const ProductionNotifyTarget* target = FindProductionNotifyTarget(stringValue);
             if (target == nullptr)
+            {
+                originalVmNotify(inst, notifyListOwnerId, stringValue, top);
+                return;
+            }
+
+            const bool isBoxWeaponEvent = std::strcmp(target->Name, "randomization_done") == 0
+                || std::strcmp(target->Name, "user_grabbed_weapon") == 0;
+            if (!isBoxWeaponEvent)
+            {
+                originalVmNotify(inst, notifyListOwnerId, stringValue, top);
+                EnqueueMatchedNotify(
+                    inst,
+                    notifyListOwnerId,
+                    stringValue,
+                    top,
+                    target->EventType,
+                    target->Name,
+                    nullptr,
+                    target->ReadRoundValue);
+                return;
+            }
+
+            originalVmNotify(inst, notifyListOwnerId, stringValue, top);
+
+            char weaponName[MaxWeaponNameBytes]{};
+            const ScriptFieldReadStatus weaponNameStatus = TryReadBoxWeaponName(
+                inst,
+                *target,
+                notifyListOwnerId,
+                weaponName);
+            if (weaponNameStatus != ScriptFieldReadStatus::Found)
+            {
+                EnqueueBoxWeaponDiagnostic(
+                    inst,
+                    notifyListOwnerId,
+                    top,
+                    weaponNameStatus == ScriptFieldReadStatus::Unavailable
+                        ? "box_weapon_read_unavailable"
+                        : "box_weapon_read_not_found",
+                    static_cast<unsigned int>(weaponNameStatus));
+                EnqueueBoxWeaponDiagnostic(
+                    inst,
+                    notifyListOwnerId,
+                    top,
+                    "box_weapon_string_field_matches",
+                    CountScriptFieldMatches(boxScriptFieldIds.WeaponString));
+                EnqueueBoxWeaponDiagnostic(
+                    inst,
+                    notifyListOwnerId,
+                    top,
+                    "box_weapon_string_object_field_matches",
+                    CountScriptFieldMatches(EncodeObjectFieldName(boxScriptFieldIds.WeaponString)));
+                EnqueueBoxWeaponDiagnostic(
+                    inst,
+                    notifyListOwnerId,
+                    top,
+                    "box_grab_weapon_name_field_matches",
+                    CountScriptFieldMatches(boxScriptFieldIds.GrabWeaponName));
+                EnqueueBoxWeaponDiagnostic(
+                    inst,
+                    notifyListOwnerId,
+                    top,
+                    "box_grab_weapon_name_object_field_matches",
+                    CountScriptFieldMatches(EncodeObjectFieldName(boxScriptFieldIds.GrabWeaponName)));
+                EnqueueBoxWeaponDiagnostic(
+                    inst,
+                    notifyListOwnerId,
+                    top,
+                    "box_zbarrier_field_matches",
+                    CountScriptFieldMatches(boxScriptFieldIds.Zbarrier));
+                EnqueueBoxWeaponDiagnostic(
+                    inst,
+                    notifyListOwnerId,
+                    top,
+                    "box_zbarrier_object_field_matches",
+                    CountScriptFieldMatches(EncodeObjectFieldName(boxScriptFieldIds.Zbarrier)));
+                EnqueueBoxWeaponDiagnostic(
+                    inst,
+                    notifyListOwnerId,
+                    top,
+                    "box_tag_bolt_field_matches",
+                    CountScriptFieldMatches(boxScriptFieldIds.TagBolt));
+            }
+
+            const bool shouldPublish = std::strcmp(target->Name, "user_grabbed_weapon") != 0
+                || weaponNameStatus != ScriptFieldReadStatus::NotFound;
+
+            if (!shouldPublish)
             {
                 return;
             }
@@ -224,6 +1009,7 @@ namespace BO2Monitor
                 top,
                 target->EventType,
                 target->Name,
+                weaponNameStatus == ScriptFieldReadStatus::Found ? weaponName : nullptr,
                 target->ReadRoundValue);
         }
 
@@ -406,12 +1192,12 @@ namespace BO2Monitor
                     static_cast<std::int32_t>(LocalVmNotifyEntryCandidate));
             }
 
-            if (IsExecutableAddress(reinterpret_cast<const void*>(PublicT6SlConvertCandidate)))
+            if (CanReadAddress(reinterpret_cast<const void*>(ScriptStringDataPointer)))
             {
                 snapshotWriter.PublishEvent(
                     GameEventType::StringResolverCandidate,
-                    "sl_convert_candidate",
-                    static_cast<std::int32_t>(PublicT6SlConvertCandidate));
+                    "sl_string_data_candidate",
+                    static_cast<std::int32_t>(ScriptStringDataPointer));
             }
 
             if (SlGetStringOfSizePrologueMatches())
@@ -453,6 +1239,9 @@ namespace BO2Monitor
             snapshotWriter.SetCompatibility(GameCompatibilityState::UnsupportedVersion);
             return GameCompatibilityState::UnsupportedVersion;
         }
+
+        ResolveBoxScriptFieldIds();
+        PublishBoxScriptFieldEvidence(snapshotWriter);
 
         if (!InstallVmNotifyHook())
         {

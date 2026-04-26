@@ -192,6 +192,9 @@
   <data name="BoxEventFormat" xml:space="preserve">
     <value>{0} - {1} (owner {2}, id {3})</value>
   </data>
+  <data name="BoxEventWithWeaponFormat" xml:space="preserve">
+    <value>{0} - {1}: {2} (owner {3}, id {4})</value>
+  </data>
   <data name="BoxEventsLabel.Text" xml:space="preserve">
     <value>Box events</value>
   </data>

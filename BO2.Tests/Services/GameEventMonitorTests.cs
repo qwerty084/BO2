@@ -34,6 +34,24 @@ namespace BO2.Tests.Services
             Assert.Equal(7u, gameEvent.OwnerId);
             Assert.Equal(1149u, gameEvent.StringValue);
             Assert.Equal(receivedAt, gameEvent.ReceivedAt);
+            Assert.Null(gameEvent.WeaponName);
+        }
+
+        [Fact]
+        public void DecodeSnapshot_WhenWeaponNameIsPresent_DecodesWeaponName()
+        {
+            byte[] snapshot = CreateSnapshot(
+                GameCompatibilityState.Compatible,
+                droppedEventCount: 0,
+                droppedNotifyCount: 0,
+                publishedNotifyCount: 1,
+                eventCount: 1);
+            WriteEvent(snapshot, 0, GameEventType.BoxEvent, 0, "randomization_done", weaponName: "ray_gun_zm");
+
+            GameEventMonitorStatus status = GameEventMonitor.DecodeSnapshot(snapshot, DateTimeOffset.UtcNow);
+
+            GameEvent gameEvent = Assert.Single(status.RecentEvents);
+            Assert.Equal("ray_gun_zm", gameEvent.WeaponName);
         }
 
         [Fact]
@@ -63,6 +81,23 @@ namespace BO2.Tests.Services
                 publishedNotifyCount: 0,
                 eventCount: 0);
             BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(4, 4), 3);
+
+            GameEventMonitorStatus status = GameEventMonitor.DecodeSnapshot(snapshot, DateTimeOffset.UtcNow);
+
+            Assert.Equal(GameCompatibilityState.UnsupportedVersion, status.CompatibilityState);
+            Assert.Empty(status.RecentEvents);
+        }
+
+        [Fact]
+        public void DecodeSnapshot_WhenSnapshotIsVersionFive_ReturnsUnsupportedVersion()
+        {
+            byte[] snapshot = CreateSnapshot(
+                GameCompatibilityState.Compatible,
+                droppedEventCount: 0,
+                droppedNotifyCount: 0,
+                publishedNotifyCount: 0,
+                eventCount: 0);
+            BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(4, 4), 5);
 
             GameEventMonitorStatus status = GameEventMonitor.DecodeSnapshot(snapshot, DateTimeOffset.UtcNow);
 
@@ -210,7 +245,8 @@ namespace BO2.Tests.Services
             GameEventType eventType,
             int levelTime,
             string eventName,
-            uint tick = 1000)
+            uint tick = 1000,
+            string? weaponName = null)
         {
             int offset = GameEventMonitor.HeaderSize + (index * GameEventMonitor.EventRecordSize);
             BinaryPrimitives.WriteInt32LittleEndian(snapshot.AsSpan(offset, 4), (int)eventType);
@@ -221,6 +257,13 @@ namespace BO2.Tests.Services
             byte[] nameBytes = Encoding.UTF8.GetBytes(eventName);
             nameBytes.AsSpan(0, Math.Min(nameBytes.Length, GameEventMonitor.MaxEventNameBytes))
                 .CopyTo(snapshot.AsSpan(offset + GameEventMonitor.EventNameOffset, GameEventMonitor.MaxEventNameBytes));
+
+            if (weaponName is not null)
+            {
+                byte[] weaponNameBytes = Encoding.UTF8.GetBytes(weaponName);
+                weaponNameBytes.AsSpan(0, Math.Min(weaponNameBytes.Length, GameEventMonitor.MaxWeaponNameBytes))
+                    .CopyTo(snapshot.AsSpan(offset + GameEventMonitor.WeaponNameOffset, GameEventMonitor.MaxWeaponNameBytes));
+            }
         }
     }
 }
