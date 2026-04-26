@@ -12,7 +12,9 @@ namespace BO2.Services
     {
         private const string MonitorDllFileName = "BO2Monitor.dll";
         private const string InjectorHelperFileName = "BO2InjectorHelper.exe";
+        private const string StartMonitorExportName = "StartMonitor";
         private const ushort ImageFileMachineI386 = 0x014c;
+        private const uint DontResolveDllReferences = 0x00000001;
         private const uint Infinite = 0xffffffff;
         private const uint WaitObject0 = 0;
         private const uint MemCommit = 0x00001000;
@@ -104,13 +106,7 @@ namespace BO2.Services
 
             try
             {
-                if (_isMonitorAlreadyLoaded(detectedGame.ProcessId))
-                {
-                    return new DllInjectionResult(
-                        DllInjectionState.AlreadyInjected,
-                        AppStrings.Get("DllInjectionAlreadyLoaded"),
-                        dllPath);
-                }
+                bool monitorAlreadyLoaded = _isMonitorAlreadyLoaded(detectedGame.ProcessId);
 
                 if (_is64BitProcess())
                 {
@@ -122,8 +118,8 @@ namespace BO2.Services
                 }
 
                 return new DllInjectionResult(
-                    DllInjectionState.Loaded,
-                    AppStrings.Get("DllInjectionLoaded"),
+                    monitorAlreadyLoaded ? DllInjectionState.AlreadyInjected : DllInjectionState.Loaded,
+                    monitorAlreadyLoaded ? AppStrings.Get("DllInjectionAlreadyLoaded") : AppStrings.Get("DllInjectionLoaded"),
                     dllPath);
             }
             catch (WrongProcessArchitectureException ex)
@@ -314,6 +310,10 @@ namespace BO2.Services
                 {
                     throw CreateWin32Exception("GetExitCodeThread");
                 }
+
+                CloseHandle(threadHandle);
+                threadHandle = IntPtr.Zero;
+                StartRemoteMonitor(processHandle, dllPath, new IntPtr(unchecked((int)exitCode)));
             }
             finally
             {
@@ -328,6 +328,74 @@ namespace BO2.Services
                 }
 
                 CloseHandle(processHandle);
+            }
+        }
+
+        private static void StartRemoteMonitor(IntPtr processHandle, string dllPath, IntPtr remoteModuleHandle)
+        {
+            IntPtr startMonitorAddress = ResolveRemoteExportAddress(
+                dllPath,
+                remoteModuleHandle,
+                StartMonitorExportName);
+            IntPtr threadHandle = CreateRemoteThread(
+                processHandle,
+                IntPtr.Zero,
+                0,
+                startMonitorAddress,
+                IntPtr.Zero,
+                0,
+                IntPtr.Zero);
+            if (threadHandle == IntPtr.Zero)
+            {
+                throw CreateWin32Exception("CreateRemoteThread");
+            }
+
+            try
+            {
+                uint waitResult = WaitForSingleObject(threadHandle, Infinite);
+                if (waitResult != WaitObject0)
+                {
+                    throw new InvalidOperationException(AppStrings.Format("DllInjectionStartFailedFormat", waitResult));
+                }
+
+                if (!GetExitCodeThread(threadHandle, out uint exitCode) || exitCode == 0)
+                {
+                    throw new InvalidOperationException(AppStrings.Format("DllInjectionStartFailedFormat", exitCode));
+                }
+            }
+            finally
+            {
+                CloseHandle(threadHandle);
+            }
+        }
+
+        private static IntPtr ResolveRemoteExportAddress(string dllPath, IntPtr remoteModuleHandle, string exportName)
+        {
+            IntPtr localModuleHandle = LoadLibraryEx(dllPath, IntPtr.Zero, DontResolveDllReferences);
+            if (localModuleHandle == IntPtr.Zero)
+            {
+                throw CreateWin32Exception("LoadLibraryEx");
+            }
+
+            try
+            {
+                IntPtr localExportAddress = GetProcAddress(localModuleHandle, exportName);
+                if (localExportAddress == IntPtr.Zero)
+                {
+                    throw new InvalidOperationException(AppStrings.Format("DllInjectionExportMissingFormat", exportName));
+                }
+
+                long exportOffset = localExportAddress.ToInt64() - localModuleHandle.ToInt64();
+                if (exportOffset < 0)
+                {
+                    throw new InvalidOperationException(AppStrings.Format("DllInjectionExportMissingFormat", exportName));
+                }
+
+                return new IntPtr(remoteModuleHandle.ToInt64() + exportOffset);
+            }
+            finally
+            {
+                FreeLibrary(localModuleHandle);
             }
         }
 
@@ -425,6 +493,12 @@ namespace BO2.Services
 
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern IntPtr GetModuleHandle(string moduleName);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr LoadLibraryEx(string fileName, IntPtr file, uint flags);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool FreeLibrary(IntPtr moduleHandle);
 
         [DllImport("kernel32.dll", CharSet = CharSet.Ansi, SetLastError = true)]
         private static extern IntPtr GetProcAddress(IntPtr moduleHandle, string procName);

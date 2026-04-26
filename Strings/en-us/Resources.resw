@@ -69,6 +69,9 @@
   <data name="DllInjectionFailedFormat" xml:space="preserve">
     <value>Injection failed: {0}</value>
   </data>
+  <data name="DllInjectionExportMissingFormat" xml:space="preserve">
+    <value>BO2Monitor export not found: {0}</value>
+  </data>
   <data name="DllInjectionInvalidDllFormat" xml:space="preserve">
     <value>BO2Monitor.dll failed validation: {0}</value>
   </data>
@@ -98,6 +101,9 @@
   </data>
   <data name="DllInjectionStatusLabel.Text" xml:space="preserve">
     <value>Injection status</value>
+  </data>
+  <data name="DllInjectionStartFailedFormat" xml:space="preserve">
+    <value>BO2Monitor StartMonitor failed with result {0}</value>
   </data>
   <data name="DllInjectionSucceeded" xml:space="preserve">
     <value>BO2Monitor injected</value>

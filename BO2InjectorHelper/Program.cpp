@@ -12,10 +12,77 @@ namespace
         | PROCESS_VM_OPERATION
         | PROCESS_VM_WRITE
         | PROCESS_VM_READ;
+    constexpr wchar_t StartMonitorExportName[] = L"StartMonitor";
 
     void PrintLastError(const wchar_t* apiName)
     {
         std::wcerr << apiName << L" failed with error " << GetLastError() << L'\n';
+    }
+
+    void* ResolveRemoteExportAddress(
+        const std::wstring& dllPath,
+        DWORD_PTR remoteModuleBase,
+        const char* exportName)
+    {
+        HMODULE localModule = LoadLibraryExW(dllPath.c_str(), nullptr, DONT_RESOLVE_DLL_REFERENCES);
+        if (localModule == nullptr)
+        {
+            PrintLastError(L"LoadLibraryExW");
+            return nullptr;
+        }
+
+        FARPROC localExport = GetProcAddress(localModule, exportName);
+        if (localExport == nullptr)
+        {
+            std::wcerr << StartMonitorExportName << L" export not found\n";
+            FreeLibrary(localModule);
+            return nullptr;
+        }
+
+        const auto exportOffset = reinterpret_cast<DWORD_PTR>(localExport)
+            - reinterpret_cast<DWORD_PTR>(localModule);
+        FreeLibrary(localModule);
+        return reinterpret_cast<void*>(remoteModuleBase + exportOffset);
+    }
+
+    bool StartRemoteMonitor(HANDLE processHandle, const std::wstring& dllPath, DWORD_PTR remoteModuleBase)
+    {
+        void* startMonitorAddress = ResolveRemoteExportAddress(
+            dllPath,
+            remoteModuleBase,
+            "StartMonitor");
+        if (startMonitorAddress == nullptr)
+        {
+            return false;
+        }
+
+        HANDLE threadHandle = CreateRemoteThread(
+            processHandle,
+            nullptr,
+            0,
+            reinterpret_cast<LPTHREAD_START_ROUTINE>(startMonitorAddress),
+            nullptr,
+            0,
+            nullptr);
+        if (threadHandle == nullptr)
+        {
+            PrintLastError(L"CreateRemoteThread");
+            return false;
+        }
+
+        const DWORD waitResult = WaitForSingleObject(threadHandle, 15000);
+        DWORD exitCode = 0;
+        const bool succeeded = waitResult == WAIT_OBJECT_0
+            && GetExitCodeThread(threadHandle, &exitCode)
+            && exitCode != 0;
+        if (!succeeded)
+        {
+            std::wcerr << L"StartMonitor failed with result " << waitResult
+                << L" and exit code " << exitCode << L'\n';
+        }
+
+        CloseHandle(threadHandle);
+        return succeeded;
     }
 
     bool InjectLibrary(DWORD processId, const std::wstring& dllPath)
@@ -103,7 +170,7 @@ namespace
         }
 
         std::wcout << L"LoadLibrary exit=0x" << std::hex << exitCode << L'\n';
-        succeeded = true;
+        succeeded = StartRemoteMonitor(processHandle, dllPath, static_cast<DWORD_PTR>(exitCode));
 
 Cleanup:
         if (threadHandle != nullptr)

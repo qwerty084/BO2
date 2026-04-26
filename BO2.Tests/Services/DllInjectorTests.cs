@@ -91,6 +91,64 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void Inject_WhenMonitorIsAlreadyLoaded_StillRequestsStartup()
+        {
+            bool startupRequested = false;
+            var injector = new DllInjector(
+                is64BitProcess: () => false,
+                resolveMonitorPath: () => @"C:\app\BO2Monitor.dll",
+                fileExists: _ => true,
+                validateMonitorDll: _ => DllInjector.DllPayloadValidationResult.Valid,
+                isMonitorAlreadyLoaded: _ => true,
+                injectLibrary: (_, _) => startupRequested = true,
+                injectLibraryViaWow64Helper: (_, _) => throw new InvalidOperationException("helper path should not run"));
+            var detectedGame = CreateSupportedGame();
+
+            DllInjectionResult result = injector.Inject(detectedGame);
+
+            Assert.Equal(DllInjectionState.AlreadyInjected, result.State);
+            Assert.True(startupRequested);
+        }
+
+        [Fact]
+        public void Inject_WhenStartMonitorExportResolutionFails_ReturnsFailed()
+        {
+            var injector = new DllInjector(
+                is64BitProcess: () => false,
+                resolveMonitorPath: () => @"C:\app\BO2Monitor.dll",
+                fileExists: _ => true,
+                validateMonitorDll: _ => DllInjector.DllPayloadValidationResult.Valid,
+                isMonitorAlreadyLoaded: _ => false,
+                injectLibrary: (_, _) => throw new InvalidOperationException("BO2Monitor export not found: StartMonitor"),
+                injectLibraryViaWow64Helper: (_, _) => throw new InvalidOperationException("helper path should not run"));
+            var detectedGame = CreateSupportedGame();
+
+            DllInjectionResult result = injector.Inject(detectedGame);
+
+            Assert.Equal(DllInjectionState.Failed, result.State);
+            Assert.Contains("StartMonitor", result.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void Inject_WhenStartMonitorReturnsFailure_ReturnsFailed()
+        {
+            var injector = new DllInjector(
+                is64BitProcess: () => false,
+                resolveMonitorPath: () => @"C:\app\BO2Monitor.dll",
+                fileExists: _ => true,
+                validateMonitorDll: _ => DllInjector.DllPayloadValidationResult.Valid,
+                isMonitorAlreadyLoaded: _ => false,
+                injectLibrary: (_, _) => throw new InvalidOperationException("BO2Monitor StartMonitor failed with result 0"),
+                injectLibraryViaWow64Helper: (_, _) => throw new InvalidOperationException("helper path should not run"));
+            var detectedGame = CreateSupportedGame();
+
+            DllInjectionResult result = injector.Inject(detectedGame);
+
+            Assert.Equal(DllInjectionState.Failed, result.State);
+            Assert.Contains("StartMonitor", result.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void Inject_WhenMonitorDllValidationFails_ReturnsFailedBeforeNativeCalls()
         {
             bool nativeCalled = false;
