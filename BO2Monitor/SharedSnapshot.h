@@ -3,11 +3,12 @@
 #include <Windows.h>
 #include <array>
 #include <cstdint>
+#include <string>
 
 namespace BO2Monitor
 {
-    constexpr wchar_t SharedMemoryName[] = L"BO2MonitorSharedMem";
-    constexpr wchar_t EventHandleName[] = L"BO2MonitorEvent";
+    constexpr wchar_t SharedMemoryNamePrefix[] = L"BO2MonitorSharedMem-";
+    constexpr wchar_t EventHandleNamePrefix[] = L"BO2MonitorEvent-";
     constexpr std::uint32_t SnapshotMagic = 0x45324F42; // BO2E
     constexpr std::uint32_t SnapshotVersion = 4;
     constexpr std::size_t MaxEventCount = 128;
@@ -71,6 +72,9 @@ namespace BO2Monitor
 
     static_assert(sizeof(GameEventRecord) == 80);
     static_assert(sizeof(SharedSnapshot) == 10276);
+
+    std::wstring BuildSharedMemoryName(DWORD processId);
+    std::wstring BuildEventHandleName(DWORD processId);
 
     class SharedSnapshotWriter
     {

@@ -14,4 +14,7 @@
   <Project Path="BO2Monitor\BO2Monitor.vcxproj" Id="c5e69ca8-8e73-4b60-b3d2-293990b3b682">
     <Platform Project="Win32" />
   </Project>
+  <Project Path="BO2InjectorHelper\BO2InjectorHelper.vcxproj" Id="8d99c6c0-11bc-4f04-bd0f-77f621464634">
+    <Platform Project="Win32" />
+  </Project>
 </Solution>

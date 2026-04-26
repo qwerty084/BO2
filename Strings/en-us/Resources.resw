@@ -69,8 +69,29 @@
   <data name="DllInjectionFailedFormat" xml:space="preserve">
     <value>Injection failed: {0}</value>
   </data>
+  <data name="DllInjectionInvalidDllFormat" xml:space="preserve">
+    <value>BO2Monitor.dll failed validation: {0}</value>
+  </data>
+  <data name="DllInjectionInvalidMachineFormat" xml:space="preserve">
+    <value>BO2Monitor.dll is not a 32-bit Windows DLL: {0}</value>
+  </data>
+  <data name="DllInjectionInvalidPathFormat" xml:space="preserve">
+    <value>BO2Monitor.dll is outside the app directory: {0}</value>
+  </data>
+  <data name="DllInjectionLoaded" xml:space="preserve">
+    <value>BO2Monitor loaded; waiting for readiness</value>
+  </data>
   <data name="DllInjectionMissingDllFormat" xml:space="preserve">
     <value>BO2Monitor.dll not found at {0}</value>
+  </data>
+  <data name="DllInjectionMissingHelper" xml:space="preserve">
+    <value>BO2InjectorHelper.exe is missing</value>
+  </data>
+  <data name="DllInjectionMonitorReady" xml:space="preserve">
+    <value>BO2Monitor ready</value>
+  </data>
+  <data name="DllInjectionPollingFallback" xml:space="preserve">
+    <value>BO2Monitor loaded; polling fallback active</value>
   </data>
   <data name="DllInjectionNotAttempted" xml:space="preserve">
     <value>Injection not attempted</value>
@@ -81,14 +102,26 @@
   <data name="DllInjectionSucceeded" xml:space="preserve">
     <value>BO2Monitor injected</value>
   </data>
+  <data name="DllInjectionUnsupportedVersion" xml:space="preserve">
+    <value>BO2Monitor loaded; unsupported game build</value>
+  </data>
   <data name="DllInjectionUnsupportedGameFormat" xml:space="preserve">
     <value>Injection disabled for {0}</value>
+  </data>
+  <data name="DllInjectionCaptureDisabled" xml:space="preserve">
+    <value>BO2Monitor loaded; native capture disabled</value>
   </data>
   <data name="DllInjectionWaitFailedFormat" xml:space="preserve">
     <value>Remote loader wait failed with result {0}</value>
   </data>
   <data name="DllInjectionWrongArchitecture" xml:space="preserve">
     <value>Unable to start the 32-bit helper for BO2Monitor injection</value>
+  </data>
+  <data name="DllInjectionWrongArchitectureFormat" xml:space="preserve">
+    <value>Unable to start the 32-bit helper for BO2Monitor injection: {0}</value>
+  </data>
+  <data name="DllInjectionWaitingForReadiness" xml:space="preserve">
+    <value>BO2Monitor loaded; waiting for readiness</value>
   </data>
   <data name="GameProcessDetectorDisplayNamePlutoniumMultiplayer" xml:space="preserve">
     <value>Plutonium Multiplayer</value>
@@ -184,7 +217,7 @@
     <value>Unsupported monitor or game build</value>
   </data>
   <data name="EventMonitorWaitingForMonitor" xml:space="preserve">
-    <value>Waiting for BO2MonitorSharedMem</value>
+    <value>Waiting for BO2Monitor shared memory</value>
   </data>
   <data name="GameEventsDescription.Text" xml:space="preserve">
     <value>Event capture is inactive until a validated BO2 monitor publishes read-only event snapshots.</value>

@@ -1,11 +1,25 @@
+param(
+    [int]$ProcessId = 0
+)
+
 $ErrorActionPreference = 'Stop'
+
+if ($ProcessId -le 0) {
+    $process = Get-Process -Name t6zm -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -eq $process) {
+        throw 'Pass -ProcessId or start t6zm.exe first.'
+    }
+
+    $ProcessId = $process.Id
+}
 
 $maxEventCount = 128
 $headerSize = 36
 $eventRecordSize = 80
 $sharedMemorySize = $headerSize + ($maxEventCount * $eventRecordSize)
 
-$mmf = [System.IO.MemoryMappedFiles.MemoryMappedFile]::OpenExisting('BO2MonitorSharedMem')
+$sharedMemoryName = "BO2MonitorSharedMem-$ProcessId"
+$mmf = [System.IO.MemoryMappedFiles.MemoryMappedFile]::OpenExisting($sharedMemoryName)
 $view = $null
 try {
     $view = $mmf.CreateViewAccessor(0, $sharedMemorySize, [System.IO.MemoryMappedFiles.MemoryMappedFileAccess]::Read)

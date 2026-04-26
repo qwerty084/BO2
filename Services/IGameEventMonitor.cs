@@ -4,6 +4,6 @@ namespace BO2.Services
 {
     public interface IGameEventMonitor : IDisposable
     {
-        GameEventMonitorStatus ReadStatus(DateTimeOffset receivedAt);
+        GameEventMonitorStatus ReadStatus(DateTimeOffset receivedAt, int? targetProcessId);
     }
 }

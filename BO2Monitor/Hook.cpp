@@ -1,5 +1,6 @@
 #include "Hook.h"
 #include "NotifyLog.h"
+#include "MinHook.h"
 
 #include <Windows.h>
 #include <algorithm>
@@ -31,7 +32,6 @@ namespace BO2Monitor
         constexpr std::uintptr_t PointsAddress = 0x0234C068;
         constexpr std::uintptr_t KillsAddress = 0x0234C080;
         constexpr std::uintptr_t DownsAddress = 0x0234C084;
-        constexpr std::uint8_t JumpInstruction = 0xE9;
 
         using VmNotifyFunction = void(__cdecl*)(std::int32_t, unsigned int, unsigned int, void*);
         using SlGetStringOfSizeFunction = unsigned int(__cdecl*)(const char*, std::int32_t, unsigned int, std::int32_t);
@@ -63,6 +63,8 @@ namespace BO2Monitor
         };
 
         VmNotifyFunction originalVmNotify = nullptr;
+        bool minHookInitialized = false;
+        bool vmNotifyHookCreated = false;
 
         bool BytesMatch(const std::uint8_t* address, const std::uint8_t* expected, std::size_t expectedLength);
         bool IsExecutableAddress(const void* address);
@@ -281,80 +283,54 @@ namespace BO2Monitor
                     ExpectedLocalVmNotifyEntryPrologue.size());
         }
 
-        bool WriteJump(void* source, const void* destination, std::size_t patchLength)
-        {
-            if (patchLength < 5)
-            {
-                return false;
-            }
-
-            DWORD oldProtect = 0;
-            if (!VirtualProtect(source, patchLength, PAGE_EXECUTE_READWRITE, &oldProtect))
-            {
-                return false;
-            }
-
-            auto* patch = static_cast<std::uint8_t*>(source);
-            const auto relativeOffset = reinterpret_cast<std::intptr_t>(destination)
-                - reinterpret_cast<std::intptr_t>(source)
-                - 5;
-
-            patch[0] = JumpInstruction;
-            *reinterpret_cast<std::int32_t*>(patch + 1) = static_cast<std::int32_t>(relativeOffset);
-            for (std::size_t index = 5; index < patchLength; ++index)
-            {
-                patch[index] = 0x90;
-            }
-
-            FlushInstructionCache(GetCurrentProcess(), source, patchLength);
-            DWORD unusedProtect = 0;
-            VirtualProtect(source, patchLength, oldProtect, &unusedProtect);
-            return true;
-        }
-
-        VmNotifyFunction CreateTrampoline(const std::uint8_t* targetAddress)
-        {
-            constexpr std::size_t TrampolineJumpSize = 5;
-            const std::size_t trampolineSize = VmNotifyStolenByteCount + TrampolineJumpSize;
-            auto* trampoline = static_cast<std::uint8_t*>(VirtualAlloc(
-                nullptr,
-                trampolineSize,
-                MEM_COMMIT | MEM_RESERVE,
-                PAGE_EXECUTE_READWRITE));
-            if (trampoline == nullptr)
-            {
-                return nullptr;
-            }
-
-            std::memcpy(trampoline, targetAddress, VmNotifyStolenByteCount);
-            if (!WriteJump(
-                trampoline + VmNotifyStolenByteCount,
-                targetAddress + VmNotifyStolenByteCount,
-                TrampolineJumpSize))
-            {
-                VirtualFree(trampoline, 0, MEM_RELEASE);
-                return nullptr;
-            }
-
-            return reinterpret_cast<VmNotifyFunction>(trampoline);
-        }
-
         bool InstallVmNotifyHook()
         {
             auto* targetAddress = reinterpret_cast<std::uint8_t*>(VmNotifyAddress);
-            originalVmNotify = CreateTrampoline(targetAddress);
-            if (originalVmNotify == nullptr)
+            MH_STATUS initializeStatus = MH_Initialize();
+            if (initializeStatus != MH_OK && initializeStatus != MH_ERROR_ALREADY_INITIALIZED)
             {
                 return false;
             }
 
-            if (!WriteJump(targetAddress, reinterpret_cast<const void*>(&VmNotifyDetour), VmNotifyStolenByteCount))
+            minHookInitialized = true;
+            MH_STATUS createStatus = MH_CreateHook(
+                targetAddress,
+                reinterpret_cast<LPVOID>(&VmNotifyDetour),
+                reinterpret_cast<LPVOID*>(&originalVmNotify));
+            if (createStatus != MH_OK)
             {
+                return false;
+            }
+
+            vmNotifyHookCreated = true;
+            MH_STATUS enableStatus = MH_EnableHook(targetAddress);
+            if (enableStatus != MH_OK)
+            {
+                MH_RemoveHook(targetAddress);
+                vmNotifyHookCreated = false;
                 originalVmNotify = nullptr;
                 return false;
             }
 
             return true;
+        }
+
+        [[maybe_unused]] void UninstallVmNotifyHook()
+        {
+            if (vmNotifyHookCreated)
+            {
+                auto* targetAddress = reinterpret_cast<std::uint8_t*>(VmNotifyAddress);
+                MH_DisableHook(targetAddress);
+                MH_RemoveHook(targetAddress);
+                vmNotifyHookCreated = false;
+                originalVmNotify = nullptr;
+            }
+
+            if (minHookInitialized)
+            {
+                MH_Uninitialize();
+                minHookInitialized = false;
+            }
         }
 
         bool CanReadAddress(const void* address)

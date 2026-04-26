@@ -146,6 +146,18 @@ namespace BO2.Tests.Services
             Assert.Equal(GameEventType.Unknown, GameEventMonitor.MapEventName(notifyName));
         }
 
+        [Fact]
+        public void BuildSharedMemoryName_UsesTargetProcessId()
+        {
+            Assert.Equal("BO2MonitorSharedMem-1234", GameEventMonitor.BuildSharedMemoryName(1234));
+        }
+
+        [Fact]
+        public void BuildEventHandleName_UsesTargetProcessId()
+        {
+            Assert.Equal("BO2MonitorEvent-1234", GameEventMonitor.BuildEventHandleName(1234));
+        }
+
         private static byte[] CreateSnapshot(
             GameCompatibilityState compatibilityState,
             uint droppedEventCount,

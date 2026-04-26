@@ -7,7 +7,10 @@ namespace BO2.Services
         MonitorDllMissing,
         WrongProcessArchitecture,
         AlreadyInjected,
-        Injected,
+        Loaded,
+        MonitorReady,
+        PollingFallback,
+        UnsupportedVersion,
         Failed
     }
 }

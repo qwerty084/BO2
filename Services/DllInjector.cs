@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -10,6 +11,8 @@ namespace BO2.Services
     public sealed class DllInjector
     {
         private const string MonitorDllFileName = "BO2Monitor.dll";
+        private const string InjectorHelperFileName = "BO2InjectorHelper.exe";
+        private const ushort ImageFileMachineI386 = 0x014c;
         private const uint Infinite = 0xffffffff;
         private const uint WaitObject0 = 0;
         private const uint MemCommit = 0x00001000;
@@ -27,6 +30,43 @@ namespace BO2.Services
             | ProcessVmOperation
             | ProcessVmWrite
             | ProcessVmRead;
+        private readonly Func<bool> _is64BitProcess;
+        private readonly Func<string> _resolveMonitorPath;
+        private readonly Func<string, bool> _fileExists;
+        private readonly Func<string, DllPayloadValidationResult> _validateMonitorDll;
+        private readonly Func<int, bool> _isMonitorAlreadyLoaded;
+        private readonly Action<int, string> _injectLibrary;
+        private readonly Action<int, string> _injectLibraryViaWow64Helper;
+
+        public DllInjector()
+            : this(
+                () => Environment.Is64BitProcess,
+                ResolveMonitorPath,
+                File.Exists,
+                ValidateMonitorDll,
+                IsMonitorAlreadyLoaded,
+                InjectLibrary,
+                InjectLibraryViaWow64Helper)
+        {
+        }
+
+        internal DllInjector(
+            Func<bool> is64BitProcess,
+            Func<string> resolveMonitorPath,
+            Func<string, bool> fileExists,
+            Func<string, DllPayloadValidationResult> validateMonitorDll,
+            Func<int, bool> isMonitorAlreadyLoaded,
+            Action<int, string> injectLibrary,
+            Action<int, string> injectLibraryViaWow64Helper)
+        {
+            _is64BitProcess = is64BitProcess;
+            _resolveMonitorPath = resolveMonitorPath;
+            _fileExists = fileExists;
+            _validateMonitorDll = validateMonitorDll;
+            _isMonitorAlreadyLoaded = isMonitorAlreadyLoaded;
+            _injectLibrary = injectLibrary;
+            _injectLibraryViaWow64Helper = injectLibraryViaWow64Helper;
+        }
 
         public DllInjectionResult Inject(DetectedGame? detectedGame)
         {
@@ -42,8 +82,8 @@ namespace BO2.Services
                     AppStrings.Format("DllInjectionUnsupportedGameFormat", detectedGame.DisplayName));
             }
 
-            string dllPath = ResolveMonitorPath();
-            if (!File.Exists(dllPath))
+            string dllPath = _resolveMonitorPath();
+            if (!_fileExists(dllPath))
             {
                 return new DllInjectionResult(
                     DllInjectionState.MonitorDllMissing,
@@ -51,9 +91,20 @@ namespace BO2.Services
                     dllPath);
             }
 
+            DllPayloadValidationResult validationResult = _validateMonitorDll(dllPath);
+            if (!validationResult.IsValid)
+            {
+                return new DllInjectionResult(
+                    DllInjectionState.Failed,
+                    AppStrings.Format(
+                        "DllInjectionInvalidDllFormat",
+                        validationResult.Message ?? AppStrings.Get("EventMonitorUnknown")),
+                    dllPath);
+            }
+
             try
             {
-                if (IsMonitorAlreadyLoaded(detectedGame.ProcessId))
+                if (_isMonitorAlreadyLoaded(detectedGame.ProcessId))
                 {
                     return new DllInjectionResult(
                         DllInjectionState.AlreadyInjected,
@@ -61,18 +112,25 @@ namespace BO2.Services
                         dllPath);
                 }
 
-                if (Environment.Is64BitProcess)
+                if (_is64BitProcess())
                 {
-                    InjectLibraryViaWow64PowerShell(detectedGame.ProcessId, dllPath);
+                    _injectLibraryViaWow64Helper(detectedGame.ProcessId, dllPath);
                 }
                 else
                 {
-                    InjectLibrary(detectedGame.ProcessId, dllPath);
+                    _injectLibrary(detectedGame.ProcessId, dllPath);
                 }
 
                 return new DllInjectionResult(
-                    DllInjectionState.Injected,
-                    AppStrings.Get("DllInjectionSucceeded"),
+                    DllInjectionState.Loaded,
+                    AppStrings.Get("DllInjectionLoaded"),
+                    dllPath);
+            }
+            catch (WrongProcessArchitectureException ex)
+            {
+                return new DllInjectionResult(
+                    DllInjectionState.WrongProcessArchitecture,
+                    AppStrings.Format("DllInjectionWrongArchitectureFormat", ex.Message),
                     dllPath);
             }
             catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
@@ -86,13 +144,81 @@ namespace BO2.Services
 
         internal static string ResolveMonitorPath()
         {
-            return Path.Combine(AppContext.BaseDirectory, MonitorDllFileName);
+            return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, MonitorDllFileName));
         }
 
-        internal static string ResolveWow64PowerShellPath()
+        internal static string ResolveWow64HelperPath()
         {
-            string windowsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-            return Path.Combine(windowsDirectory, "SysWOW64", "WindowsPowerShell", "v1.0", "powershell.exe");
+            return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, InjectorHelperFileName));
+        }
+
+        internal static DllPayloadValidationResult ValidateMonitorDll(string dllPath)
+        {
+            string fullDllPath = Path.GetFullPath(dllPath);
+            string appBaseDirectory = Path.GetFullPath(AppContext.BaseDirectory);
+            if (!appBaseDirectory.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal))
+            {
+                appBaseDirectory += Path.DirectorySeparatorChar;
+            }
+
+            if (!fullDllPath.StartsWith(appBaseDirectory, StringComparison.OrdinalIgnoreCase))
+            {
+                return DllPayloadValidationResult.Invalid(
+                    AppStrings.Format("DllInjectionInvalidPathFormat", fullDllPath));
+            }
+
+            try
+            {
+                FileAttributes attributes = File.GetAttributes(fullDllPath);
+                if ((attributes & FileAttributes.Directory) != 0)
+                {
+                    return DllPayloadValidationResult.Invalid(
+                        AppStrings.Format("DllInjectionInvalidDllFormat", fullDllPath));
+                }
+
+                if (!HasExpectedPeMachine(fullDllPath, ImageFileMachineI386))
+                {
+                    return DllPayloadValidationResult.Invalid(
+                        AppStrings.Format("DllInjectionInvalidMachineFormat", fullDllPath));
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or BadImageFormatException)
+            {
+                return DllPayloadValidationResult.Invalid(ex.Message);
+            }
+
+            return DllPayloadValidationResult.Valid;
+        }
+
+        internal static bool HasExpectedPeMachine(string path, ushort expectedMachine)
+        {
+            using FileStream stream = File.OpenRead(path);
+            using BinaryReader reader = new(stream, Encoding.UTF8, leaveOpen: false);
+            if (stream.Length < 0x40)
+            {
+                throw new BadImageFormatException(AppStrings.Format("DllInjectionInvalidDllFormat", path));
+            }
+
+            if (reader.ReadUInt16() != 0x5A4D)
+            {
+                throw new BadImageFormatException(AppStrings.Format("DllInjectionInvalidDllFormat", path));
+            }
+
+            stream.Position = 0x3C;
+            int peHeaderOffset = reader.ReadInt32();
+            if (peHeaderOffset <= 0 || peHeaderOffset > stream.Length - 6)
+            {
+                throw new BadImageFormatException(AppStrings.Format("DllInjectionInvalidDllFormat", path));
+            }
+
+            stream.Position = peHeaderOffset;
+            if (reader.ReadUInt32() != 0x00004550)
+            {
+                throw new BadImageFormatException(AppStrings.Format("DllInjectionInvalidDllFormat", path));
+            }
+
+            ushort machine = reader.ReadUInt16();
+            return machine == expectedMachine;
         }
 
         private static bool IsMonitorAlreadyLoaded(int processId)
@@ -205,158 +331,27 @@ namespace BO2.Services
             }
         }
 
-        private static void InjectLibraryViaWow64PowerShell(int processId, string dllPath)
+        private static void InjectLibraryViaWow64Helper(int processId, string dllPath)
         {
-            string powerShellPath = ResolveWow64PowerShellPath();
-            if (!File.Exists(powerShellPath))
+            string helperPath = ResolveWow64HelperPath();
+            if (!File.Exists(helperPath))
             {
-                throw new InvalidOperationException(AppStrings.Get("DllInjectionWrongArchitecture"));
+                throw new WrongProcessArchitectureException(AppStrings.Get("DllInjectionMissingHelper"));
             }
 
-            string escapedDllPath = dllPath.Replace("'", "''", StringComparison.Ordinal);
-            string script = $$"""
-$ErrorActionPreference = 'Stop'
-$source = @'
-using System;
-using System.ComponentModel;
-using System.Runtime.InteropServices;
-using System.Text;
-
-public static class RemoteDllInjector
-{
-    private const uint PROCESS_CREATE_THREAD = 0x0002;
-    private const uint PROCESS_QUERY_INFORMATION = 0x0400;
-    private const uint PROCESS_VM_OPERATION = 0x0008;
-    private const uint PROCESS_VM_WRITE = 0x0020;
-    private const uint PROCESS_VM_READ = 0x0010;
-    private const uint MEM_COMMIT = 0x1000;
-    private const uint MEM_RESERVE = 0x2000;
-    private const uint MEM_RELEASE = 0x8000;
-    private const uint PAGE_READWRITE = 0x04;
-    private const uint INFINITE = 0xffffffff;
-    private const uint WAIT_OBJECT_0 = 0;
-
-    public static void Inject(int processId, string dllPath)
-    {
-        byte[] bytes = Encoding.Unicode.GetBytes(dllPath + '\0');
-        IntPtr processHandle = OpenProcess(
-            PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ,
-            false,
-            processId);
-        if (processHandle == IntPtr.Zero)
-        {
-            ThrowLastError("OpenProcess");
-        }
-
-        IntPtr remotePath = IntPtr.Zero;
-        IntPtr threadHandle = IntPtr.Zero;
-        try
-        {
-            remotePath = VirtualAllocEx(processHandle, IntPtr.Zero, (UIntPtr)bytes.Length, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-            if (remotePath == IntPtr.Zero)
-            {
-                ThrowLastError("VirtualAllocEx");
-            }
-
-            UIntPtr written;
-            if (!WriteProcessMemory(processHandle, remotePath, bytes, bytes.Length, out written)
-                || written.ToUInt64() != (ulong)bytes.Length)
-            {
-                ThrowLastError("WriteProcessMemory");
-            }
-
-            IntPtr loadLibrary = GetProcAddress(GetModuleHandle("kernel32.dll"), "LoadLibraryW");
-            if (loadLibrary == IntPtr.Zero)
-            {
-                ThrowLastError("LoadLibraryW");
-            }
-
-            threadHandle = CreateRemoteThread(processHandle, IntPtr.Zero, 0, loadLibrary, remotePath, 0, IntPtr.Zero);
-            if (threadHandle == IntPtr.Zero)
-            {
-                ThrowLastError("CreateRemoteThread");
-            }
-
-            uint waitResult = WaitForSingleObject(threadHandle, INFINITE);
-            if (waitResult != WAIT_OBJECT_0)
-            {
-                throw new InvalidOperationException("Remote loader wait failed with result " + waitResult);
-            }
-
-            uint exitCode;
-            if (!GetExitCodeThread(threadHandle, out exitCode) || exitCode == 0)
-            {
-                ThrowLastError("GetExitCodeThread");
-            }
-        }
-        finally
-        {
-            if (threadHandle != IntPtr.Zero)
-            {
-                CloseHandle(threadHandle);
-            }
-
-            if (remotePath != IntPtr.Zero)
-            {
-                VirtualFreeEx(processHandle, remotePath, UIntPtr.Zero, MEM_RELEASE);
-            }
-
-            CloseHandle(processHandle);
-        }
-    }
-
-    private static void ThrowLastError(string apiName)
-    {
-        throw new Win32Exception(Marshal.GetLastWin32Error(), apiName);
-    }
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr OpenProcess(uint access, bool inheritHandle, int processId);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr VirtualAllocEx(IntPtr process, IntPtr address, UIntPtr size, uint allocationType, uint protect);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool VirtualFreeEx(IntPtr process, IntPtr address, UIntPtr size, uint freeType);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool WriteProcessMemory(IntPtr process, IntPtr baseAddress, byte[] buffer, int size, out UIntPtr bytesWritten);
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern IntPtr GetModuleHandle(string moduleName);
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Ansi, SetLastError = true)]
-    private static extern IntPtr GetProcAddress(IntPtr moduleHandle, string procName);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr CreateRemoteThread(IntPtr process, IntPtr attributes, uint stackSize, IntPtr start, IntPtr parameter, uint flags, IntPtr threadId);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool GetExitCodeThread(IntPtr thread, out uint exitCode);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool CloseHandle(IntPtr handle);
-}
-'@
-Add-Type -TypeDefinition $source
-[RemoteDllInjector]::Inject({{processId}}, '{{escapedDllPath}}')
-""";
-            string encodedScript = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
             var startInfo = new ProcessStartInfo
             {
-                FileName = powerShellPath,
-                Arguments = "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + encodedScript,
+                FileName = helperPath,
                 CreateNoWindow = true,
                 UseShellExecute = false,
                 RedirectStandardError = true,
                 RedirectStandardOutput = true
             };
+            startInfo.ArgumentList.Add(processId.ToString(CultureInfo.InvariantCulture));
+            startInfo.ArgumentList.Add(dllPath);
 
             using Process process = Process.Start(startInfo)
-                ?? throw new InvalidOperationException(AppStrings.Get("DllInjectionWrongArchitecture"));
+                ?? throw new WrongProcessArchitectureException(AppStrings.Get("DllInjectionMissingHelper"));
             string standardOutput = process.StandardOutput.ReadToEnd();
             string standardError = process.StandardError.ReadToEnd();
             if (!process.WaitForExit(15000))
@@ -382,6 +377,24 @@ Add-Type -TypeDefinition $source
         private static Win32Exception CreateWin32Exception(string apiName)
         {
             return new Win32Exception(Marshal.GetLastWin32Error(), apiName);
+        }
+
+        internal sealed record DllPayloadValidationResult(bool IsValid, string? Message)
+        {
+            public static DllPayloadValidationResult Valid { get; } = new(true, null);
+
+            public static DllPayloadValidationResult Invalid(string message)
+            {
+                return new DllPayloadValidationResult(false, message);
+            }
+        }
+
+        internal sealed class WrongProcessArchitectureException : InvalidOperationException
+        {
+            public WrongProcessArchitectureException(string message)
+                : base(message)
+            {
+            }
         }
 
         [DllImport("kernel32.dll", SetLastError = true)]

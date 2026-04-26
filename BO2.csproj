@@ -71,6 +71,13 @@
       Properties="Configuration=Production;Platform=Win32;EnableVmNotifyHook=true" />
   </Target>
 
+  <Target Name="BuildBO2InjectorHelper" BeforeTargets="CopyBO2InjectorHelper" Condition="'$(Platform)'!='ARM64'">
+    <MSBuild
+      Projects="$(MSBuildProjectDirectory)\BO2InjectorHelper\BO2InjectorHelper.vcxproj"
+      Targets="Build"
+      Properties="Configuration=Production;Platform=Win32" />
+  </Target>
+
   <Target Name="CopyBO2MonitorDll" AfterTargets="Build">
     <ItemGroup>
       <BO2MonitorDll Include="$(MSBuildProjectDirectory)\BO2Monitor\bin\Win32\Production\BO2Monitor.dll" Condition="Exists('$(MSBuildProjectDirectory)\BO2Monitor\bin\Win32\Production\BO2Monitor.dll')" />
@@ -78,5 +85,14 @@
     </ItemGroup>
     <Copy SourceFiles="@(BO2MonitorDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(BO2MonitorDll)" DestinationFolder="$(OutDir)AppX\" SkipUnchangedFiles="true" Condition="Exists('$(OutDir)AppX')" />
+  </Target>
+
+  <Target Name="CopyBO2InjectorHelper" AfterTargets="Build">
+    <ItemGroup>
+      <BO2InjectorHelper Include="$(MSBuildProjectDirectory)\BO2InjectorHelper\bin\Win32\Production\BO2InjectorHelper.exe" Condition="Exists('$(MSBuildProjectDirectory)\BO2InjectorHelper\bin\Win32\Production\BO2InjectorHelper.exe')" />
+      <BO2InjectorHelper Include="$(MSBuildProjectDirectory)\BO2InjectorHelper\bin\Win32\$(Configuration)\BO2InjectorHelper.exe" Condition="!Exists('$(MSBuildProjectDirectory)\BO2InjectorHelper\bin\Win32\Production\BO2InjectorHelper.exe') and Exists('$(MSBuildProjectDirectory)\BO2InjectorHelper\bin\Win32\$(Configuration)\BO2InjectorHelper.exe')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BO2InjectorHelper)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(BO2InjectorHelper)" DestinationFolder="$(OutDir)AppX\" SkipUnchangedFiles="true" Condition="Exists('$(OutDir)AppX')" />
   </Target>
 </Project>

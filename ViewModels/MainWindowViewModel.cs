@@ -203,7 +203,9 @@ namespace BO2.ViewModels
                     {
                         PlayerStatsReadResult readResult = _memoryReader.ReadPlayerStats();
                         DllInjectionResult injectionResult = EnsureMonitorInjected(readResult.DetectedGame);
-                        GameEventMonitorStatus eventStatus = _eventMonitor.ReadStatus(DateTimeOffset.UtcNow);
+                        GameEventMonitorStatus eventStatus = _eventMonitor.ReadStatus(
+                            DateTimeOffset.UtcNow,
+                            readResult.DetectedGame?.ProcessId);
                         return (readResult, injectionResult, eventStatus);
                     },
                     cancellationToken);
@@ -494,8 +496,31 @@ namespace BO2.ViewModels
             return state is DllInjectionState.UnsupportedGame
                 or DllInjectionState.WrongProcessArchitecture
                 or DllInjectionState.AlreadyInjected
-                or DllInjectionState.Injected
+                or DllInjectionState.Loaded
+                or DllInjectionState.MonitorReady
+                or DllInjectionState.PollingFallback
+                or DllInjectionState.UnsupportedVersion
                 or DllInjectionState.Failed;
+        }
+
+        private static string FormatInjectionStatus(
+            DllInjectionResult injectionResult,
+            GameEventMonitorStatus eventStatus)
+        {
+            if (injectionResult.State is not (DllInjectionState.Loaded or DllInjectionState.AlreadyInjected))
+            {
+                return injectionResult.Message;
+            }
+
+            return eventStatus.CompatibilityState switch
+            {
+                GameCompatibilityState.Compatible => AppStrings.Get("DllInjectionMonitorReady"),
+                GameCompatibilityState.PollingFallback => AppStrings.Get("DllInjectionPollingFallback"),
+                GameCompatibilityState.UnsupportedVersion => AppStrings.Get("DllInjectionUnsupportedVersion"),
+                GameCompatibilityState.CaptureDisabled => AppStrings.Get("DllInjectionCaptureDisabled"),
+                GameCompatibilityState.WaitingForMonitor => AppStrings.Get("DllInjectionWaitingForReadiness"),
+                _ => injectionResult.Message
+            };
         }
 
         private void ApplyEventMonitorStatus(
@@ -503,7 +528,7 @@ namespace BO2.ViewModels
             DllInjectionResult injectionResult,
             GameEventMonitorStatus eventStatus)
         {
-            InjectionStatusText = injectionResult.Message;
+            InjectionStatusText = FormatInjectionStatus(injectionResult, eventStatus);
 
             if (readResult.DetectedGame is null)
             {

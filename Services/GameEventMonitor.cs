@@ -10,8 +10,8 @@ namespace BO2.Services
 {
     public sealed class GameEventMonitor : IGameEventMonitor
     {
-        public const string SharedMemoryName = "BO2MonitorSharedMem";
-        public const string EventHandleName = "BO2MonitorEvent";
+        public const string SharedMemoryNamePrefix = "BO2MonitorSharedMem-";
+        public const string EventHandleNamePrefix = "BO2MonitorEvent-";
 
         internal const uint SnapshotMagic = 0x45324F42; // BO2E
         internal const uint SnapshotVersion = 4;
@@ -23,13 +23,42 @@ namespace BO2.Services
         internal const int WriteSequenceOffset = 32;
         private const int StableReadAttempts = 4;
 
+        private int? _targetProcessId;
         private MemoryMappedFile? _sharedMemory;
+        private EventWaitHandle? _eventHandle;
+        private bool _readinessSignalObserved;
 
-        public GameEventMonitorStatus ReadStatus(DateTimeOffset receivedAt)
+        public GameEventMonitorStatus ReadStatus(DateTimeOffset receivedAt, int? targetProcessId)
         {
-            if (!TryEnsureSharedMemory())
+            if (targetProcessId is null or <= 0)
+            {
+                ResetSharedMemory();
+                _targetProcessId = null;
+                return GameEventMonitorStatus.WaitingForMonitor;
+            }
+
+            if (_targetProcessId != targetProcessId)
+            {
+                ResetSharedMemory();
+                _targetProcessId = targetProcessId;
+            }
+
+            if (!TryEnsureSharedMemory(targetProcessId.Value))
             {
                 return GameEventMonitorStatus.WaitingForMonitor;
+            }
+
+            if (!_readinessSignalObserved)
+            {
+                _readinessSignalObserved = _eventHandle?.WaitOne(0) == true;
+                if (!_readinessSignalObserved)
+                {
+                    return GameEventMonitorStatus.WaitingForMonitor;
+                }
+            }
+            else
+            {
+                _eventHandle?.WaitOne(0);
             }
 
             byte[] snapshot = new byte[SharedMemorySize];
@@ -189,6 +218,16 @@ namespace BO2.Services
             return Encoding.UTF8.GetString(nameBytes);
         }
 
+        internal static string BuildSharedMemoryName(int processId)
+        {
+            return SharedMemoryNamePrefix + processId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        internal static string BuildEventHandleName(int processId)
+        {
+            return EventHandleNamePrefix + processId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         private static bool TryReadStableSnapshot(MemoryMappedViewAccessor accessor, byte[] snapshot)
         {
             for (int attempt = 0; attempt < StableReadAttempts; attempt++)
@@ -213,28 +252,39 @@ namespace BO2.Services
             return false;
         }
 
-        private bool TryEnsureSharedMemory()
+        private bool TryEnsureSharedMemory(int targetProcessId)
         {
-            if (_sharedMemory is not null)
+            if (_sharedMemory is not null && _eventHandle is not null)
             {
                 return true;
             }
 
             try
             {
-                _sharedMemory = MemoryMappedFile.OpenExisting(SharedMemoryName, MemoryMappedFileRights.Read);
+                _eventHandle ??= EventWaitHandle.OpenExisting(BuildEventHandleName(targetProcessId));
+                _sharedMemory ??= MemoryMappedFile.OpenExisting(
+                    BuildSharedMemoryName(targetProcessId),
+                    MemoryMappedFileRights.Read);
                 return true;
             }
             catch (FileNotFoundException)
             {
+                ResetSharedMemory();
                 return false;
             }
             catch (IOException)
             {
+                ResetSharedMemory();
                 return false;
             }
             catch (UnauthorizedAccessException)
             {
+                ResetSharedMemory();
+                return false;
+            }
+            catch (WaitHandleCannotBeOpenedException)
+            {
+                ResetSharedMemory();
                 return false;
             }
         }
@@ -243,6 +293,9 @@ namespace BO2.Services
         {
             _sharedMemory?.Dispose();
             _sharedMemory = null;
+            _eventHandle?.Dispose();
+            _eventHandle = null;
+            _readinessSignalObserved = false;
         }
     }
 }

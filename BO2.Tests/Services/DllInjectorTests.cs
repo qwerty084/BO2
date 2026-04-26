@@ -45,18 +45,126 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void ResolveWow64PowerShellPath_UsesWindowsDirectory()
+        public void ResolveWow64HelperPath_UsesAppBaseDirectory()
         {
-            string expectedPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Windows),
-                "SysWOW64",
-                "WindowsPowerShell",
-                "v1.0",
-                "powershell.exe");
+            string expectedPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "BO2InjectorHelper.exe"));
 
-            string actualPath = DllInjector.ResolveWow64PowerShellPath();
+            string actualPath = DllInjector.ResolveWow64HelperPath();
 
             Assert.Equal(expectedPath, actualPath);
+        }
+
+        [Fact]
+        public void Inject_WhenHelperIsMissing_MapsToWrongProcessArchitecture()
+        {
+            var injector = new DllInjector(
+                is64BitProcess: () => true,
+                resolveMonitorPath: () => @"C:\app\BO2Monitor.dll",
+                fileExists: _ => true,
+                validateMonitorDll: _ => DllInjector.DllPayloadValidationResult.Valid,
+                isMonitorAlreadyLoaded: _ => false,
+                injectLibrary: (_, _) => throw new InvalidOperationException("direct path should not run"),
+                injectLibraryViaWow64Helper: (_, _) => throw new DllInjector.WrongProcessArchitectureException("missing helper"));
+            var detectedGame = CreateSupportedGame();
+
+            DllInjectionResult result = injector.Inject(detectedGame);
+
+            Assert.Equal(DllInjectionState.WrongProcessArchitecture, result.State);
+        }
+
+        [Fact]
+        public void Inject_WhenMonitorLoads_ReturnsLoadedUntilReadinessIsObserved()
+        {
+            var injector = new DllInjector(
+                is64BitProcess: () => false,
+                resolveMonitorPath: () => @"C:\app\BO2Monitor.dll",
+                fileExists: _ => true,
+                validateMonitorDll: _ => DllInjector.DllPayloadValidationResult.Valid,
+                isMonitorAlreadyLoaded: _ => false,
+                injectLibrary: (_, _) => { },
+                injectLibraryViaWow64Helper: (_, _) => throw new InvalidOperationException("helper path should not run"));
+            var detectedGame = CreateSupportedGame();
+
+            DllInjectionResult result = injector.Inject(detectedGame);
+
+            Assert.Equal(DllInjectionState.Loaded, result.State);
+        }
+
+        [Fact]
+        public void Inject_WhenMonitorDllValidationFails_ReturnsFailedBeforeNativeCalls()
+        {
+            bool nativeCalled = false;
+            var injector = new DllInjector(
+                is64BitProcess: () => false,
+                resolveMonitorPath: () => @"C:\app\BO2Monitor.dll",
+                fileExists: _ => true,
+                validateMonitorDll: _ => DllInjector.DllPayloadValidationResult.Invalid("bad payload"),
+                isMonitorAlreadyLoaded: _ => false,
+                injectLibrary: (_, _) => nativeCalled = true,
+                injectLibraryViaWow64Helper: (_, _) => nativeCalled = true);
+            var detectedGame = CreateSupportedGame();
+
+            DllInjectionResult result = injector.Inject(detectedGame);
+
+            Assert.Equal(DllInjectionState.Failed, result.State);
+            Assert.False(nativeCalled);
+        }
+
+        [Fact]
+        public void HasExpectedPeMachine_WhenMachineMatches_ReturnsTrue()
+        {
+            string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".dll");
+            try
+            {
+                File.WriteAllBytes(path, CreateMinimalPe(machine: 0x014c));
+
+                Assert.True(DllInjector.HasExpectedPeMachine(path, 0x014c));
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public void HasExpectedPeMachine_WhenMachineDiffers_ReturnsFalse()
+        {
+            string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".dll");
+            try
+            {
+                File.WriteAllBytes(path, CreateMinimalPe(machine: 0x8664));
+
+                Assert.False(DllInjector.HasExpectedPeMachine(path, 0x014c));
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        private static DetectedGame CreateSupportedGame()
+        {
+            return new DetectedGame(
+                GameVariant.SteamZombies,
+                "Steam Zombies",
+                "t6zm",
+                42,
+                PlayerStatAddressMap.SteamZombies,
+                "Supported");
+        }
+
+        private static byte[] CreateMinimalPe(ushort machine)
+        {
+            byte[] bytes = new byte[0x80];
+            bytes[0] = 0x4D;
+            bytes[1] = 0x5A;
+            BitConverter.GetBytes(0x40).CopyTo(bytes, 0x3C);
+            bytes[0x40] = 0x50;
+            bytes[0x41] = 0x45;
+            bytes[0x42] = 0;
+            bytes[0x43] = 0;
+            BitConverter.GetBytes(machine).CopyTo(bytes, 0x44);
+            return bytes;
         }
     }
 }

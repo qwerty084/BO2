@@ -5,6 +5,16 @@
 
 namespace BO2Monitor
 {
+    std::wstring BuildSharedMemoryName(DWORD processId)
+    {
+        return std::wstring(SharedMemoryNamePrefix) + std::to_wstring(processId);
+    }
+
+    std::wstring BuildEventHandleName(DWORD processId)
+    {
+        return std::wstring(EventHandleNamePrefix) + std::to_wstring(processId);
+    }
+
     SharedSnapshotWriter::~SharedSnapshotWriter()
     {
         if (snapshot_ != nullptr)
@@ -28,13 +38,16 @@ namespace BO2Monitor
 
     bool SharedSnapshotWriter::Initialize()
     {
+        const DWORD processId = GetCurrentProcessId();
+        const std::wstring sharedMemoryName = BuildSharedMemoryName(processId);
+        const std::wstring eventHandleName = BuildEventHandleName(processId);
         mappingHandle_ = CreateFileMappingW(
             INVALID_HANDLE_VALUE,
             nullptr,
             PAGE_READWRITE,
             0,
             static_cast<DWORD>(sizeof(SharedSnapshot)),
-            SharedMemoryName);
+            sharedMemoryName.c_str());
         if (mappingHandle_ == nullptr)
         {
             return false;
@@ -51,7 +64,7 @@ namespace BO2Monitor
             return false;
         }
 
-        eventHandle_ = CreateEventW(nullptr, FALSE, FALSE, EventHandleName);
+        eventHandle_ = CreateEventW(nullptr, FALSE, FALSE, eventHandleName.c_str());
         if (eventHandle_ == nullptr)
         {
             return false;
