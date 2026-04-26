@@ -10,5 +10,10 @@
     <Platform Solution="*|x86" Project="x86" />
     <Deploy />
   </Project>
+  <Project Path="BO2Monitor\BO2Monitor.vcxproj">
+    <Platform Solution="*|ARM64" Project="Win32" />
+    <Platform Solution="*|x64" Project="Win32" />
+    <Platform Solution="*|x86" Project="Win32" />
+  </Project>
   <Project Path="BO2.Tests\BO2.Tests.csproj" />
 </Solution>

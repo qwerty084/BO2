@@ -1,0 +1,6 @@
+sxd bpe
+ba r1 02c27a5c ".echo HIT start_of_round 02c27a5c; kb; r eip esp ebp eax ebx ecx edx esi edi; g"
+ba r1 02c275cf ".echo HIT end_of_round 02c275cf; kb; r eip esp ebp eax ebx ecx edx esi edi; g"
+ba r1 02c2375e ".echo HIT powerup_grabbed 02c2375e; kb; r eip esp ebp eax ebx ecx edx esi edi; g"
+ba w4 0233fa10 ".echo HIT round_write 0233fa10; dd 0233fa10 L4; kb; r eip esp ebp eax ebx ecx edx esi edi; u @eip-20 @eip+40; g"
+g

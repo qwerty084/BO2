@@ -294,8 +294,75 @@
                                 AutomationProperties.HeadingLevel="Level2"
                                 Style="{ThemeResource SubtitleTextBlockStyle}" />
                             <TextBlock
+                                x:Uid="GameEventsDescription"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="{x:Bind ViewModel.DetectedGameText, Mode=OneWay}" />
+                                TextWrapping="Wrap" />
+                            <Grid
+                                ColumnSpacing="24"
+                                RowSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock
+                                    x:Uid="DetectedGameLabel"
+                                    Grid.Row="0"
+                                    Grid.Column="0"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    Grid.Row="0"
+                                    Grid.Column="1"
+                                    Text="{x:Bind ViewModel.DetectedGameText, Mode=OneWay}"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    x:Uid="EventCompatibilityLabel"
+                                    Grid.Row="1"
+                                    Grid.Column="0"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    Grid.Row="1"
+                                    Grid.Column="1"
+                                    Text="{x:Bind ViewModel.EventCompatibilityText, Mode=OneWay}"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    x:Uid="DllInjectionStatusLabel"
+                                    Grid.Row="2"
+                                    Grid.Column="0"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    Grid.Row="2"
+                                    Grid.Column="1"
+                                    Text="{x:Bind ViewModel.InjectionStatusText, Mode=OneWay}"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    x:Uid="EventMonitorStatusLabel"
+                                    Grid.Row="3"
+                                    Grid.Column="0"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    Grid.Row="3"
+                                    Grid.Column="1"
+                                    Text="{x:Bind ViewModel.EventMonitorStatusText, Mode=OneWay}"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    x:Uid="RecentEventsLabel"
+                                    Grid.Row="4"
+                                    Grid.Column="0"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    Grid.Row="4"
+                                    Grid.Column="1"
+                                    Text="{x:Bind ViewModel.RecentGameEventsText, Mode=OneWay}"
+                                    TextWrapping="Wrap" />
+                            </Grid>
                         </StackPanel>
                     </StackPanel>
 
