@@ -12,6 +12,8 @@
 
 - Complex tasks: consult GitHub wiki before design and implementation: https://github.com/qwerty084/BO2/wiki.
 - Memory reading, address discovery, CDB/WinDbg usage, BO2 Zombies runtime data: check wiki pages such as `Confirmed-Memory-Addresses` for confirmed addresses + validation notes.
+- For mystery-box weapon tracking, use `BO2-Box-Weapon-Tracking`: https://github.com/qwerty084/BO2/wiki/BO2-Box-Weapon-Tracking.
+- For Ghidra/x32dbg reverse-engineering workflows, use `Ghidra-and-x32dbg-Workflow`: https://github.com/qwerty084/BO2/wiki/Ghidra-and-x32dbg-Workflow.
 - Durable future-agent findings go in repo wiki, not ad-hoc local notes. Use `repo-wiki-notes`.
 - Never store secrets, credentials, raw sensitive memory dumps, anti-cheat bypass techniques, process hiding techniques, code injection workflows, or memory-writing instructions in wiki.
 
