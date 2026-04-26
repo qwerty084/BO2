@@ -19,6 +19,7 @@ namespace BO2
         public MainWindow()
         {
             ViewModel = new MainWindowViewModel(DispatcherQueue);
+            ViewModel.RefreshRequested += OnViewModelRefreshRequested;
             InitializeComponent();
 
             _refreshTimer = new DispatcherTimer
@@ -40,11 +41,29 @@ namespace BO2
             QueueRefresh();
         }
 
+        private void OnViewModelRefreshRequested(object? sender, EventArgs e)
+        {
+            QueueRefresh();
+        }
+
+        private async void OnConnectButtonClick(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                await ViewModel.ConnectAsync(_refreshCancellationTokenSource.Token);
+                QueueRefresh();
+            }
+            catch (OperationCanceledException) when (_refreshCancellationTokenSource.IsCancellationRequested)
+            {
+            }
+        }
+
         private void OnClosed(object sender, WindowEventArgs args)
         {
             Closed -= OnClosed;
             _refreshTimer.Stop();
             _refreshTimer.Tick -= OnRefreshTimerTick;
+            ViewModel.RefreshRequested -= OnViewModelRefreshRequested;
             _refreshCancellationTokenSource.Cancel();
 
             Task? refreshTask = _refreshTask;

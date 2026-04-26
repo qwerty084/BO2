@@ -15,6 +15,18 @@
   <data name="ConnectedStatusFormat" xml:space="preserve">
     <value>Connected: {0}</value>
   </data>
+  <data name="ConnectButtonText" xml:space="preserve">
+    <value>Connect</value>
+  </data>
+  <data name="ConnectButtonConnectingText" xml:space="preserve">
+    <value>Connecting...</value>
+  </data>
+  <data name="ConnectButtonConnectedText" xml:space="preserve">
+    <value>Connected</value>
+  </data>
+  <data name="ConnectionStatusConnecting" xml:space="preserve">
+    <value>Connecting...</value>
+  </data>
   <data name="AdvancedCandidateDetailsExpander.AutomationProperties.Name" xml:space="preserve">
     <value>Advanced candidate details</value>
   </data>
@@ -66,6 +78,9 @@
   <data name="DllInjectionAlreadyLoaded" xml:space="preserve">
     <value>BO2Monitor already loaded</value>
   </data>
+  <data name="DllInjectionConnecting" xml:space="preserve">
+    <value>Connecting...</value>
+  </data>
   <data name="DllInjectionFailedFormat" xml:space="preserve">
     <value>Injection failed: {0}</value>
   </data>
@@ -108,6 +123,9 @@
   <data name="DllInjectionNotAttempted" xml:space="preserve">
     <value>Injection not attempted</value>
   </data>
+  <data name="DllInjectionReadinessTimedOut" xml:space="preserve">
+    <value>BO2Monitor did not become ready. Press Connect to retry.</value>
+  </data>
   <data name="DllInjectionStatusLabel.Text" xml:space="preserve">
     <value>Injection status</value>
   </data>
@@ -137,6 +155,9 @@
   </data>
   <data name="DllInjectionWaitingForReadiness" xml:space="preserve">
     <value>BO2Monitor loaded; waiting for readiness</value>
+  </data>
+  <data name="DllInjectionWaitingForConnect" xml:space="preserve">
+    <value>Waiting for Connect</value>
   </data>
   <data name="GameProcessDetectorDisplayNamePlutoniumMultiplayer" xml:space="preserve">
     <value>Plutonium Multiplayer</value>
@@ -234,6 +255,9 @@
   <data name="EventMonitorUnsupportedVersion" xml:space="preserve">
     <value>Unsupported monitor or game build</value>
   </data>
+  <data name="EventMonitorWaitingForConnect" xml:space="preserve">
+    <value>Waiting for Connect</value>
+  </data>
   <data name="EventMonitorWaitingForMonitor" xml:space="preserve">
     <value>Waiting for BO2Monitor shared memory</value>
   </data>
@@ -242,6 +266,9 @@
   </data>
   <data name="GameEventsTitle.Text" xml:space="preserve">
     <value>Game events</value>
+  </data>
+  <data name="GameDetectedConnectPromptFormat" xml:space="preserve">
+    <value>Game detected: {0}. Press Connect.</value>
   </data>
   <data name="GameNotRunning" xml:space="preserve">
     <value>Game not running</value>
@@ -341,6 +368,9 @@
   </data>
   <data name="PointsLabel.Text" xml:space="preserve">
     <value>Points</value>
+  </data>
+  <data name="ProcessWatcherUnavailableFormat" xml:space="preserve">
+    <value>Unable to watch game process changes: {0}</value>
   </data>
   <data name="RevivesLabel.Text" xml:space="preserve">
     <value>Revives</value>

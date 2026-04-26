@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 namespace BO2.Services
 {
@@ -65,6 +66,7 @@ namespace BO2.Services
                 null,
                 AppStrings.Get("GameProcessDetectorUnsupportedReasonSteamSinglePlayer"))
         ];
+        private static readonly string[] KnownProcessNames = BuildKnownProcessNames();
 
         private readonly IProcessInfoProvider _processInfoProvider;
         private readonly TimeProvider _timeProvider;
@@ -82,6 +84,27 @@ namespace BO2.Services
             ArgumentNullException.ThrowIfNull(timeProvider);
             _processInfoProvider = processInfoProvider;
             _timeProvider = timeProvider;
+        }
+
+        internal static IReadOnlyCollection<string> ProcessNames => KnownProcessNames;
+
+        internal static bool IsKnownProcessName(string? processName)
+        {
+            string normalizedProcessName = NormalizeProcessName(processName);
+            if (normalizedProcessName.Length == 0)
+            {
+                return false;
+            }
+
+            foreach (string knownProcessName in KnownProcessNames)
+            {
+                if (string.Equals(knownProcessName, normalizedProcessName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public DetectedGame? Detect()
@@ -165,5 +188,29 @@ namespace BO2.Services
         }
 
         private sealed record CommandLineCacheEntry(string? CommandLine, DateTimeOffset CachedAt);
+
+        private static string[] BuildKnownProcessNames()
+        {
+            HashSet<string> processNames = new(StringComparer.OrdinalIgnoreCase);
+            foreach (GameProcessDefinition definition in Definitions)
+            {
+                processNames.Add(definition.ProcessName);
+            }
+
+            string[] result = new string[processNames.Count];
+            processNames.CopyTo(result);
+            return result;
+        }
+
+        private static string NormalizeProcessName(string? processName)
+        {
+            if (string.IsNullOrWhiteSpace(processName))
+            {
+                return string.Empty;
+            }
+
+            string fileName = Path.GetFileName(processName.Trim());
+            return Path.GetFileNameWithoutExtension(fileName);
+        }
     }
 }
