@@ -27,9 +27,18 @@
   <ItemGroup>
     <Compile Include="..\Services\ConnectionState.cs"           Link="Services\ConnectionState.cs" />
     <Compile Include="..\Services\DetectedGame.cs"              Link="Services\DetectedGame.cs" />
+    <Compile Include="..\Services\DllInjectionResult.cs"        Link="Services\DllInjectionResult.cs" />
+    <Compile Include="..\Services\DllInjectionState.cs"         Link="Services\DllInjectionState.cs" />
+    <Compile Include="..\Services\DllInjector.cs"               Link="Services\DllInjector.cs" />
     <Compile Include="..\Services\IGameProcessDetector.cs"      Link="Services\IGameProcessDetector.cs" />
     <Compile Include="..\Services\GameProcessDefinition.cs"     Link="Services\GameProcessDefinition.cs" />
     <Compile Include="..\Services\GameVariant.cs"               Link="Services\GameVariant.cs" />
+    <Compile Include="..\Services\GameCompatibilityState.cs"    Link="Services\GameCompatibilityState.cs" />
+    <Compile Include="..\Services\GameEvent.cs"                 Link="Services\GameEvent.cs" />
+    <Compile Include="..\Services\GameEventMonitor.cs"          Link="Services\GameEventMonitor.cs" />
+    <Compile Include="..\Services\GameEventMonitorStatus.cs"    Link="Services\GameEventMonitorStatus.cs" />
+    <Compile Include="..\Services\GameEventType.cs"             Link="Services\GameEventType.cs" />
+    <Compile Include="..\Services\IGameEventMonitor.cs"         Link="Services\IGameEventMonitor.cs" />
     <Compile Include="..\Services\IProcessInfoProvider.cs"      Link="Services\IProcessInfoProvider.cs" />
     <Compile Include="..\Services\IProcessMemoryAccessor.cs"    Link="Services\IProcessMemoryAccessor.cs" />
     <Compile Include="..\Services\GameMemoryReader.cs"          Link="Services\GameMemoryReader.cs" />

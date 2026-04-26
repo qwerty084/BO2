@@ -60,6 +60,84 @@
   <data name="DispatcherQueueFailed" xml:space="preserve">
     <value>Unable to queue UI update.</value>
   </data>
+  <data name="DetectedGameLabel.Text" xml:space="preserve">
+    <value>Detected game</value>
+  </data>
+  <data name="DllInjectionAlreadyLoaded" xml:space="preserve">
+    <value>BO2Monitor already loaded</value>
+  </data>
+  <data name="DllInjectionFailedFormat" xml:space="preserve">
+    <value>Injection failed: {0}</value>
+  </data>
+  <data name="DllInjectionExportMissingFormat" xml:space="preserve">
+    <value>BO2Monitor export not found: {0}</value>
+  </data>
+  <data name="DllInjectionInvalidDllFormat" xml:space="preserve">
+    <value>BO2Monitor.dll failed validation: {0}</value>
+  </data>
+  <data name="DllInjectionInvalidMachineFormat" xml:space="preserve">
+    <value>BO2Monitor.dll is not a 32-bit Windows DLL: {0}</value>
+  </data>
+  <data name="DllInjectionInvalidHelperFormat" xml:space="preserve">
+    <value>BO2InjectorHelper.exe failed validation: {0}</value>
+  </data>
+  <data name="DllInjectionInvalidHelperMachineFormat" xml:space="preserve">
+    <value>BO2InjectorHelper.exe is not a 32-bit Windows executable: {0}</value>
+  </data>
+  <data name="DllInjectionInvalidHelperPathFormat" xml:space="preserve">
+    <value>BO2InjectorHelper.exe is outside the app directory: {0}</value>
+  </data>
+  <data name="DllInjectionInvalidPathFormat" xml:space="preserve">
+    <value>BO2Monitor.dll is outside the app directory: {0}</value>
+  </data>
+  <data name="DllInjectionLoaded" xml:space="preserve">
+    <value>BO2Monitor loaded; waiting for readiness</value>
+  </data>
+  <data name="DllInjectionMissingDllFormat" xml:space="preserve">
+    <value>BO2Monitor.dll not found at {0}</value>
+  </data>
+  <data name="DllInjectionMissingHelper" xml:space="preserve">
+    <value>BO2InjectorHelper.exe is missing</value>
+  </data>
+  <data name="DllInjectionMonitorReady" xml:space="preserve">
+    <value>BO2Monitor ready</value>
+  </data>
+  <data name="DllInjectionPollingFallback" xml:space="preserve">
+    <value>BO2Monitor loaded; polling fallback active</value>
+  </data>
+  <data name="DllInjectionNotAttempted" xml:space="preserve">
+    <value>Injection not attempted</value>
+  </data>
+  <data name="DllInjectionStatusLabel.Text" xml:space="preserve">
+    <value>Injection status</value>
+  </data>
+  <data name="DllInjectionStartFailedFormat" xml:space="preserve">
+    <value>BO2Monitor StartMonitor failed with result {0}</value>
+  </data>
+  <data name="DllInjectionSucceeded" xml:space="preserve">
+    <value>BO2Monitor injected</value>
+  </data>
+  <data name="DllInjectionUnsupportedVersion" xml:space="preserve">
+    <value>BO2Monitor loaded; unsupported game build</value>
+  </data>
+  <data name="DllInjectionUnsupportedGameFormat" xml:space="preserve">
+    <value>Injection disabled for {0}</value>
+  </data>
+  <data name="DllInjectionCaptureDisabled" xml:space="preserve">
+    <value>BO2Monitor loaded; native capture disabled</value>
+  </data>
+  <data name="DllInjectionWaitFailedFormat" xml:space="preserve">
+    <value>Remote loader wait failed with result {0}</value>
+  </data>
+  <data name="DllInjectionWrongArchitecture" xml:space="preserve">
+    <value>Unable to start the 32-bit helper for BO2Monitor injection</value>
+  </data>
+  <data name="DllInjectionWrongArchitectureFormat" xml:space="preserve">
+    <value>Unable to start the 32-bit helper for BO2Monitor injection: {0}</value>
+  </data>
+  <data name="DllInjectionWaitingForReadiness" xml:space="preserve">
+    <value>BO2Monitor loaded; waiting for readiness</value>
+  </data>
   <data name="GameProcessDetectorDisplayNamePlutoniumMultiplayer" xml:space="preserve">
     <value>Plutonium Multiplayer</value>
   </data>
@@ -107,6 +185,57 @@
   </data>
   <data name="DownsLabel.Text" xml:space="preserve">
     <value>Downs</value>
+  </data>
+  <data name="EventCompatibilityLabel.Text" xml:space="preserve">
+    <value>Compatibility</value>
+  </data>
+  <data name="BoxEventFormat" xml:space="preserve">
+    <value>{0} - {1} (owner {2}, id {3})</value>
+  </data>
+  <data name="BoxEventsLabel.Text" xml:space="preserve">
+    <value>Box events</value>
+  </data>
+  <data name="CurrentRoundFormat" xml:space="preserve">
+    <value>Round {0} ({1})</value>
+  </data>
+  <data name="CurrentRoundLabel.Text" xml:space="preserve">
+    <value>Round/session</value>
+  </data>
+  <data name="EventMonitorCaptureDisabled" xml:space="preserve">
+    <value>Native event capture disabled pending BO2 hook validation</value>
+  </data>
+  <data name="EventMonitorCompatible" xml:space="preserve">
+    <value>Monitor compatible</value>
+  </data>
+  <data name="EventMonitorPollingFallback" xml:space="preserve">
+    <value>Polling fallback active</value>
+  </data>
+  <data name="EventMonitorDroppedEventsFormat" xml:space="preserve">
+    <value>{0} ({1} dropped events)</value>
+  </data>
+  <data name="EventMonitorCaptureDropsFormat" xml:space="preserve">
+    <value>{0} ({1} summary drops, {2} notify drops, {3} published)</value>
+  </data>
+  <data name="EventMonitorPublishedEventsFormat" xml:space="preserve">
+    <value>{0} ({1} notifies published)</value>
+  </data>
+  <data name="EventMonitorStatusLabel.Text" xml:space="preserve">
+    <value>Monitor status</value>
+  </data>
+  <data name="EventMonitorUnknown" xml:space="preserve">
+    <value>Unknown monitor state</value>
+  </data>
+  <data name="EventMonitorUnsupportedGameFormat" xml:space="preserve">
+    <value>Unsupported for {0}</value>
+  </data>
+  <data name="EventMonitorUnsupportedVersion" xml:space="preserve">
+    <value>Unsupported monitor or game build</value>
+  </data>
+  <data name="EventMonitorWaitingForMonitor" xml:space="preserve">
+    <value>Waiting for BO2Monitor shared memory</value>
+  </data>
+  <data name="GameEventsDescription.Text" xml:space="preserve">
+    <value>Event capture is inactive until a validated BO2 monitor publishes read-only event snapshots.</value>
   </data>
   <data name="GameEventsTitle.Text" xml:space="preserve">
     <value>Game events</value>
@@ -213,6 +342,15 @@
   <data name="RevivesLabel.Text" xml:space="preserve">
     <value>Revives</value>
   </data>
+  <data name="RecentEventFormat" xml:space="preserve">
+    <value>{0} - {1} ({2}, value {3}, owner {4}, id {5})</value>
+  </data>
+  <data name="RecentEventsEmpty" xml:space="preserve">
+    <value>No events received</value>
+  </data>
+  <data name="RecentEventsLabel.Text" xml:space="preserve">
+    <value>Recent events</value>
+  </data>
   <data name="RoundCandidateLabel" xml:space="preserve">
     <value>Round candidate</value>
   </data>
@@ -224,6 +362,9 @@
   </data>
   <data name="RoundTimePlaceholder.Text" xml:space="preserve">
     <value>--:--</value>
+  </data>
+  <data name="RoundSessionEnded" xml:space="preserve">
+    <value>Game over</value>
   </data>
   <data name="SettingsDescription.Text" xml:space="preserve">
     <value>Settings will appear here.</value>

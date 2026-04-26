@@ -3,6 +3,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using System;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,9 +13,15 @@ namespace BO2.ViewModels
     public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     {
         private const string EmptyStatText = "--";
+        private static readonly TimeSpan MonitorReadinessRetryTimeout = TimeSpan.FromSeconds(15);
 
         private readonly DispatcherQueue _dispatcherQueue;
         private readonly GameMemoryReader _memoryReader = new();
+        private readonly DllInjector _dllInjector = new();
+        private readonly IGameEventMonitor _eventMonitor = new GameEventMonitor();
+        private DllInjectionResult _lastInjectionResult = DllInjectionResult.NotAttempted;
+        private int? _lastInjectionProcessId;
+        private DateTimeOffset? _lastInjectionAttemptedAt;
         private string _pointsText = EmptyStatText;
         private string _killsText = EmptyStatText;
         private string _downsText = EmptyStatText;
@@ -28,6 +35,12 @@ namespace BO2.ViewModels
         private string _counterCandidateDetailsText = EmptyStatText;
         private string _addressCandidateDetailsText = EmptyStatText;
         private string _detectedGameText = AppStrings.Get("NoGameDetected");
+        private string _eventCompatibilityText = AppStrings.Get("NoGameDetected");
+        private string _injectionStatusText = AppStrings.Get("DllInjectionNotAttempted");
+        private string _eventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForMonitor");
+        private string _currentRoundText = EmptyStatText;
+        private string _boxEventsText = AppStrings.Get("RecentEventsEmpty");
+        private string _recentGameEventsText = AppStrings.Get("RecentEventsEmpty");
         private string _statusText = AppStrings.Get("GameNotRunning");
         private Visibility _connectedStatusVisibility = Visibility.Collapsed;
         private Visibility _unsupportedStatusVisibility = Visibility.Collapsed;
@@ -58,6 +71,42 @@ namespace BO2.ViewModels
         {
             get => _detectedGameText;
             private set => SetProperty(ref _detectedGameText, value);
+        }
+
+        public string EventCompatibilityText
+        {
+            get => _eventCompatibilityText;
+            private set => SetProperty(ref _eventCompatibilityText, value);
+        }
+
+        public string InjectionStatusText
+        {
+            get => _injectionStatusText;
+            private set => SetProperty(ref _injectionStatusText, value);
+        }
+
+        public string EventMonitorStatusText
+        {
+            get => _eventMonitorStatusText;
+            private set => SetProperty(ref _eventMonitorStatusText, value);
+        }
+
+        public string RecentGameEventsText
+        {
+            get => _recentGameEventsText;
+            private set => SetProperty(ref _recentGameEventsText, value);
+        }
+
+        public string CurrentRoundText
+        {
+            get => _currentRoundText;
+            private set => SetProperty(ref _currentRoundText, value);
+        }
+
+        public string BoxEventsText
+        {
+            get => _boxEventsText;
+            private set => SetProperty(ref _boxEventsText, value);
         }
 
         public Visibility ConnectedStatusVisibility
@@ -148,8 +197,32 @@ namespace BO2.ViewModels
         {
             try
             {
-                PlayerStatsReadResult result = await Task.Run(_memoryReader.ReadPlayerStats, cancellationToken);
-                await RunOnDispatcherAsync(() => ApplyReadResult(result), cancellationToken);
+                (
+                    PlayerStatsReadResult readResult,
+                    DllInjectionResult injectionResult,
+                    GameEventMonitorStatus eventStatus) = await Task.Run(
+                    () =>
+                    {
+                        PlayerStatsReadResult readResult = _memoryReader.ReadPlayerStats();
+                        DllInjectionResult injectionResult = EnsureMonitorInjected(readResult.DetectedGame);
+                        GameEventMonitorStatus eventStatus = _eventMonitor.ReadStatus(
+                            DateTimeOffset.UtcNow,
+                            readResult.DetectedGame?.ProcessId);
+                        ApplyInjectionRetryPolicy(
+                            readResult.DetectedGame,
+                            injectionResult,
+                            eventStatus,
+                            DateTimeOffset.UtcNow);
+                        return (readResult, injectionResult, eventStatus);
+                    },
+                    cancellationToken);
+                await RunOnDispatcherAsync(
+                    () =>
+                    {
+                        ApplyReadResult(readResult);
+                        ApplyEventMonitorStatus(readResult, injectionResult, eventStatus);
+                    },
+                    cancellationToken);
             }
             catch (InvalidOperationException ex) when (!cancellationToken.IsCancellationRequested)
             {
@@ -168,6 +241,7 @@ namespace BO2.ViewModels
 
         public void Dispose()
         {
+            _eventMonitor.Dispose();
             _memoryReader.Dispose();
         }
 
@@ -328,9 +402,222 @@ namespace BO2.ViewModels
             ]);
         }
 
+        private static string FormatEventCompatibility(GameCompatibilityState compatibilityState)
+        {
+            return compatibilityState switch
+            {
+                GameCompatibilityState.WaitingForMonitor => AppStrings.Get("EventMonitorWaitingForMonitor"),
+                GameCompatibilityState.Compatible => AppStrings.Get("EventMonitorCompatible"),
+                GameCompatibilityState.UnsupportedVersion => AppStrings.Get("EventMonitorUnsupportedVersion"),
+                GameCompatibilityState.CaptureDisabled => AppStrings.Get("EventMonitorCaptureDisabled"),
+                GameCompatibilityState.PollingFallback => AppStrings.Get("EventMonitorPollingFallback"),
+                _ => AppStrings.Get("EventMonitorUnknown")
+            };
+        }
+
+        private static string FormatRecentGameEvents(GameEventMonitorStatus eventStatus)
+        {
+            if (eventStatus.RecentEvents.Count == 0)
+            {
+                return AppStrings.Get("RecentEventsEmpty");
+            }
+
+            return string.Join(
+                Environment.NewLine,
+                eventStatus.RecentEvents
+                    .TakeLast(6)
+                    .Select(gameEvent => AppStrings.Format(
+                        "RecentEventFormat",
+                        gameEvent.ReceivedAt.ToLocalTime().ToString("HH:mm:ss"),
+                        gameEvent.EventType,
+                        gameEvent.EventName,
+                        gameEvent.LevelTime,
+                        gameEvent.OwnerId,
+                        gameEvent.StringValue)));
+        }
+
+        private static string FormatRoundSession(GameEventMonitorStatus eventStatus)
+        {
+            GameEvent? sessionEvent = eventStatus.RecentEvents
+                .LastOrDefault(gameEvent => gameEvent.EventType is GameEventType.StartOfRound or GameEventType.EndOfRound or GameEventType.EndGame);
+            if (sessionEvent is null)
+            {
+                return EmptyStatText;
+            }
+
+            if (sessionEvent.EventType == GameEventType.EndGame)
+            {
+                return AppStrings.Get("RoundSessionEnded");
+            }
+
+            if (sessionEvent.LevelTime <= 0)
+            {
+                return EmptyStatText;
+            }
+
+            return AppStrings.Format("CurrentRoundFormat", sessionEvent.LevelTime, sessionEvent.EventName);
+        }
+
+        private static string FormatRecentBoxEvents(GameEventMonitorStatus eventStatus)
+        {
+            GameEvent[] boxEvents = eventStatus.RecentEvents
+                .Where(gameEvent => gameEvent.EventType == GameEventType.BoxEvent)
+                .TakeLast(6)
+                .ToArray();
+            if (boxEvents.Length == 0)
+            {
+                return AppStrings.Get("RecentEventsEmpty");
+            }
+
+            return string.Join(
+                Environment.NewLine,
+                boxEvents.Select(gameEvent => AppStrings.Format(
+                    "BoxEventFormat",
+                    gameEvent.ReceivedAt.ToLocalTime().ToString("HH:mm:ss"),
+                    gameEvent.EventName,
+                    gameEvent.OwnerId,
+                    gameEvent.StringValue)));
+        }
+
+        private DllInjectionResult EnsureMonitorInjected(DetectedGame? detectedGame)
+        {
+            if (detectedGame is null)
+            {
+                _lastInjectionProcessId = null;
+                _lastInjectionAttemptedAt = null;
+                _lastInjectionResult = DllInjectionResult.NotAttempted;
+                return _lastInjectionResult;
+            }
+
+            if (_lastInjectionProcessId == detectedGame.ProcessId && IsCachedInjectionResult(_lastInjectionResult.State))
+            {
+                return _lastInjectionResult;
+            }
+
+            _lastInjectionProcessId = detectedGame.ProcessId;
+            _lastInjectionResult = _dllInjector.Inject(detectedGame);
+            _lastInjectionAttemptedAt = _lastInjectionResult.State is DllInjectionState.Loaded or DllInjectionState.AlreadyInjected
+                ? DateTimeOffset.UtcNow
+                : null;
+            return _lastInjectionResult;
+        }
+
+        private void ApplyInjectionRetryPolicy(
+            DetectedGame? detectedGame,
+            DllInjectionResult injectionResult,
+            GameEventMonitorStatus eventStatus,
+            DateTimeOffset now)
+        {
+            if (detectedGame is null
+                || _lastInjectionProcessId != detectedGame.ProcessId
+                || eventStatus.CompatibilityState != GameCompatibilityState.WaitingForMonitor
+                || injectionResult.State is not (DllInjectionState.Loaded or DllInjectionState.AlreadyInjected)
+                || _lastInjectionAttemptedAt is not DateTimeOffset attemptedAt
+                || now - attemptedAt < MonitorReadinessRetryTimeout)
+            {
+                return;
+            }
+
+            _eventMonitor.Dispose();
+            _lastInjectionProcessId = null;
+            _lastInjectionAttemptedAt = null;
+            _lastInjectionResult = DllInjectionResult.NotAttempted;
+        }
+
+        private static bool IsCachedInjectionResult(DllInjectionState state)
+        {
+            return state is DllInjectionState.UnsupportedGame
+                or DllInjectionState.WrongProcessArchitecture
+                or DllInjectionState.AlreadyInjected
+                or DllInjectionState.Loaded
+                or DllInjectionState.MonitorReady
+                or DllInjectionState.PollingFallback
+                or DllInjectionState.UnsupportedVersion;
+        }
+
+        private static string FormatInjectionStatus(
+            DllInjectionResult injectionResult,
+            GameEventMonitorStatus eventStatus)
+        {
+            if (injectionResult.State is not (DllInjectionState.Loaded or DllInjectionState.AlreadyInjected))
+            {
+                return injectionResult.Message;
+            }
+
+            return eventStatus.CompatibilityState switch
+            {
+                GameCompatibilityState.Compatible => AppStrings.Get("DllInjectionMonitorReady"),
+                GameCompatibilityState.PollingFallback => AppStrings.Get("DllInjectionPollingFallback"),
+                GameCompatibilityState.UnsupportedVersion => AppStrings.Get("DllInjectionUnsupportedVersion"),
+                GameCompatibilityState.CaptureDisabled => AppStrings.Get("DllInjectionCaptureDisabled"),
+                GameCompatibilityState.WaitingForMonitor => AppStrings.Get("DllInjectionWaitingForReadiness"),
+                _ => injectionResult.Message
+            };
+        }
+
+        private void ApplyEventMonitorStatus(
+            PlayerStatsReadResult readResult,
+            DllInjectionResult injectionResult,
+            GameEventMonitorStatus eventStatus)
+        {
+            InjectionStatusText = FormatInjectionStatus(injectionResult, eventStatus);
+
+            if (readResult.DetectedGame is null)
+            {
+                EventCompatibilityText = AppStrings.Get("NoGameDetected");
+                EventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForMonitor");
+                CurrentRoundText = EmptyStatText;
+                BoxEventsText = AppStrings.Get("RecentEventsEmpty");
+                RecentGameEventsText = AppStrings.Get("RecentEventsEmpty");
+                return;
+            }
+
+            if (readResult.DetectedGame.Variant != GameVariant.SteamZombies || readResult.DetectedGame.AddressMap is null)
+            {
+                EventCompatibilityText = AppStrings.Format(
+                    "EventMonitorUnsupportedGameFormat",
+                    readResult.DetectedGame.DisplayName);
+                EventMonitorStatusText = AppStrings.Get("EventMonitorCaptureDisabled");
+                CurrentRoundText = EmptyStatText;
+                BoxEventsText = AppStrings.Get("RecentEventsEmpty");
+                RecentGameEventsText = AppStrings.Get("RecentEventsEmpty");
+                return;
+            }
+
+            string monitorStatusText = FormatEventCompatibility(eventStatus.CompatibilityState);
+            if (eventStatus.DroppedEventCount > 0 || eventStatus.DroppedNotifyCount > 0)
+            {
+                monitorStatusText = AppStrings.Format(
+                    "EventMonitorCaptureDropsFormat",
+                    monitorStatusText,
+                    eventStatus.DroppedEventCount,
+                    eventStatus.DroppedNotifyCount,
+                    eventStatus.PublishedNotifyCount);
+            }
+            else if (eventStatus.PublishedNotifyCount > 0)
+            {
+                monitorStatusText = AppStrings.Format(
+                    "EventMonitorPublishedEventsFormat",
+                    monitorStatusText,
+                    eventStatus.PublishedNotifyCount);
+            }
+
+            EventCompatibilityText = AppStrings.Get("GameProcessDetectorDisplayNameSteamZombies");
+            EventMonitorStatusText = monitorStatusText;
+            CurrentRoundText = FormatRoundSession(eventStatus);
+            BoxEventsText = FormatRecentBoxEvents(eventStatus);
+            RecentGameEventsText = FormatRecentGameEvents(eventStatus);
+        }
+
         private void ApplyReadError(string message)
         {
             ClearStats();
+            EventCompatibilityText = AppStrings.Get("NoGameDetected");
+            InjectionStatusText = AppStrings.Get("DllInjectionNotAttempted");
+            EventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForMonitor");
+            CurrentRoundText = EmptyStatText;
+            BoxEventsText = AppStrings.Get("RecentEventsEmpty");
+            RecentGameEventsText = AppStrings.Get("RecentEventsEmpty");
             StatusText = message;
             SetConnectionState(ConnectionState.Disconnected);
         }

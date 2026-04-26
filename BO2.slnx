@@ -1,14 +1,16 @@
 <Solution>
   <Configurations>
-    <Platform Name="ARM64" />
-    <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
   <Project Path="BO2.csproj">
-    <Platform Solution="*|ARM64" Project="ARM64" />
-    <Platform Solution="*|x64" Project="x64" />
     <Platform Solution="*|x86" Project="x86" />
     <Deploy />
   </Project>
   <Project Path="BO2.Tests\BO2.Tests.csproj" />
+  <Project Path="BO2Monitor\BO2Monitor.vcxproj" Id="c5e69ca8-8e73-4b60-b3d2-293990b3b682">
+    <Platform Project="Win32" />
+  </Project>
+  <Project Path="BO2InjectorHelper\BO2InjectorHelper.vcxproj" Id="8d99c6c0-11bc-4f04-bd0f-77f621464634">
+    <Platform Project="Win32" />
+  </Project>
 </Solution>

@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Production|Win32">
+      <Configuration>Production</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{C5E69CA8-8E73-4B60-B3D2-293990B3B682}</ProjectGuid>
+    <RootNamespace>BO2Monitor</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <RestoreProjectStyle>None</RestoreProjectStyle>
+  </PropertyGroup>
+  <PropertyGroup>
+    <VCTargetsPath Condition="'$(VCTargetsPath)'=='' and Exists('$(MSBuildToolsPath)\..\..\Microsoft\VC\v170\Microsoft.Cpp.Default.props')">$(MSBuildToolsPath)\..\..\Microsoft\VC\v170\</VCTargetsPath>
+    <VCTargetsPath Condition="'$(VCTargetsPath)'=='' and Exists('$(MSBuildToolsPath)\..\..\Microsoft\VC\v180\Microsoft.Cpp.Default.props')">$(MSBuildToolsPath)\..\..\Microsoft\VC\v180\</VCTargetsPath>
+    <VCTargetsPath Condition="'$(VCTargetsPath)'=='' and Exists('$(ProgramFiles)\Microsoft Visual Studio\18\Community\MSBuild\Microsoft\VC\v170\Microsoft.Cpp.Default.props')">$(ProgramFiles)\Microsoft Visual Studio\18\Community\MSBuild\Microsoft\VC\v170\</VCTargetsPath>
+    <VCTargetsPath Condition="'$(VCTargetsPath)'=='' and Exists('$(ProgramFiles)\Microsoft Visual Studio\18\Community\MSBuild\Microsoft\VC\v180\Microsoft.Cpp.Default.props')">$(ProgramFiles)\Microsoft Visual Studio\18\Community\MSBuild\Microsoft\VC\v180\</VCTargetsPath>
+    <HasCppTargets Condition="'$(MSBuildRuntimeType)'!='Core' and Exists('$(VCTargetsPath)\Microsoft.Cpp.Default.props')">true</HasCppTargets>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" Condition="'$(HasCppTargets)'=='true'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Production|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" Condition="'$(HasCppTargets)'=='true'" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Production|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <OutDir>$(MSBuildProjectDirectory)\bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(MSBuildProjectDirectory)\obj\$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>BO2Monitor</TargetName>
+    <EnableVmNotifyHook Condition="'$(EnableVmNotifyHook)'==''">false</EnableVmNotifyHook>
+    <EnableVmNotifyHook Condition="'$(Configuration)'=='Production'">true</EnableVmNotifyHook>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\third_party\minhook\include;$(MSBuildProjectDirectory)\third_party\minhook\src\hde;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;NOMINMAX;BO2MONITOR_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(EnableVmNotifyHook)'=='true'">BO2MONITOR_ENABLE_VM_NOTIFY_HOOK;WIN32;_DEBUG;NOMINMAX;BO2MONITOR_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\third_party\minhook\include;$(MSBuildProjectDirectory)\third_party\minhook\src\hde;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;NOMINMAX;BO2MONITOR_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(EnableVmNotifyHook)'=='true'">BO2MONITOR_ENABLE_VM_NOTIFY_HOOK;WIN32;NDEBUG;NOMINMAX;BO2MONITOR_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Production|Win32'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\third_party\minhook\include;$(MSBuildProjectDirectory)\third_party\minhook\src\hde;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>BO2MONITOR_ENABLE_VM_NOTIFY_HOOK;WIN32;NDEBUG;NOMINMAX;BO2MONITOR_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="Hook.h" />
+    <ClInclude Include="NotifyLog.h" />
+    <ClInclude Include="SharedSnapshot.h" />
+    <ClInclude Include="third_party\minhook\include\MinHook.h" />
+    <ClInclude Include="third_party\minhook\src\buffer.h" />
+    <ClInclude Include="third_party\minhook\src\hde\hde32.h" />
+    <ClInclude Include="third_party\minhook\src\hde\hde64.h" />
+    <ClInclude Include="third_party\minhook\src\hde\pstdint.h" />
+    <ClInclude Include="third_party\minhook\src\hde\table32.h" />
+    <ClInclude Include="third_party\minhook\src\hde\table64.h" />
+    <ClInclude Include="third_party\minhook\src\trampoline.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="Hook.cpp">
+      <ObjectFileName>$(IntDir)BO2MonitorHook.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="NotifyLog.cpp" />
+    <ClCompile Include="SharedSnapshot.cpp" />
+    <ClCompile Include="third_party\minhook\src\buffer.c" />
+    <ClCompile Include="third_party\minhook\src\hde\hde32.c" />
+    <ClCompile Include="third_party\minhook\src\hde\hde64.c" />
+    <ClCompile Include="third_party\minhook\src\hook.c">
+      <ObjectFileName>$(IntDir)minhook_hook.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="third_party\minhook\src\trampoline.c" />
+  </ItemGroup>
+  <Target Name="Build" Condition="'$(HasCppTargets)'!='true'">
+    <Message Importance="high" Text="Skipping BO2Monitor native build because Visual C++ MSBuild targets are unavailable." />
+  </Target>
+  <Target Name="Clean" Condition="'$(HasCppTargets)'!='true'" />
+  <Target Name="Rebuild" DependsOnTargets="Clean;Build" Condition="'$(HasCppTargets)'!='true'" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" Condition="'$(HasCppTargets)'=='true'" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>
