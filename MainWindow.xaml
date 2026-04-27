@@ -33,41 +33,47 @@
 
         <NavigationView.PaneFooter>
             <StackPanel Padding="16,0,16,12">
-                <StackPanel
-                    Orientation="Horizontal"
-                    Spacing="8">
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
                     <Grid
                         Width="8"
                         Height="8"
-                        VerticalAlignment="Center">
+                        VerticalAlignment="Top"
+                        Margin="0,7,0,0">
                         <Ellipse
                             AutomationProperties.AccessibilityView="Raw"
                             Fill="{ThemeResource SystemFillColorSuccessBrush}"
-                            Visibility="{x:Bind ViewModel.ConnectedStatusVisibility, Mode=OneWay}" />
+                            Visibility="{x:Bind ViewModel.FooterSuccessStatusVisibility, Mode=OneWay}" />
                         <Ellipse
                             AutomationProperties.AccessibilityView="Raw"
                             Fill="{ThemeResource SystemFillColorCautionBrush}"
-                            Visibility="{x:Bind ViewModel.DetectedStatusVisibility, Mode=OneWay}" />
-                        <Ellipse
-                            AutomationProperties.AccessibilityView="Raw"
-                            Fill="{ThemeResource SystemFillColorCautionBrush}"
-                            Visibility="{x:Bind ViewModel.UnsupportedStatusVisibility, Mode=OneWay}" />
+                            Visibility="{x:Bind ViewModel.FooterPendingStatusVisibility, Mode=OneWay}" />
                         <Ellipse
                             AutomationProperties.AccessibilityView="Raw"
                             Fill="{ThemeResource SystemFillColorCriticalBrush}"
-                            Visibility="{x:Bind ViewModel.DisconnectedStatusVisibility, Mode=OneWay}" />
+                            Visibility="{x:Bind ViewModel.FooterErrorStatusVisibility, Mode=OneWay}" />
                     </Grid>
-                    <TextBlock
-                        VerticalAlignment="Center"
-                        Style="{ThemeResource CaptionTextBlockStyle}"
-                        Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
-                        TextWrapping="Wrap" />
-                </StackPanel>
+                    <StackPanel
+                        Grid.Column="1"
+                        Spacing="4">
+                        <TextBlock
+                            Style="{ThemeResource CaptionTextBlockStyle}"
+                            Text="{x:Bind ViewModel.GameStatusText, Mode=OneWay}"
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            Style="{ThemeResource CaptionTextBlockStyle}"
+                            Text="{x:Bind ViewModel.EventConnectionStatusText, Mode=OneWay}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Grid>
                 <Button
                     x:Name="ConnectButton"
-                    Margin="16,8,0,0"
+                    Margin="0,8,0,0"
                     MinWidth="96"
-                    HorizontalAlignment="Left"
+                    HorizontalAlignment="Stretch"
                     Click="OnConnectButtonClick"
                     Content="{x:Bind ViewModel.ConnectButtonText, Mode=OneWay}"
                     IsEnabled="{x:Bind ViewModel.IsConnectButtonEnabled, Mode=OneWay}" />

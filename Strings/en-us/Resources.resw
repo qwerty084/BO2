@@ -24,6 +24,12 @@
   <data name="ConnectButtonConnectedText" xml:space="preserve">
     <value>Connected</value>
   </data>
+  <data name="ConnectButtonUnsupportedText" xml:space="preserve">
+    <value>Unsupported game</value>
+  </data>
+  <data name="ConnectButtonWaitingForGameText" xml:space="preserve">
+    <value>Waiting for game</value>
+  </data>
   <data name="ConnectionStatusConnecting" xml:space="preserve">
     <value>Connecting...</value>
   </data>
@@ -267,8 +273,26 @@
   <data name="GameEventsTitle.Text" xml:space="preserve">
     <value>Game events</value>
   </data>
+  <data name="FooterEventsConnected" xml:space="preserve">
+    <value>Game link: Connected</value>
+  </data>
+  <data name="FooterEventsConnecting" xml:space="preserve">
+    <value>Game link: Connecting</value>
+  </data>
+  <data name="FooterEventsNotConnected" xml:space="preserve">
+    <value>Game link: Not connected</value>
+  </data>
+  <data name="FooterEventsUnsupported" xml:space="preserve">
+    <value>Game link: Unsupported</value>
+  </data>
+  <data name="FooterGameDetectedFormat" xml:space="preserve">
+    <value>Game: {0}</value>
+  </data>
+  <data name="FooterGameNotRunning" xml:space="preserve">
+    <value>Game: Not running</value>
+  </data>
   <data name="GameDetectedConnectPromptFormat" xml:space="preserve">
-    <value>Game detected: {0}. Press Connect.</value>
+    <value>Game detected: {0}.</value>
   </data>
   <data name="GameNotRunning" xml:space="preserve">
     <value>Game not running</value>

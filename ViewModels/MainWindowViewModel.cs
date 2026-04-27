@@ -28,7 +28,6 @@ namespace BO2.ViewModels
         private int? _lastInjectionProcessId;
         private DateTimeOffset? _lastInjectionAttemptedAt;
         private DetectedGame? _detectedGame;
-        private string? _processWatcherErrorText;
         private bool _usePollingProcessDetection;
         private bool _isConnecting;
         private bool _disposed;
@@ -52,12 +51,13 @@ namespace BO2.ViewModels
         private string _boxEventsText = AppStrings.Get("RecentEventsEmpty");
         private string _recentGameEventsText = AppStrings.Get("RecentEventsEmpty");
         private string _statusText = AppStrings.Get("GameNotRunning");
+        private string _gameStatusText = AppStrings.Get("FooterGameNotRunning");
+        private string _eventConnectionStatusText = AppStrings.Get("FooterEventsNotConnected");
         private string _connectButtonText = AppStrings.Get("ConnectButtonText");
         private bool _isConnectButtonEnabled;
-        private Visibility _connectedStatusVisibility = Visibility.Collapsed;
-        private Visibility _detectedStatusVisibility = Visibility.Collapsed;
-        private Visibility _unsupportedStatusVisibility = Visibility.Collapsed;
-        private Visibility _disconnectedStatusVisibility = Visibility.Visible;
+        private Visibility _footerSuccessStatusVisibility = Visibility.Collapsed;
+        private Visibility _footerPendingStatusVisibility = Visibility.Collapsed;
+        private Visibility _footerErrorStatusVisibility = Visibility.Visible;
         private readonly StatFormatter _formatter;
         private GameEventMonitorStatus _latestEventStatus = GameEventMonitorStatus.WaitingForMonitor;
 
@@ -73,7 +73,6 @@ namespace BO2.ViewModels
             }
             catch (Exception ex) when (ex is ManagementException or UnauthorizedAccessException or COMException)
             {
-                _processWatcherErrorText = AppStrings.Format("ProcessWatcherUnavailableFormat", ex.Message);
                 _usePollingProcessDetection = true;
             }
 
@@ -98,6 +97,18 @@ namespace BO2.ViewModels
         {
             get => _statusText;
             private set => SetProperty(ref _statusText, value);
+        }
+
+        public string GameStatusText
+        {
+            get => _gameStatusText;
+            private set => SetProperty(ref _gameStatusText, value);
+        }
+
+        public string EventConnectionStatusText
+        {
+            get => _eventConnectionStatusText;
+            private set => SetProperty(ref _eventConnectionStatusText, value);
         }
 
         public string DetectedGameText
@@ -170,28 +181,22 @@ namespace BO2.ViewModels
             }
         }
 
-        public Visibility ConnectedStatusVisibility
+        public Visibility FooterSuccessStatusVisibility
         {
-            get => _connectedStatusVisibility;
-            private set => SetProperty(ref _connectedStatusVisibility, value);
+            get => _footerSuccessStatusVisibility;
+            private set => SetProperty(ref _footerSuccessStatusVisibility, value);
         }
 
-        public Visibility DetectedStatusVisibility
+        public Visibility FooterPendingStatusVisibility
         {
-            get => _detectedStatusVisibility;
-            private set => SetProperty(ref _detectedStatusVisibility, value);
+            get => _footerPendingStatusVisibility;
+            private set => SetProperty(ref _footerPendingStatusVisibility, value);
         }
 
-        public Visibility UnsupportedStatusVisibility
+        public Visibility FooterErrorStatusVisibility
         {
-            get => _unsupportedStatusVisibility;
-            private set => SetProperty(ref _unsupportedStatusVisibility, value);
-        }
-
-        public Visibility DisconnectedStatusVisibility
-        {
-            get => _disconnectedStatusVisibility;
-            private set => SetProperty(ref _disconnectedStatusVisibility, value);
+            get => _footerErrorStatusVisibility;
+            private set => SetProperty(ref _footerErrorStatusVisibility, value);
         }
 
         public string KillsText
@@ -504,34 +509,34 @@ namespace BO2.ViewModels
         {
             if (detectedGame is null)
             {
-                StatusText = _processWatcherErrorText ?? AppStrings.Get("GameNotRunning");
-                SetConnectionState(ConnectionState.Disconnected);
+                StatusText = AppStrings.Get("GameNotRunning");
+                SetConnectionState(detectedGame, ConnectionState.Disconnected);
                 return;
             }
 
             if (!detectedGame.IsStatsSupported)
             {
                 StatusText = FormatUnsupportedStatus(detectedGame);
-                SetConnectionState(ConnectionState.Unsupported);
+                SetConnectionState(detectedGame, ConnectionState.Unsupported);
                 return;
             }
 
             if (_isConnecting)
             {
                 StatusText = AppStrings.Get("ConnectionStatusConnecting");
-                SetConnectionState(ConnectionState.Detected);
+                SetConnectionState(detectedGame, ConnectionState.Detected);
                 return;
             }
 
             if (IsMonitorConnectedFor(detectedGame))
             {
                 StatusText = connectedStatusText ?? AppStrings.Format("ConnectedStatusFormat", detectedGame.DisplayName);
-                SetConnectionState(ConnectionState.Connected);
+                SetConnectionState(detectedGame, ConnectionState.Connected);
                 return;
             }
 
             StatusText = AppStrings.Format("GameDetectedConnectPromptFormat", detectedGame.DisplayName);
-            SetConnectionState(ConnectionState.Detected);
+            SetConnectionState(detectedGame, ConnectionState.Detected);
         }
 
         private static string FormatUnsupportedStatus(DetectedGame detectedGame)
@@ -849,12 +854,33 @@ namespace BO2.ViewModels
 
         private void UpdateConnectButtonState(DetectedGame? detectedGame)
         {
-            ConnectButtonText = _isConnecting
-                ? AppStrings.Get("ConnectButtonConnectingText")
-                : IsMonitorConnectedFor(detectedGame)
-                    ? AppStrings.Get("ConnectButtonConnectedText")
-                    : AppStrings.Get("ConnectButtonText");
+            ConnectButtonText = GetConnectButtonText(detectedGame);
             IsConnectButtonEnabled = CanAttemptConnect(detectedGame);
+        }
+
+        private string GetConnectButtonText(DetectedGame? detectedGame)
+        {
+            if (detectedGame is null)
+            {
+                return AppStrings.Get("ConnectButtonWaitingForGameText");
+            }
+
+            if (_isConnecting)
+            {
+                return AppStrings.Get("ConnectButtonConnectingText");
+            }
+
+            if (IsMonitorConnectedFor(detectedGame))
+            {
+                return AppStrings.Get("ConnectButtonConnectedText");
+            }
+
+            if (detectedGame.Variant != GameVariant.SteamZombies || !detectedGame.IsStatsSupported)
+            {
+                return AppStrings.Get("ConnectButtonUnsupportedText");
+            }
+
+            return AppStrings.Get("ConnectButtonText");
         }
 
         private void ApplyReadError(string message)
@@ -869,16 +895,58 @@ namespace BO2.ViewModels
             BoxEventsText = AppStrings.Get("RecentEventsEmpty");
             RecentGameEventsText = AppStrings.Get("RecentEventsEmpty");
             StatusText = message;
-            SetConnectionState(ConnectionState.Disconnected);
+            SetConnectionState(_detectedGame, ConnectionState.Disconnected);
             UpdateConnectButtonState(_detectedGame);
         }
 
-        private void SetConnectionState(ConnectionState connectionState)
+        private void SetConnectionState(DetectedGame? detectedGame, ConnectionState connectionState)
         {
-            ConnectedStatusVisibility = connectionState == ConnectionState.Connected ? Visibility.Visible : Visibility.Collapsed;
-            DetectedStatusVisibility = connectionState == ConnectionState.Detected ? Visibility.Visible : Visibility.Collapsed;
-            UnsupportedStatusVisibility = connectionState == ConnectionState.Unsupported ? Visibility.Visible : Visibility.Collapsed;
-            DisconnectedStatusVisibility = connectionState == ConnectionState.Disconnected ? Visibility.Visible : Visibility.Collapsed;
+            UpdateGameFooterState(detectedGame);
+            UpdateEventFooterState(detectedGame, connectionState);
+            UpdateFooterIndicator(connectionState);
+        }
+
+        private void UpdateGameFooterState(DetectedGame? detectedGame)
+        {
+            if (detectedGame is null)
+            {
+                GameStatusText = AppStrings.Get("FooterGameNotRunning");
+                return;
+            }
+
+            GameStatusText = AppStrings.Format("FooterGameDetectedFormat", detectedGame.DisplayName);
+        }
+
+        private void UpdateEventFooterState(DetectedGame? detectedGame, ConnectionState connectionState)
+        {
+            if (connectionState == ConnectionState.Connected)
+            {
+                EventConnectionStatusText = AppStrings.Get("FooterEventsConnected");
+                return;
+            }
+
+            if (_isConnecting)
+            {
+                EventConnectionStatusText = AppStrings.Get("FooterEventsConnecting");
+                return;
+            }
+
+            if (detectedGame is not null && !detectedGame.IsStatsSupported)
+            {
+                EventConnectionStatusText = AppStrings.Get("FooterEventsUnsupported");
+                return;
+            }
+
+            EventConnectionStatusText = AppStrings.Get("FooterEventsNotConnected");
+        }
+
+        private void UpdateFooterIndicator(ConnectionState connectionState)
+        {
+            FooterSuccessStatusVisibility = connectionState == ConnectionState.Connected ? Visibility.Visible : Visibility.Collapsed;
+            FooterPendingStatusVisibility = connectionState is ConnectionState.Detected or ConnectionState.Unsupported
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            FooterErrorStatusVisibility = connectionState == ConnectionState.Disconnected ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void ClearStats()
