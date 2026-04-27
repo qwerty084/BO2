@@ -30,6 +30,27 @@
   <data name="ConnectButtonWaitingForGameText" xml:space="preserve">
     <value>Waiting for game</value>
   </data>
+  <data name="DisconnectButtonText" xml:space="preserve">
+    <value>Disconnect</value>
+  </data>
+  <data name="ConnectionCardStatusConnected" xml:space="preserve">
+    <value>Connected</value>
+  </data>
+  <data name="ConnectionCardStatusConnecting" xml:space="preserve">
+    <value>Connecting</value>
+  </data>
+  <data name="ConnectionCardStatusDisconnected" xml:space="preserve">
+    <value>Disconnected</value>
+  </data>
+  <data name="ConnectionCardStatusMonitoring" xml:space="preserve">
+    <value>Monitoring</value>
+  </data>
+  <data name="ConnectionCardStatusUnsupported" xml:space="preserve">
+    <value>Unsupported</value>
+  </data>
+  <data name="ConnectionLastUpdateJustNow" xml:space="preserve">
+    <value>Just now</value>
+  </data>
   <data name="ConnectionStatusConnecting" xml:space="preserve">
     <value>Connecting...</value>
   </data>
@@ -318,6 +339,12 @@
   <data name="GameTimePlaceholder.Text" xml:space="preserve">
     <value>--:--:--</value>
   </data>
+  <data name="GameConnectionTitle.Text" xml:space="preserve">
+    <value>Game connection</value>
+  </data>
+  <data name="LastUpdateLabel.Text" xml:space="preserve">
+    <value>Last update</value>
+  </data>
   <data name="HeadshotsLabel.Text" xml:space="preserve">
     <value>Headshots</value>
   </data>
@@ -335,6 +362,9 @@
   </data>
   <data name="HomeNavigationItem.Content" xml:space="preserve">
     <value>Home</value>
+  </data>
+  <data name="SettingsNavigationItem.Content" xml:space="preserve">
+    <value>Settings</value>
   </data>
   <data name="KillsLabel.Text" xml:space="preserve">
     <value>Kills</value>
@@ -431,6 +461,24 @@
   </data>
   <data name="SettingsTitle.Text" xml:space="preserve">
     <value>Settings</value>
+  </data>
+  <data name="ThemeSettingsTitle.Text" xml:space="preserve">
+    <value>Appearance</value>
+  </data>
+  <data name="ThemeSettingsDescription.Text" xml:space="preserve">
+    <value>Choose how BO2 resolves light and dark mode.</value>
+  </data>
+  <data name="ThemeModeLabel.Text" xml:space="preserve">
+    <value>Theme</value>
+  </data>
+  <data name="ThemeModeSystemItem.Content" xml:space="preserve">
+    <value>System</value>
+  </data>
+  <data name="ThemeModeLightItem.Content" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="ThemeModeDarkItem.Content" xml:space="preserve">
+    <value>Dark</value>
   </data>
   <data name="WidgetsSettingsTitle.Text" xml:space="preserve">
     <value>Widgets</value>

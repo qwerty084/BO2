@@ -15,9 +15,13 @@
 
     <NavigationView
         x:Name="RootNavigationView"
+        Background="{ThemeResource BO2BackgroundBrush}"
+        CompactPaneLength="56"
+        Foreground="{ThemeResource BO2TextPrimaryBrush}"
         IsBackButtonVisible="Collapsed"
-        IsSettingsVisible="True"
-        OpenPaneLength="320"
+        IsPaneOpen="True"
+        IsSettingsVisible="False"
+        OpenPaneLength="272"
         PaneDisplayMode="Left"
         SelectionChanged="OnNavigationViewSelectionChanged">
         <NavigationView.MenuItems>
@@ -31,414 +35,513 @@
             </NavigationViewItem>
         </NavigationView.MenuItems>
 
+        <NavigationView.FooterMenuItems>
+            <NavigationViewItem
+                x:Name="SettingsNavigationItem"
+                x:Uid="SettingsNavigationItem"
+                Margin="0,0,0,12"
+                Tag="settings"
+                Tapped="OnSettingsPaneItemTapped">
+                <NavigationViewItem.Icon>
+                    <FontIcon
+                        x:Name="SettingsPaneIcon"
+                        FontSize="16"
+                        Glyph="&#xE713;"
+                        RenderTransformOrigin="0.5,0.5"
+                        VerticalAlignment="Center">
+                        <FontIcon.RenderTransform>
+                            <RotateTransform x:Name="SettingsPaneIconRotation" />
+                        </FontIcon.RenderTransform>
+                    </FontIcon>
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+        </NavigationView.FooterMenuItems>
+
         <NavigationView.PaneFooter>
-            <StackPanel Padding="16,0,16,12">
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="8" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Grid
-                        Width="8"
-                        Height="8"
-                        VerticalAlignment="Top"
-                        Margin="0,7,0,0">
-                        <Ellipse
-                            AutomationProperties.AccessibilityView="Raw"
-                            Fill="{ThemeResource SystemFillColorSuccessBrush}"
-                            Visibility="{x:Bind ViewModel.FooterSuccessStatusVisibility, Mode=OneWay}" />
-                        <Ellipse
-                            AutomationProperties.AccessibilityView="Raw"
-                            Fill="{ThemeResource SystemFillColorCautionBrush}"
-                            Visibility="{x:Bind ViewModel.FooterPendingStatusVisibility, Mode=OneWay}" />
-                        <Ellipse
-                            AutomationProperties.AccessibilityView="Raw"
-                            Fill="{ThemeResource SystemFillColorCriticalBrush}"
-                            Visibility="{x:Bind ViewModel.FooterErrorStatusVisibility, Mode=OneWay}" />
-                    </Grid>
-                    <StackPanel
-                        Grid.Column="1"
-                        Spacing="4">
+            <StackPanel
+                x:Name="PaneFooterHost"
+                Padding="18,0,18,16"
+                Spacing="14">
+                <Border
+                    x:Name="ConnectionPaneFooter"
+                    Style="{StaticResource BO2CardBorderStyle}"
+                    Padding="12">
+                    <StackPanel Spacing="12">
                         <TextBlock
-                            Style="{ThemeResource CaptionTextBlockStyle}"
-                            Text="{x:Bind ViewModel.GameStatusText, Mode=OneWay}"
-                            TextWrapping="Wrap" />
-                        <TextBlock
-                            Style="{ThemeResource CaptionTextBlockStyle}"
-                            Text="{x:Bind ViewModel.EventConnectionStatusText, Mode=OneWay}"
-                            TextWrapping="Wrap" />
+                            x:Uid="GameConnectionTitle"
+                            Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid
+                                Width="8"
+                                Height="8"
+                                Margin="0,5,0,0"
+                                VerticalAlignment="Top">
+                                <Ellipse
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    Fill="{ThemeResource BO2SuccessBrush}"
+                                    Visibility="{x:Bind ViewModel.FooterSuccessStatusVisibility, Mode=OneWay}" />
+                                <Ellipse
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    Fill="{ThemeResource BO2AccentBrush}"
+                                    Visibility="{x:Bind ViewModel.FooterPendingStatusVisibility, Mode=OneWay}" />
+                                <Ellipse
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    Fill="{ThemeResource BO2DisconnectedBrush}"
+                                    Visibility="{x:Bind ViewModel.FooterDisconnectedStatusVisibility, Mode=OneWay}" />
+                                <Ellipse
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    Fill="{ThemeResource BO2ErrorBrush}"
+                                    Visibility="{x:Bind ViewModel.FooterErrorStatusVisibility, Mode=OneWay}" />
+                            </Grid>
+                            <TextBlock
+                                Grid.Column="1"
+                                Style="{StaticResource BO2StatValueTextBlockStyle}"
+                                Text="{x:Bind ViewModel.ConnectionCardStatusText, Mode=OneWay}" />
+                        </Grid>
+
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Image
+                                Width="28"
+                                Height="28"
+                                VerticalAlignment="Center"
+                                Source="ms-appx:///Assets/BO2_logo_mini.png" />
+                            <StackPanel Grid.Column="1" Spacing="0">
+                                <TextBlock
+                                    Style="{StaticResource BO2StatValueTextBlockStyle}"
+                                    Text="{x:Bind ViewModel.DetectedGameText, Mode=OneWay}"
+                                    TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Rectangle
+                            Height="1"
+                            Fill="{ThemeResource BO2BorderBrush}" />
+
+                        <Grid ColumnSpacing="12" RowSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock
+                                x:Uid="LastUpdateLabel"
+                                Grid.Row="0"
+                                Grid.Column="0"
+                                Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                            <TextBlock
+                                Grid.Row="0"
+                                Grid.Column="1"
+                                Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                Text="{x:Bind ViewModel.ConnectionLastUpdateText, Mode=OneWay}" />
+                            <TextBlock
+                                x:Uid="EventMonitorStatusLabel"
+                                Grid.Row="1"
+                                Grid.Column="0"
+                                Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                            <TextBlock
+                                Grid.Row="1"
+                                Grid.Column="1"
+                                MaxWidth="136"
+                                Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                Text="{x:Bind ViewModel.EventMonitorStatusText, Mode=OneWay}"
+                                TextAlignment="Right"
+                                TextTrimming="CharacterEllipsis" />
+                        </Grid>
+
+                        <Button
+                            x:Name="ConnectButton"
+                            HorizontalAlignment="Stretch"
+                            Click="OnConnectButtonClick"
+                            Content="{x:Bind ViewModel.ConnectButtonText, Mode=OneWay}"
+                            IsEnabled="{x:Bind ViewModel.IsConnectButtonEnabled, Mode=OneWay}"
+                            Style="{StaticResource BO2PrimaryButtonStyle}"
+                            Visibility="{x:Bind ViewModel.ConnectButtonVisibility, Mode=OneWay}">
+                            <Button.Resources>
+                                <ResourceDictionary>
+                                    <ResourceDictionary.ThemeDictionaries>
+                                        <ResourceDictionary x:Key="Light">
+                                            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#1416A34A" />
+                                            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#2216A34A" />
+                                            <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#16A34A" />
+                                            <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#16A34A" />
+                                            <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#16A34A" />
+                                            <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#16A34A" />
+                                        </ResourceDictionary>
+                                        <ResourceDictionary x:Key="Default">
+                                            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#1822C55E" />
+                                            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#2622C55E" />
+                                            <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#22C55E" />
+                                            <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#22C55E" />
+                                            <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#22C55E" />
+                                            <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#22C55E" />
+                                        </ResourceDictionary>
+                                    </ResourceDictionary.ThemeDictionaries>
+                                </ResourceDictionary>
+                            </Button.Resources>
+                        </Button>
+                        <Button
+                            x:Name="DisconnectButton"
+                            HorizontalAlignment="Stretch"
+                            Click="OnDisconnectButtonClick"
+                            Content="{x:Bind ViewModel.DisconnectButtonText, Mode=OneWay}"
+                            Style="{StaticResource BO2DangerButtonStyle}"
+                            Visibility="{x:Bind ViewModel.DisconnectButtonVisibility, Mode=OneWay}">
+                            <Button.Resources>
+                                <ResourceDictionary>
+                                    <ResourceDictionary.ThemeDictionaries>
+                                        <ResourceDictionary x:Key="Light">
+                                            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#14DC2626" />
+                                            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#22DC2626" />
+                                            <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#DC2626" />
+                                            <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#DC2626" />
+                                            <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#DC2626" />
+                                            <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#DC2626" />
+                                        </ResourceDictionary>
+                                        <ResourceDictionary x:Key="Default">
+                                            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#18EF4444" />
+                                            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#26EF4444" />
+                                            <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#EF4444" />
+                                            <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#EF4444" />
+                                            <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#EF4444" />
+                                            <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#EF4444" />
+                                        </ResourceDictionary>
+                                    </ResourceDictionary.ThemeDictionaries>
+                                </ResourceDictionary>
+                            </Button.Resources>
+                        </Button>
                     </StackPanel>
-                </Grid>
-                <Button
-                    x:Name="ConnectButton"
-                    Margin="0,8,0,0"
-                    MinWidth="96"
-                    HorizontalAlignment="Stretch"
-                    Click="OnConnectButtonClick"
-                    Content="{x:Bind ViewModel.ConnectButtonText, Mode=OneWay}"
-                    IsEnabled="{x:Bind ViewModel.IsConnectButtonEnabled, Mode=OneWay}" />
+                </Border>
             </StackPanel>
         </NavigationView.PaneFooter>
 
-        <ScrollViewer>
-            <Grid Padding="32">
-                <StackPanel Spacing="28">
+        <Grid Background="{ThemeResource BO2BackgroundBrush}">
+            <ScrollViewer>
+                <Grid Padding="32,28,32,28">
+                    <StackPanel
+                        HorizontalAlignment="Stretch"
+                        Spacing="20">
                     <TextBlock
                         x:Name="PageTitle"
                         x:Uid="PageTitle"
                         AutomationProperties.HeadingLevel="Level1"
-                        Style="{ThemeResource TitleLargeTextBlockStyle}" />
+                        Style="{StaticResource BO2PageTitleTextBlockStyle}" />
 
                     <StackPanel
                         x:Name="HomeContent"
-                        Spacing="28">
-                        <StackPanel Spacing="12">
-                            <TextBlock
-                                x:Uid="TimersTitle"
-                                AutomationProperties.HeadingLevel="Level2"
-                                Style="{ThemeResource SubtitleTextBlockStyle}" />
-                            <Grid
-                                ColumnSpacing="32"
-                                RowSpacing="4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <TextBlock
-                                    x:Uid="GameTimeLabel"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    x:Uid="GameTimePlaceholder"
-                                    Grid.Row="1"
-                                    Grid.Column="0" />
-                                <TextBlock
-                                    x:Uid="RoundTimeLabel"
-                                    Grid.Row="0"
-                                    Grid.Column="1"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    x:Uid="RoundTimePlaceholder"
-                                    Grid.Row="1"
-                                    Grid.Column="1" />
-                            </Grid>
-                        </StackPanel>
-
-                        <StackPanel Spacing="12">
-                            <TextBlock
-                                x:Uid="PlayerStatsTitle"
-                                AutomationProperties.HeadingLevel="Level2"
-                                Style="{ThemeResource SubtitleTextBlockStyle}" />
-                            <Grid
-                                ColumnSpacing="32"
-                                RowSpacing="4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-
-                                <TextBlock
-                                    x:Uid="PointsLabel"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    Grid.Row="1"
-                                    Grid.Column="0"
-                                    Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                    Text="{x:Bind ViewModel.PointsText, Mode=OneWay}" />
-                                <TextBlock
-                                    x:Uid="KillsLabel"
-                                    Grid.Row="0"
-                                    Grid.Column="1"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    Grid.Row="1"
-                                    Grid.Column="1"
-                                    Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                    Text="{x:Bind ViewModel.KillsText, Mode=OneWay}" />
-                                <TextBlock
-                                    x:Uid="DownsLabel"
-                                    Grid.Row="0"
-                                    Grid.Column="2"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    Grid.Row="1"
-                                    Grid.Column="2"
-                                    Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                    Text="{x:Bind ViewModel.DownsText, Mode=OneWay}" />
-                                <TextBlock
-                                    x:Uid="RevivesLabel"
-                                    Grid.Row="0"
-                                    Grid.Column="3"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    Grid.Row="1"
-                                    Grid.Column="3"
-                                    Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                    Text="{x:Bind ViewModel.RevivesText, Mode=OneWay}" />
-                                <TextBlock
-                                    x:Uid="HeadshotsLabel"
-                                    Grid.Row="0"
-                                    Grid.Column="4"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    Grid.Row="1"
-                                    Grid.Column="4"
-                                    Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                    Text="{x:Bind ViewModel.HeadshotsText, Mode=OneWay}" />
-                            </Grid>
-                        </StackPanel>
-
-                        <StackPanel Spacing="12">
-                            <TextBlock
-                                x:Uid="PlayerStateTitle"
-                                AutomationProperties.HeadingLevel="Level2"
-                                Style="{ThemeResource SubtitleTextBlockStyle}" />
-                            <Grid
-                                ColumnSpacing="32"
-                                RowSpacing="4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-
-                                <TextBlock
-                                    x:Uid="PositionXLabel"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    Grid.Row="1"
-                                    Grid.Column="0"
-                                    Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                    Text="{x:Bind ViewModel.PositionXText, Mode=OneWay}" />
-                                <TextBlock
-                                    x:Uid="PositionYLabel"
-                                    Grid.Row="0"
-                                    Grid.Column="1"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    Grid.Row="1"
-                                    Grid.Column="1"
-                                    Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                    Text="{x:Bind ViewModel.PositionYText, Mode=OneWay}" />
-                                <TextBlock
-                                    x:Uid="PositionZLabel"
-                                    Grid.Row="0"
-                                    Grid.Column="2"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    Grid.Row="1"
-                                    Grid.Column="2"
-                                    Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                    Text="{x:Bind ViewModel.PositionZText, Mode=OneWay}" />
-                            </Grid>
-                        </StackPanel>
-
-                        <Expander x:Uid="AdvancedCandidateDetailsExpander">
-                            <StackPanel Spacing="16">
-                                <TextBlock
-                                    x:Uid="CandidateDetailsDescription"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    TextWrapping="Wrap" />
-
-                                <StackPanel Spacing="12">
+                        HorizontalAlignment="Stretch"
+                        Spacing="12">
+                        <Border Style="{StaticResource BO2CardBorderStyle}">
+                            <StackPanel Spacing="12">
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon
+                                        FontSize="16"
+                                        Foreground="{ThemeResource BO2TextSecondaryBrush}"
+                                        Glyph="&#xE121;" />
                                     <TextBlock
-                                        x:Uid="PlayerCandidateDetailsTitle"
-                                        AutomationProperties.HeadingLevel="Level2"
-                                        Style="{ThemeResource SubtitleTextBlockStyle}" />
-                                    <TextBlock
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Text="{x:Bind ViewModel.PlayerCandidateDetailsText, Mode=OneWay}"
-                                        TextWrapping="Wrap" />
-                                </StackPanel>
-
-                                <StackPanel Spacing="12">
-                                    <TextBlock
-                                        x:Uid="AmmoCandidateDetailsTitle"
-                                        AutomationProperties.HeadingLevel="Level2"
-                                        Style="{ThemeResource SubtitleTextBlockStyle}" />
-                                    <TextBlock
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Text="{x:Bind ViewModel.AmmoCandidateDetailsText, Mode=OneWay}"
-                                        TextWrapping="Wrap" />
-                                </StackPanel>
-
-                                <StackPanel Spacing="12">
-                                    <TextBlock
-                                        x:Uid="CounterCandidateDetailsTitle"
-                                        AutomationProperties.HeadingLevel="Level2"
-                                        Style="{ThemeResource SubtitleTextBlockStyle}" />
-                                    <TextBlock
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Text="{x:Bind ViewModel.CounterCandidateDetailsText, Mode=OneWay}"
-                                        TextWrapping="Wrap" />
-                                </StackPanel>
-
-                                <StackPanel Spacing="12">
-                                    <TextBlock
-                                        x:Uid="AddressCandidateDetailsTitle"
-                                        AutomationProperties.HeadingLevel="Level2"
-                                        Style="{ThemeResource SubtitleTextBlockStyle}" />
-                                    <TextBlock
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Text="{x:Bind ViewModel.AddressCandidateDetailsText, Mode=OneWay}"
-                                        TextWrapping="Wrap" />
-                                </StackPanel>
+                                        x:Uid="TimersTitle"
+                                        Grid.Column="1"
+                                        Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                                </Grid>
+                                <Grid ColumnSpacing="64">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <TextBlock
+                                            x:Uid="GameTimeLabel"
+                                            Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock
+                                            x:Uid="GameTimePlaceholder"
+                                            Style="{StaticResource BO2BodyTextBlockStyle}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="4">
+                                        <TextBlock
+                                            x:Uid="RoundTimeLabel"
+                                            Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock
+                                            x:Uid="RoundTimePlaceholder"
+                                            Style="{StaticResource BO2BodyTextBlockStyle}" />
+                                    </StackPanel>
+                                </Grid>
                             </StackPanel>
-                        </Expander>
+                        </Border>
 
-                        <StackPanel Spacing="12">
-                            <TextBlock
-                                x:Uid="GameEventsTitle"
-                                AutomationProperties.HeadingLevel="Level2"
-                                Style="{ThemeResource SubtitleTextBlockStyle}" />
-                            <TextBlock
-                                x:Uid="GameEventsDescription"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                TextWrapping="Wrap" />
-                            <Grid
-                                ColumnSpacing="24"
-                                RowSpacing="8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
+                        <Border Style="{StaticResource BO2CardBorderStyle}">
+                            <StackPanel Spacing="12">
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon
+                                        FontSize="16"
+                                        Foreground="{ThemeResource BO2TextSecondaryBrush}"
+                                        Glyph="&#xE77B;" />
+                                    <TextBlock
+                                        x:Uid="PlayerStatsTitle"
+                                        Grid.Column="1"
+                                        Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                                </Grid>
+                                <Grid ColumnSpacing="20">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <TextBlock x:Uid="PointsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{x:Bind ViewModel.PointsText, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="4">
+                                        <TextBlock x:Uid="KillsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{x:Bind ViewModel.KillsText, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Spacing="4">
+                                        <TextBlock x:Uid="DownsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{x:Bind ViewModel.DownsText, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="3" Spacing="4">
+                                        <TextBlock x:Uid="RevivesLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{x:Bind ViewModel.RevivesText, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4" Spacing="4">
+                                        <TextBlock x:Uid="HeadshotsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{x:Bind ViewModel.HeadshotsText, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
 
+                        <Border Style="{StaticResource BO2CardBorderStyle}">
+                            <StackPanel Spacing="12">
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon
+                                        FontSize="16"
+                                        Foreground="{ThemeResource BO2TextSecondaryBrush}"
+                                        Glyph="&#xE72D;" />
+                                    <TextBlock
+                                        x:Uid="PlayerStateTitle"
+                                        Grid.Column="1"
+                                        Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                                </Grid>
+                                <Grid ColumnSpacing="56">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <TextBlock x:Uid="PositionXLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{x:Bind ViewModel.PositionXText, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="4">
+                                        <TextBlock x:Uid="PositionYLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{x:Bind ViewModel.PositionYText, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Spacing="4">
+                                        <TextBlock x:Uid="PositionZLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{x:Bind ViewModel.PositionZText, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Expander x:Uid="AdvancedCandidateDetailsExpander">
+                                    <StackPanel Spacing="16">
+                                        <TextBlock
+                                            x:Uid="CandidateDetailsDescription"
+                                            Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                            TextWrapping="Wrap" />
+
+                                        <StackPanel Spacing="6">
+                                            <TextBlock
+                                                x:Uid="PlayerCandidateDetailsTitle"
+                                                Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                                            <TextBlock
+                                                Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                                Text="{x:Bind ViewModel.PlayerCandidateDetailsText, Mode=OneWay}"
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <StackPanel Spacing="6">
+                                            <TextBlock
+                                                x:Uid="AmmoCandidateDetailsTitle"
+                                                Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                                            <TextBlock
+                                                Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                                Text="{x:Bind ViewModel.AmmoCandidateDetailsText, Mode=OneWay}"
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <StackPanel Spacing="6">
+                                            <TextBlock
+                                                x:Uid="CounterCandidateDetailsTitle"
+                                                Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                                            <TextBlock
+                                                Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                                Text="{x:Bind ViewModel.CounterCandidateDetailsText, Mode=OneWay}"
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <StackPanel Spacing="6">
+                                            <TextBlock
+                                                x:Uid="AddressCandidateDetailsTitle"
+                                                Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                                            <TextBlock
+                                                Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                                Text="{x:Bind ViewModel.AddressCandidateDetailsText, Mode=OneWay}"
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Expander>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource BO2CardBorderStyle}">
+                            <StackPanel Spacing="12">
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon
+                                        FontSize="16"
+                                        Foreground="{ThemeResource BO2TextSecondaryBrush}"
+                                        Glyph="&#xE787;" />
+                                    <TextBlock
+                                        x:Uid="GameEventsTitle"
+                                        Grid.Column="1"
+                                        Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                                </Grid>
                                 <TextBlock
-                                    x:Uid="DetectedGameLabel"
-                                    Grid.Row="0"
-                                    Grid.Column="0"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    Grid.Row="0"
-                                    Grid.Column="1"
-                                    Text="{x:Bind ViewModel.DetectedGameText, Mode=OneWay}"
+                                    x:Uid="GameEventsDescription"
+                                    Style="{StaticResource BO2CaptionTextBlockStyle}"
                                     TextWrapping="Wrap" />
-                                <TextBlock
-                                    x:Uid="EventCompatibilityLabel"
-                                    Grid.Row="1"
-                                    Grid.Column="0"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    Grid.Row="1"
-                                    Grid.Column="1"
-                                    Text="{x:Bind ViewModel.EventCompatibilityText, Mode=OneWay}"
-                                    TextWrapping="Wrap" />
-                                <TextBlock
-                                    x:Uid="DllInjectionStatusLabel"
-                                    Grid.Row="2"
-                                    Grid.Column="0"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    Grid.Row="2"
-                                    Grid.Column="1"
-                                    Text="{x:Bind ViewModel.InjectionStatusText, Mode=OneWay}"
-                                    TextWrapping="Wrap" />
-                                <TextBlock
-                                    x:Uid="EventMonitorStatusLabel"
-                                    Grid.Row="3"
-                                    Grid.Column="0"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    Grid.Row="3"
-                                    Grid.Column="1"
-                                    Text="{x:Bind ViewModel.EventMonitorStatusText, Mode=OneWay}"
-                                    TextWrapping="Wrap" />
-                                <TextBlock
-                                    x:Uid="CurrentRoundLabel"
-                                    Grid.Row="4"
-                                    Grid.Column="0"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    Grid.Row="4"
-                                    Grid.Column="1"
-                                    Text="{x:Bind ViewModel.CurrentRoundText, Mode=OneWay}"
-                                    TextWrapping="Wrap" />
-                                <TextBlock
-                                    x:Uid="BoxEventsLabel"
-                                    Grid.Row="5"
-                                    Grid.Column="0"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    Grid.Row="5"
-                                    Grid.Column="1"
-                                    Text="{x:Bind ViewModel.BoxEventsText, Mode=OneWay}"
-                                    TextWrapping="Wrap" />
-                                <TextBlock
-                                    x:Uid="RecentEventsLabel"
-                                    Grid.Row="6"
-                                    Grid.Column="0"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock
-                                    Grid.Row="6"
-                                    Grid.Column="1"
-                                    Text="{x:Bind ViewModel.RecentGameEventsText, Mode=OneWay}"
-                                    TextWrapping="Wrap" />
-                            </Grid>
-                        </StackPanel>
+                                <Grid
+                                    ColumnSpacing="24"
+                                    RowSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock x:Uid="DetectedGameLabel" Grid.Row="0" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{x:Bind ViewModel.DetectedGameText, Mode=OneWay}" TextWrapping="Wrap" />
+                                    <TextBlock x:Uid="EventCompatibilityLabel" Grid.Row="1" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{x:Bind ViewModel.EventCompatibilityText, Mode=OneWay}" TextWrapping="Wrap" />
+                                    <TextBlock x:Uid="DllInjectionStatusLabel" Grid.Row="2" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{x:Bind ViewModel.InjectionStatusText, Mode=OneWay}" TextWrapping="Wrap" />
+                                    <TextBlock x:Uid="EventMonitorStatusLabel" Grid.Row="3" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{x:Bind ViewModel.EventMonitorStatusText, Mode=OneWay}" TextWrapping="Wrap" />
+                                    <TextBlock x:Uid="CurrentRoundLabel" Grid.Row="4" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{x:Bind ViewModel.CurrentRoundText, Mode=OneWay}" TextWrapping="Wrap" />
+                                    <TextBlock x:Uid="BoxEventsLabel" Grid.Row="5" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{x:Bind ViewModel.BoxEventsText, Mode=OneWay}" TextWrapping="Wrap" />
+                                    <TextBlock x:Uid="RecentEventsLabel" Grid.Row="6" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <TextBlock Grid.Row="6" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{x:Bind ViewModel.RecentGameEventsText, Mode=OneWay}" TextWrapping="Wrap" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
                     <StackPanel
                         x:Name="SettingsContent"
-                        Spacing="16"
+                        HorizontalAlignment="Stretch"
+                        Spacing="8"
                         Visibility="Collapsed">
-                        <TextBlock
-                            x:Uid="WidgetsSettingsTitle"
-                            AutomationProperties.HeadingLevel="Level2"
-                            Style="{ThemeResource SubtitleTextBlockStyle}" />
-                        <TextBlock
-                            x:Uid="WidgetsSettingsDescription"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            TextWrapping="Wrap" />
-                        <ListView
-                            x:Name="WidgetsListView"
-                            MaxWidth="520"
-                            HorizontalAlignment="Left"
-                            SelectionMode="Single"
-                            SelectedIndex="0">
-                            <ListViewItem>
-                                <CheckBox
-                                    x:Name="BoxTrackerWidgetCheckBox"
-                                    x:Uid="BoxTrackerWidgetCheckBox"
-                                    Checked="OnBoxTrackerWidgetCheckBoxChanged"
-                                    Unchecked="OnBoxTrackerWidgetCheckBoxChanged" />
-                            </ListViewItem>
-                        </ListView>
-                        <Button
-                            x:Name="ConfigureSelectedWidgetButton"
-                            x:Uid="ConfigureSelectedWidgetButton"
-                            Click="OnConfigureSelectedWidgetClick" />
+                        <Border Style="{StaticResource BO2CardBorderStyle}">
+                            <StackPanel Spacing="12">
+                                <TextBlock
+                                    x:Uid="ThemeSettingsTitle"
+                                    AutomationProperties.HeadingLevel="Level2"
+                                    Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                                <TextBlock
+                                    x:Uid="ThemeSettingsDescription"
+                                    Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                    TextWrapping="Wrap" />
+                                <StackPanel Spacing="6">
+                                    <TextBlock
+                                        x:Uid="ThemeModeLabel"
+                                        Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <ComboBox
+                                        x:Name="ThemeModeComboBox"
+                                        MinWidth="220"
+                                        HorizontalAlignment="Left"
+                                        SelectionChanged="OnThemeModeSelectionChanged">
+                                        <ComboBoxItem x:Uid="ThemeModeSystemItem" Tag="System" />
+                                        <ComboBoxItem x:Uid="ThemeModeLightItem" Tag="Light" />
+                                        <ComboBoxItem x:Uid="ThemeModeDarkItem" Tag="Dark" />
+                                    </ComboBox>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource BO2CardBorderStyle}">
+                            <StackPanel Spacing="12">
+                                <TextBlock
+                                    x:Uid="WidgetsSettingsTitle"
+                                    AutomationProperties.HeadingLevel="Level2"
+                                    Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                                <TextBlock
+                                    x:Uid="WidgetsSettingsDescription"
+                                    Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                    TextWrapping="Wrap" />
+                                <ListView
+                                    x:Name="WidgetsListView"
+                                    MaxWidth="520"
+                                    HorizontalAlignment="Left"
+                                    SelectionMode="Single"
+                                    SelectedIndex="0">
+                                    <ListViewItem>
+                                        <CheckBox
+                                            x:Name="BoxTrackerWidgetCheckBox"
+                                            x:Uid="BoxTrackerWidgetCheckBox"
+                                            Checked="OnBoxTrackerWidgetCheckBoxChanged"
+                                            Unchecked="OnBoxTrackerWidgetCheckBoxChanged" />
+                                    </ListViewItem>
+                                </ListView>
+                                <Button
+                                    x:Name="ConfigureSelectedWidgetButton"
+                                    x:Uid="ConfigureSelectedWidgetButton"
+                                    HorizontalAlignment="Left"
+                                    Click="OnConfigureSelectedWidgetClick"
+                                    Style="{StaticResource BO2SecondaryButtonStyle}" />
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
-                </StackPanel>
-            </Grid>
-        </ScrollViewer>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+        </Grid>
     </NavigationView>
 </Window>

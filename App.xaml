@@ -8,9 +8,157 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
-                <!-- Other merged dictionaries here -->
             </ResourceDictionary.MergedDictionaries>
-            <!-- Other app resources here -->
+
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <x:String x:Key="ControlNormalAnimationDuration">00:00:00.160</x:String>
+                    <x:String x:Key="ControlFastAnimationDuration">00:00:00.100</x:String>
+                    <x:String x:Key="SplitViewPaneAnimationOpenDuration">00:00:00.095</x:String>
+                    <x:String x:Key="SplitViewPaneAnimationOpenPreDuration">00:00:00.09499</x:String>
+                    <x:String x:Key="SplitViewPaneAnimationCloseDuration">00:00:00.050</x:String>
+                    <SolidColorBrush x:Key="BO2BackgroundBrush" Color="#F5F7FB" />
+                    <SolidColorBrush x:Key="BO2SidebarBackgroundBrush" Color="#EEF2F7" />
+                    <SolidColorBrush x:Key="BO2Surface1Brush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="BO2Surface2Brush" Color="#F1F5F9" />
+                    <SolidColorBrush x:Key="BO2BorderBrush" Color="#D7DEE8" />
+                    <SolidColorBrush x:Key="BO2TextPrimaryBrush" Color="#0F172A" />
+                    <SolidColorBrush x:Key="BO2TextSecondaryBrush" Color="#475569" />
+                    <SolidColorBrush x:Key="BO2AccentBrush" Color="#3882F6" />
+                    <SolidColorBrush x:Key="BO2SuccessBrush" Color="#16A34A" />
+                    <SolidColorBrush x:Key="BO2WarningBrush" Color="#D97706" />
+                    <SolidColorBrush x:Key="BO2ErrorBrush" Color="#DC2626" />
+                    <SolidColorBrush x:Key="BO2DisconnectedBrush" Color="#64748B" />
+                    <SolidColorBrush x:Key="BO2SuccessButtonBackgroundBrush" Color="#00FFFFFF" />
+                    <SolidColorBrush x:Key="BO2SuccessButtonBackgroundPointerOverBrush" Color="#1416A34A" />
+                    <SolidColorBrush x:Key="BO2SuccessButtonBackgroundPressedBrush" Color="#2216A34A" />
+                    <SolidColorBrush x:Key="BO2DangerButtonBackgroundBrush" Color="#00FFFFFF" />
+                    <SolidColorBrush x:Key="BO2DangerButtonBackgroundPointerOverBrush" Color="#14DC2626" />
+                    <SolidColorBrush x:Key="BO2DangerButtonBackgroundPressedBrush" Color="#22DC2626" />
+                    <SolidColorBrush x:Key="BO2ButtonTextOnAccentBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#EEF2F7" />
+                    <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#EEF2F7" />
+                    <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="#3882F6" />
+                    <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="#00FFFFFF" />
+                    <Thickness x:Key="NavigationViewContentGridBorderThickness">0</Thickness>
+                    <CornerRadius x:Key="NavigationViewContentGridCornerRadius">0</CornerRadius>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Default">
+                    <x:String x:Key="ControlNormalAnimationDuration">00:00:00.160</x:String>
+                    <x:String x:Key="ControlFastAnimationDuration">00:00:00.100</x:String>
+                    <x:String x:Key="SplitViewPaneAnimationOpenDuration">00:00:00.095</x:String>
+                    <x:String x:Key="SplitViewPaneAnimationOpenPreDuration">00:00:00.09499</x:String>
+                    <x:String x:Key="SplitViewPaneAnimationCloseDuration">00:00:00.050</x:String>
+                    <SolidColorBrush x:Key="BO2BackgroundBrush" Color="#101821" />
+                    <SolidColorBrush x:Key="BO2SidebarBackgroundBrush" Color="#0B1118" />
+                    <SolidColorBrush x:Key="BO2Surface1Brush" Color="#151C26" />
+                    <SolidColorBrush x:Key="BO2Surface2Brush" Color="#1B2430" />
+                    <SolidColorBrush x:Key="BO2BorderBrush" Color="#334155" />
+                    <SolidColorBrush x:Key="BO2TextPrimaryBrush" Color="#E6EDF5" />
+                    <SolidColorBrush x:Key="BO2TextSecondaryBrush" Color="#98A7B3" />
+                    <SolidColorBrush x:Key="BO2AccentBrush" Color="#3882F6" />
+                    <SolidColorBrush x:Key="BO2SuccessBrush" Color="#22C55E" />
+                    <SolidColorBrush x:Key="BO2WarningBrush" Color="#F59E0B" />
+                    <SolidColorBrush x:Key="BO2ErrorBrush" Color="#EF4444" />
+                    <SolidColorBrush x:Key="BO2DisconnectedBrush" Color="#6B7280" />
+                    <SolidColorBrush x:Key="BO2SuccessButtonBackgroundBrush" Color="#00151C26" />
+                    <SolidColorBrush x:Key="BO2SuccessButtonBackgroundPointerOverBrush" Color="#1822C55E" />
+                    <SolidColorBrush x:Key="BO2SuccessButtonBackgroundPressedBrush" Color="#2622C55E" />
+                    <SolidColorBrush x:Key="BO2DangerButtonBackgroundBrush" Color="#00151C26" />
+                    <SolidColorBrush x:Key="BO2DangerButtonBackgroundPointerOverBrush" Color="#18EF4444" />
+                    <SolidColorBrush x:Key="BO2DangerButtonBackgroundPressedBrush" Color="#26EF4444" />
+                    <SolidColorBrush x:Key="BO2ButtonTextOnAccentBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#0B1118" />
+                    <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#0B1118" />
+                    <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="#3882F6" />
+                    <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="#00101821" />
+                    <Thickness x:Key="NavigationViewContentGridBorderThickness">0</Thickness>
+                    <CornerRadius x:Key="NavigationViewContentGridCornerRadius">0</CornerRadius>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+
+            <Style x:Key="BO2PageTitleTextBlockStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource BO2TextPrimaryBrush}" />
+                <Setter Property="FontSize" Value="28" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="LineHeight" Value="36" />
+            </Style>
+
+            <Style x:Key="BO2CardTitleTextBlockStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource BO2TextPrimaryBrush}" />
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="LineHeight" Value="20" />
+            </Style>
+
+            <Style x:Key="BO2BodyTextBlockStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource BO2TextPrimaryBrush}" />
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="LineHeight" Value="20" />
+            </Style>
+
+            <Style x:Key="BO2CaptionTextBlockStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource BO2TextSecondaryBrush}" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="LineHeight" Value="16" />
+            </Style>
+
+            <Style x:Key="BO2StatValueTextBlockStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource BO2TextPrimaryBrush}" />
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="LineHeight" Value="20" />
+            </Style>
+
+            <Style x:Key="BO2CardBorderStyle" TargetType="Border">
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                <Setter Property="Background" Value="{ThemeResource BO2Surface1Brush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource BO2BorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Padding" Value="16" />
+            </Style>
+
+            <Style x:Key="BO2PrimaryButtonStyle" TargetType="Button">
+                <Setter Property="MinHeight" Value="36" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Background" Value="{ThemeResource BO2SuccessButtonBackgroundBrush}" />
+                <Setter Property="Foreground" Value="{ThemeResource BO2SuccessBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource BO2SuccessBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+            </Style>
+
+            <Style x:Key="BO2DangerButtonStyle" TargetType="Button">
+                <Setter Property="MinHeight" Value="36" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Background" Value="{ThemeResource BO2DangerButtonBackgroundBrush}" />
+                <Setter Property="Foreground" Value="{ThemeResource BO2ErrorBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource BO2ErrorBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+            </Style>
+
+            <Style x:Key="BO2SecondaryButtonStyle" TargetType="Button">
+                <Setter Property="MinHeight" Value="36" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Background" Value="{ThemeResource BO2Surface2Brush}" />
+                <Setter Property="Foreground" Value="{ThemeResource BO2TextPrimaryBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource BO2BorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+            </Style>
+
+            <Style x:Key="BO2PaneFooterButtonStyle" TargetType="Button">
+                <Setter Property="MinHeight" Value="44" />
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="Padding" Value="12,0" />
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Background" Value="{ThemeResource BO2Surface1Brush}" />
+                <Setter Property="Foreground" Value="{ThemeResource BO2TextPrimaryBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource BO2BorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
