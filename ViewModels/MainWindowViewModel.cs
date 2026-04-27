@@ -20,6 +20,7 @@ namespace BO2.ViewModels
         private readonly DispatcherQueue _dispatcherQueue;
         private readonly GameMemoryReader _memoryReader = new();
         private readonly GameProcessDetectionService _processDetectionService = new();
+        private readonly IGameProcessDetector _pollingProcessDetector = new GameProcessDetector();
         private readonly DllInjector _dllInjector = new();
         private readonly IGameEventMonitor _eventMonitor = new GameEventMonitor();
         private readonly SemaphoreSlim _operationSemaphore = new(1, 1);
@@ -28,6 +29,7 @@ namespace BO2.ViewModels
         private DateTimeOffset? _lastInjectionAttemptedAt;
         private DetectedGame? _detectedGame;
         private string? _processWatcherErrorText;
+        private bool _usePollingProcessDetection;
         private bool _isConnecting;
         private bool _disposed;
         private string _pointsText = EmptyStatText;
@@ -72,6 +74,7 @@ namespace BO2.ViewModels
             catch (Exception ex) when (ex is ManagementException or UnauthorizedAccessException or COMException)
             {
                 _processWatcherErrorText = AppStrings.Format("ProcessWatcherUnavailableFormat", ex.Message);
+                _usePollingProcessDetection = true;
             }
 
             _detectedGame = _processDetectionService.CurrentGame;
@@ -263,6 +266,16 @@ namespace BO2.ViewModels
             try
             {
                 DetectedGame? detectedGame = _detectedGame;
+                if (_usePollingProcessDetection)
+                {
+                    detectedGame = await Task.Run(
+                        _pollingProcessDetector.Detect,
+                        cancellationToken);
+                    await RunOnDispatcherAsync(
+                        () => ApplyPolledDetectedGame(detectedGame),
+                        cancellationToken);
+                }
+
                 (
                     PlayerStatsReadResult readResult,
                     GameEventMonitorStatus eventStatus,
@@ -800,6 +813,22 @@ namespace BO2.ViewModels
 
         private void ApplyDetectedGameChanged(DetectedGame? detectedGame)
         {
+            ApplyDetectedGameState(detectedGame);
+            RefreshRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void ApplyPolledDetectedGame(DetectedGame? detectedGame)
+        {
+            if (Equals(_detectedGame, detectedGame))
+            {
+                return;
+            }
+
+            ApplyDetectedGameState(detectedGame);
+        }
+
+        private void ApplyDetectedGameState(DetectedGame? detectedGame)
+        {
             _detectedGame = detectedGame;
             ResetMonitorConnectionState();
             DetectedGameText = detectedGame?.DisplayName ?? AppStrings.Get("NoGameDetected");
@@ -807,7 +836,6 @@ namespace BO2.ViewModels
             ApplyEventMonitorStatus(detectedGame, _lastInjectionResult, GameEventMonitorStatus.WaitingForMonitor);
             UpdateConnectButtonState(detectedGame);
             ClearStats();
-            RefreshRequested?.Invoke(this, EventArgs.Empty);
         }
 
         private void ResetMonitorConnectionState()

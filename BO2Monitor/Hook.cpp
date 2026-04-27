@@ -408,7 +408,8 @@ namespace BO2Monitor
             char (&weaponName)[MaxWeaponNameBytes])
         {
             std::memset(weaponName, 0, MaxWeaponNameBytes);
-            if (std::strcmp(target.Name, "randomization_done") == 0)
+            if (std::strcmp(target.Name, "randomization_done") == 0
+                || std::strcmp(target.Name, "user_grabbed_weapon") == 0)
             {
                 return TryReadOwnerWeaponAliasField(inst, ownerId, weaponName);
             }
@@ -502,14 +503,6 @@ namespace BO2Monitor
                 *target,
                 notifyListOwnerId,
                 weaponName);
-
-            const bool shouldPublish = std::strcmp(target->Name, "user_grabbed_weapon") != 0
-                || weaponNameStatus != ScriptFieldReadStatus::NotFound;
-
-            if (!shouldPublish)
-            {
-                return;
-            }
 
             EnqueueMatchedNotify(
                 inst,
