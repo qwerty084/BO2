@@ -352,7 +352,13 @@ namespace BO2.ViewModels
                     () =>
                     {
                         DateTimeOffset receivedAt = DateTimeOffset.UtcNow;
-                        StatsRefreshSnapshot snapshot = _statsRefreshService.Read(detectedGame, receivedAt);
+                        int? ownedMonitorProcessId = IsMonitorConnectedFor(detectedGame)
+                            ? detectedGame?.ProcessId
+                            : null;
+                        StatsRefreshSnapshot snapshot = _statsRefreshService.Read(
+                            detectedGame,
+                            receivedAt,
+                            ownedMonitorProcessId);
                         ApplyMonitorReadinessTimeout(
                             snapshot.ReadResult.DetectedGame,
                             snapshot.EventStatus,

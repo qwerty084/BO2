@@ -13,15 +13,19 @@ namespace BO2.Services
             _gameSession = gameSession;
         }
 
-        public StatsRefreshSnapshot Read(DetectedGame? detectedGame, DateTimeOffset receivedAt)
+        public StatsRefreshSnapshot Read(
+            DetectedGame? detectedGame,
+            DateTimeOffset receivedAt,
+            int? ownedMonitorProcessId)
         {
             long diagnosticsStartedAt = RefreshDiagnostics.Start();
             try
             {
                 PlayerStatsReadResult readResult = _gameSession.ReadPlayerStats(detectedGame);
-                GameEventMonitorStatus eventStatus = _gameSession.ReadEventMonitorStatus(
-                    receivedAt,
-                    readResult.DetectedGame?.ProcessId);
+                GameEventMonitorStatus eventStatus = ownedMonitorProcessId is int processId
+                    && readResult.DetectedGame?.ProcessId == processId
+                    ? _gameSession.ReadEventMonitorStatus(receivedAt, processId)
+                    : GameEventMonitorStatus.WaitingForMonitor;
                 return new StatsRefreshSnapshot(readResult, eventStatus);
             }
             finally
