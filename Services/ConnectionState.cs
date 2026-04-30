@@ -4,6 +4,7 @@ namespace BO2.Services
     {
         Disconnected,
         Detected,
+        Disconnecting,
         Unsupported,
         Connected
     }

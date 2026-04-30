@@ -36,6 +36,9 @@
   <data name="ConnectionCardStatusConnected" xml:space="preserve">
     <value>Connected</value>
   </data>
+  <data name="ConnectionCardStatusDisconnecting" xml:space="preserve">
+    <value>Disconnecting</value>
+  </data>
   <data name="ConnectionCardStatusConnecting" xml:space="preserve">
     <value>Connecting</value>
   </data>
@@ -53,6 +56,9 @@
   </data>
   <data name="ConnectionStatusConnecting" xml:space="preserve">
     <value>Connecting...</value>
+  </data>
+  <data name="ConnectionStatusDisconnecting" xml:space="preserve">
+    <value>Disconnecting...</value>
   </data>
   <data name="AdvancedCandidateDetailsExpander.AutomationProperties.Name" xml:space="preserve">
     <value>Advanced candidate details</value>
@@ -107,6 +113,9 @@
   </data>
   <data name="DllInjectionConnecting" xml:space="preserve">
     <value>Connecting...</value>
+  </data>
+  <data name="DllInjectionDisconnecting" xml:space="preserve">
+    <value>Stopping BO2Monitor</value>
   </data>
   <data name="DllInjectionFailedFormat" xml:space="preserve">
     <value>Injection failed: {0}</value>
@@ -285,6 +294,9 @@
   <data name="EventMonitorWaitingForConnect" xml:space="preserve">
     <value>Waiting for Connect</value>
   </data>
+  <data name="EventMonitorDisconnecting" xml:space="preserve">
+    <value>Disconnecting from BO2Monitor</value>
+  </data>
   <data name="EventMonitorWaitingForMonitor" xml:space="preserve">
     <value>Waiting for BO2Monitor shared memory</value>
   </data>
@@ -296,6 +308,9 @@
   </data>
   <data name="FooterEventsConnected" xml:space="preserve">
     <value>Game link: Connected</value>
+  </data>
+  <data name="FooterEventsDisconnecting" xml:space="preserve">
+    <value>Game link: Disconnecting</value>
   </data>
   <data name="FooterEventsConnecting" xml:space="preserve">
     <value>Game link: Connecting</value>

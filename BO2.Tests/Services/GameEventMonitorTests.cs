@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Text;
+using System.Threading;
 using BO2.Services;
 using Xunit;
 
@@ -8,6 +9,8 @@ namespace BO2.Tests.Services
 {
     public sealed class GameEventMonitorTests
     {
+        private static int _nextMonitorTestProcessId = 1_400_000_000;
+
         [Fact]
         public void DecodeSnapshot_WhenSnapshotIsValid_MapsKnownNotifyNames()
         {
@@ -200,6 +203,42 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void RequestStop_WhenStopEventExists_SignalsStopEvent()
+        {
+            int processId = NextMonitorTestProcessId();
+            using EventWaitHandle stopEvent = new(false, EventResetMode.ManualReset, GameEventMonitor.BuildStopEventHandleName(processId));
+            stopEvent.Reset();
+            using var monitor = new GameEventMonitor();
+
+            monitor.RequestStop(processId);
+
+            Assert.True(stopEvent.WaitOne(0));
+        }
+
+        [Fact]
+        public void IsStopComplete_WhenStopEventExists_ReturnsFalse()
+        {
+            int processId = NextMonitorTestProcessId();
+            using EventWaitHandle stopEvent = new(false, EventResetMode.ManualReset, GameEventMonitor.BuildStopEventHandleName(processId));
+            using var monitor = new GameEventMonitor();
+
+            Assert.False(monitor.IsStopComplete(processId));
+        }
+
+        [Fact]
+        public void IsStopComplete_WhenStopEventCloses_ReturnsTrue()
+        {
+            int processId = NextMonitorTestProcessId();
+            EventWaitHandle stopEvent = new(false, EventResetMode.ManualReset, GameEventMonitor.BuildStopEventHandleName(processId));
+            using var monitor = new GameEventMonitor();
+            Assert.False(monitor.IsStopComplete(processId));
+
+            stopEvent.Dispose();
+
+            Assert.True(monitor.IsStopComplete(processId));
+        }
+
+        [Fact]
         public void DecodeSnapshot_UsesNativeTickForStableEventTimestamp()
         {
             byte[] snapshot = CreateSnapshot(
@@ -263,6 +302,11 @@ namespace BO2.Tests.Services
                 weaponNameBytes.AsSpan(0, Math.Min(weaponNameBytes.Length, GameEventMonitor.MaxWeaponNameBytes))
                     .CopyTo(snapshot.AsSpan(offset + GameEventMonitor.WeaponNameOffset, GameEventMonitor.MaxWeaponNameBytes));
             }
+        }
+
+        private static int NextMonitorTestProcessId()
+        {
+            return Interlocked.Increment(ref _nextMonitorTestProcessId);
         }
     }
 }
