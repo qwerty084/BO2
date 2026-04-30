@@ -80,6 +80,51 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void Load_WhenJsonIsInvalid_MovesBadFileToBackup()
+        {
+            string settingsPath = CreateSettingsPath();
+            Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
+            File.WriteAllText(settingsPath, "{not json");
+            var store = new WidgetSettingsStore(settingsPath);
+
+            _ = store.Load();
+
+            Assert.False(File.Exists(settingsPath));
+            WidgetSettingsLoadRecovery recovery = Assert.IsType<WidgetSettingsLoadRecovery>(store.LastLoadRecovery);
+            Assert.NotNull(recovery.BackupPath);
+            Assert.True(File.Exists(recovery.BackupPath));
+            Assert.Equal("{not json", File.ReadAllText(recovery.BackupPath));
+        }
+
+        [Fact]
+        public void Load_WhenVersionIsNewer_MovesUnsupportedFileToBackup()
+        {
+            string settingsPath = CreateSettingsPath();
+            Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
+            File.WriteAllText(
+                settingsPath,
+                """
+                {
+                  "Version": 999,
+                  "Widgets": {
+                    "BoxTracker": {
+                      "Enabled": true
+                    }
+                  }
+                }
+                """);
+            var store = new WidgetSettingsStore(settingsPath);
+
+            WidgetSettings settings = store.Load().GetWidget(WidgetKind.BoxTracker);
+
+            Assert.False(settings.Enabled);
+            Assert.False(File.Exists(settingsPath));
+            WidgetSettingsLoadRecovery recovery = Assert.IsType<WidgetSettingsLoadRecovery>(store.LastLoadRecovery);
+            Assert.NotNull(recovery.BackupPath);
+            Assert.True(File.Exists(recovery.BackupPath));
+        }
+
+        [Fact]
         public void Load_WhenValuesAreOutOfRange_NormalizesSettings()
         {
             string settingsPath = CreateSettingsPath();

@@ -1,11 +1,9 @@
 using BO2.Services;
 using BO2.ViewModels;
 using BO2.Widgets;
-using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using System;
 using System.Runtime.InteropServices;
@@ -55,6 +53,7 @@ namespace BO2
             ShowHome();
             RefreshPaneFooterVisibility();
             RefreshThemeControls();
+            RefreshWidgetSettingsRecoveryMessage();
             RefreshWidgetControls();
             _widgetWindowManager.RestoreEnabledWidgets();
             QueueRefresh();
@@ -250,89 +249,20 @@ namespace BO2
 
         private async void OnConfigureSelectedWidgetClick(object sender, RoutedEventArgs e)
         {
-            WidgetSettings settings = _widgetWindowManager.BoxTrackerSettings.Clone();
-
-            NumberBox widthBox = CreateNumberBox(AppStrings.Get("WidgetWidthLabel"), settings.Width, 160, 3840);
-            NumberBox heightBox = CreateNumberBox(AppStrings.Get("WidgetHeightLabel"), settings.Height, 80, 2160);
-            ColorPicker backgroundColorPicker = CreateColorPicker(settings.BackgroundColor, Colors.White);
-            ColorPicker textColorPicker = CreateColorPicker(settings.TextColor, Colors.Black);
-            CheckBox transparentBackgroundCheckBox = new()
-            {
-                Content = AppStrings.Get("WidgetTransparentBackgroundLabel"),
-                IsChecked = settings.TransparentBackground
-            };
-            CheckBox alwaysOnTopCheckBox = new()
-            {
-                Content = AppStrings.Get("WidgetAlwaysOnTopLabel"),
-                IsChecked = settings.AlwaysOnTop
-            };
-            CheckBox centerAlignCheckBox = new()
-            {
-                Content = AppStrings.Get("WidgetCenterAlignLabel"),
-                IsChecked = settings.CenterAlign
-            };
-
-            StackPanel content = new()
-            {
-                Spacing = 12,
-                MaxWidth = 520
-            };
-            content.Children.Add(widthBox);
-            content.Children.Add(heightBox);
-            content.Children.Add(CreateLabeledColorPicker(AppStrings.Get("WidgetBackgroundColorLabel"), backgroundColorPicker));
-            content.Children.Add(CreateLabeledColorPicker(AppStrings.Get("WidgetTextColorLabel"), textColorPicker));
-            content.Children.Add(transparentBackgroundCheckBox);
-            content.Children.Add(alwaysOnTopCheckBox);
-            content.Children.Add(centerAlignCheckBox);
-
-            ScrollViewer dialogContent = new()
-            {
-                Content = content,
-                IsTabStop = true,
-                Padding = new Thickness(0, 0, 20, 0),
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                HorizontalScrollMode = ScrollMode.Disabled
-            };
-
-            ContentDialog dialog = new()
-            {
-                Title = AppStrings.Get("BoxTrackerWidgetConfigTitle"),
-                Content = dialogContent,
-                PrimaryButtonText = AppStrings.Get("WidgetConfigSaveButton"),
-                CloseButtonText = AppStrings.Get("WidgetConfigCancelButton"),
-                DefaultButton = ContentDialogButton.Primary,
-                RequestedTheme = ResolveElementTheme(_preferences.ThemeMode)
-            };
-
-            if (Content is FrameworkElement rootElement)
-            {
-                dialog.XamlRoot = rootElement.XamlRoot;
-            }
-
-            dialog.Opened += (_, _) =>
-            {
-                _ = dialog.DispatcherQueue.TryEnqueue(
-                    Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
-                    () =>
-                    {
-                        _ = dialogContent.Focus(FocusState.Programmatic);
-                        dialogContent.IsTabStop = false;
-                    });
-            };
-
-            ContentDialogResult result = await dialog.ShowAsync();
-            if (result != ContentDialogResult.Primary)
+            if (Content is not FrameworkElement rootElement)
             {
                 return;
             }
 
-            settings.Width = ReadNumberBoxValue(widthBox, WidgetSettings.DefaultWidth);
-            settings.Height = ReadNumberBoxValue(heightBox, WidgetSettings.DefaultHeight);
-            settings.BackgroundColor = WidgetColorSerializer.Format(backgroundColorPicker.Color);
-            settings.TextColor = WidgetColorSerializer.Format(textColorPicker.Color);
-            settings.TransparentBackground = transparentBackgroundCheckBox.IsChecked == true;
-            settings.AlwaysOnTop = alwaysOnTopCheckBox.IsChecked == true;
-            settings.CenterAlign = centerAlignCheckBox.IsChecked == true;
+            WidgetSettings? settings = await BoxTrackerWidgetSettingsDialog.ShowAsync(
+                rootElement.XamlRoot,
+                _widgetWindowManager.BoxTrackerSettings,
+                ResolveElementTheme(_preferences.ThemeMode));
+            if (settings is null)
+            {
+                return;
+            }
+
             _widgetWindowManager.ApplyBoxTrackerSettings(settings);
         }
 
@@ -347,6 +277,22 @@ namespace BO2
             {
                 _isUpdatingWidgetControls = false;
             }
+        }
+
+        private void RefreshWidgetSettingsRecoveryMessage()
+        {
+            WidgetSettingsLoadRecovery? recovery = _widgetWindowManager.SettingsLoadRecovery;
+            if (recovery is null)
+            {
+                WidgetSettingsRecoveryInfoBar.IsOpen = false;
+                return;
+            }
+
+            WidgetSettingsRecoveryInfoBar.Title = AppStrings.Get("WidgetSettingsRecoveryTitle");
+            WidgetSettingsRecoveryInfoBar.Message = string.IsNullOrWhiteSpace(recovery.BackupPath)
+                ? AppStrings.Get("WidgetSettingsRecoveryNoBackupMessage")
+                : AppStrings.Format("WidgetSettingsRecoveryMessageFormat", recovery.BackupPath);
+            WidgetSettingsRecoveryInfoBar.IsOpen = true;
         }
 
         private void RefreshThemeControls()
@@ -433,30 +379,6 @@ namespace BO2
             ViewModel.Dispose();
         }
 
-        private static NumberBox CreateNumberBox(string header, int value, int minimum, int maximum)
-        {
-            return new NumberBox
-            {
-                Header = header,
-                Value = value,
-                Minimum = minimum,
-                Maximum = maximum,
-                SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact
-            };
-        }
-
-        private static ColorPicker CreateColorPicker(string value, Windows.UI.Color defaultColor)
-        {
-            return new ColorPicker
-            {
-                Color = WidgetColorSerializer.ParseOrDefault(value, defaultColor),
-                IsAlphaEnabled = true,
-                IsColorSliderVisible = true,
-                IsColorChannelTextInputVisible = true,
-                IsHexInputVisible = true
-            };
-        }
-
         private void TryDisableWindowCornerRounding()
         {
             if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
@@ -478,31 +400,6 @@ namespace BO2
             catch (Exception)
             {
             }
-        }
-
-        private static FrameworkElement CreateLabeledColorPicker(string label, ColorPicker colorPicker)
-        {
-            StackPanel panel = new()
-            {
-                Spacing = 6
-            };
-            panel.Children.Add(new TextBlock
-            {
-                Text = label,
-                Style = (Style)Application.Current.Resources["BO2CaptionTextBlockStyle"]
-            });
-            panel.Children.Add(colorPicker);
-            return panel;
-        }
-
-        private static int ReadNumberBoxValue(NumberBox numberBox, int fallback)
-        {
-            if (double.IsNaN(numberBox.Value))
-            {
-                return fallback;
-            }
-
-            return (int)Math.Round(numberBox.Value);
         }
 
         private const uint DwmWindowCornerPreferenceAttribute = 33;

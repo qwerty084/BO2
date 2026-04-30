@@ -160,6 +160,9 @@ namespace
         if (waitResult != WAIT_OBJECT_0)
         {
             std::wcerr << L"Remote loader wait failed with result " << waitResult << L'\n';
+            // The remote loader thread may still be reading this buffer after our wait expires.
+            // Once the thread has started, only free the path after definitive completion.
+            remotePath = nullptr;
             goto Cleanup;
         }
 

@@ -1,9 +1,12 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 
 namespace BO2.Services
 {
+    public sealed record WidgetSettingsLoadRecovery(string Reason, string? BackupPath, string? ErrorMessage);
+
     public sealed class WidgetSettingsStore
     {
         private static readonly JsonSerializerOptions JsonOptions = new()
@@ -18,6 +21,8 @@ namespace BO2.Services
             _settingsPath = settingsPath;
         }
 
+        public WidgetSettingsLoadRecovery? LastLoadRecovery { get; private set; }
+
         public static WidgetSettingsStore CreateDefault()
         {
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -27,6 +32,8 @@ namespace BO2.Services
 
         public WidgetSettingsDocument Load()
         {
+            LastLoadRecovery = null;
+
             try
             {
                 if (!File.Exists(_settingsPath))
@@ -36,25 +43,31 @@ namespace BO2.Services
 
                 string json = File.ReadAllText(_settingsPath);
                 WidgetSettingsDocument? document = JsonSerializer.Deserialize<WidgetSettingsDocument>(json, JsonOptions);
-                if (document is null || document.Version > WidgetSettingsDocument.CurrentVersion)
+                if (document is null)
                 {
-                    return WidgetSettingsDocument.CreateDefault();
+                    return RecoverDefault("Widget settings document was empty.");
+                }
+
+                if (document.Version > WidgetSettingsDocument.CurrentVersion)
+                {
+                    return RecoverDefault(
+                        $"Widget settings version {document.Version.ToString(CultureInfo.InvariantCulture)} is newer than supported version {WidgetSettingsDocument.CurrentVersion.ToString(CultureInfo.InvariantCulture)}.");
                 }
 
                 document.Normalize();
                 return document;
             }
-            catch (IOException)
+            catch (IOException ex)
             {
-                return WidgetSettingsDocument.CreateDefault();
+                return RecoverDefault("Widget settings file could not be read.", ex);
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
-                return WidgetSettingsDocument.CreateDefault();
+                return RecoverDefault("Widget settings file could not be accessed.", ex);
             }
-            catch (JsonException)
+            catch (JsonException ex)
             {
-                return WidgetSettingsDocument.CreateDefault();
+                return RecoverDefault("Widget settings JSON was invalid.", ex);
             }
         }
 
@@ -71,6 +84,53 @@ namespace BO2.Services
             string json = JsonSerializer.Serialize(document, JsonOptions);
             File.WriteAllText(tempPath, json);
             File.Move(tempPath, _settingsPath, overwrite: true);
+        }
+
+        private WidgetSettingsDocument RecoverDefault(string reason, Exception? exception = null)
+        {
+            string? backupPath = TryMoveInvalidSettingsFile();
+            LastLoadRecovery = new WidgetSettingsLoadRecovery(reason, backupPath, exception?.Message);
+            return WidgetSettingsDocument.CreateDefault();
+        }
+
+        private string? TryMoveInvalidSettingsFile()
+        {
+            try
+            {
+                if (!File.Exists(_settingsPath))
+                {
+                    return null;
+                }
+
+                string backupPath = CreateBackupPath();
+                File.Move(_settingsPath, backupPath);
+                return backupPath;
+            }
+            catch (IOException)
+            {
+                return null;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return null;
+            }
+        }
+
+        private string CreateBackupPath()
+        {
+            string timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
+            string prefix = _settingsPath + ".invalid-" + timestamp;
+            for (int i = 0; i < 1000; i++)
+            {
+                string suffix = i == 0 ? ".bak" : "-" + i.ToString(CultureInfo.InvariantCulture) + ".bak";
+                string candidate = prefix + suffix;
+                if (!File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+
+            return _settingsPath + ".invalid-" + Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture) + ".bak";
         }
     }
 }

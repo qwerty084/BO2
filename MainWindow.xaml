@@ -516,6 +516,11 @@
                                     x:Uid="WidgetsSettingsDescription"
                                     Style="{StaticResource BO2CaptionTextBlockStyle}"
                                     TextWrapping="Wrap" />
+                                <InfoBar
+                                    x:Name="WidgetSettingsRecoveryInfoBar"
+                                    IsClosable="True"
+                                    IsOpen="False"
+                                    Severity="Warning" />
                                 <ListView
                                     x:Name="WidgetsListView"
                                     MaxWidth="520"

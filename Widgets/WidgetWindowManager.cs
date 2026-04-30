@@ -26,6 +26,8 @@ namespace BO2.Widgets
 
         public WidgetSettings BoxTrackerSettings => _settingsDocument.GetWidget(WidgetKind.BoxTracker);
 
+        public WidgetSettingsLoadRecovery? SettingsLoadRecovery => _settingsStore.LastLoadRecovery;
+
         public bool IsBoxTrackerEnabled => BoxTrackerSettings.Enabled;
 
         public void RestoreEnabledWidgets()
