@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="BO2.Views.WidgetSettingsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Border Style="{StaticResource BO2CardBorderStyle}">
+        <StackPanel Spacing="12">
+            <TextBlock
+                x:Uid="WidgetsSettingsTitle"
+                AutomationProperties.HeadingLevel="Level2"
+                Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+            <TextBlock
+                x:Uid="WidgetsSettingsDescription"
+                Style="{StaticResource BO2CaptionTextBlockStyle}"
+                TextWrapping="Wrap" />
+            <InfoBar
+                x:Name="WidgetSettingsRecoveryInfoBar"
+                IsClosable="True"
+                IsOpen="False"
+                Severity="Warning" />
+            <ListView
+                x:Name="WidgetsListView"
+                MaxWidth="520"
+                HorizontalAlignment="Left"
+                SelectionMode="Single"
+                SelectedIndex="0">
+                <ListViewItem>
+                    <CheckBox
+                        x:Name="BoxTrackerWidgetCheckBox"
+                        x:Uid="BoxTrackerWidgetCheckBox"
+                        Checked="OnBoxTrackerWidgetCheckBoxChanged"
+                        Unchecked="OnBoxTrackerWidgetCheckBoxChanged" />
+                </ListViewItem>
+            </ListView>
+            <Button
+                x:Name="ConfigureSelectedWidgetButton"
+                x:Uid="ConfigureSelectedWidgetButton"
+                HorizontalAlignment="Left"
+                Click="OnConfigureSelectedWidgetClick"
+                Style="{StaticResource BO2SecondaryButtonStyle}" />
+        </StackPanel>
+    </Border>
+</UserControl>

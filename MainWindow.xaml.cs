@@ -1,5 +1,6 @@
 using BO2.Services;
 using BO2.ViewModels;
+using BO2.Views;
 using BO2.Widgets;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -22,7 +23,6 @@ namespace BO2
         private readonly WidgetWindowManager _widgetWindowManager;
         private readonly AppPreferencesStore _preferencesStore = AppPreferencesStore.CreateDefault();
         private AppPreferences _preferences = AppPreferences.CreateDefault();
-        private bool _isUpdatingWidgetControls;
         private bool _isUpdatingThemeMode;
         private long _paneOpenChangedToken;
         private Storyboard? _settingsCogStoryboard;
@@ -224,14 +224,9 @@ namespace BO2
             RefreshWidgetControls();
         }
 
-        private void OnBoxTrackerWidgetCheckBoxChanged(object sender, RoutedEventArgs e)
+        private void OnBoxTrackerEnabledChanged(object sender, BoxTrackerEnabledChangedEventArgs e)
         {
-            if (_isUpdatingWidgetControls)
-            {
-                return;
-            }
-
-            _widgetWindowManager.SetBoxTrackerEnabled(BoxTrackerWidgetCheckBox.IsChecked == true);
+            _widgetWindowManager.SetBoxTrackerEnabled(e.IsEnabled);
         }
 
         private void OnThemeModeSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -247,7 +242,7 @@ namespace BO2
             ApplyThemeMode(themeMode);
         }
 
-        private async void OnConfigureSelectedWidgetClick(object sender, RoutedEventArgs e)
+        private async void OnConfigureSelectedWidgetRequested(object? sender, EventArgs e)
         {
             if (Content is not FrameworkElement rootElement)
             {
@@ -268,31 +263,12 @@ namespace BO2
 
         private void RefreshWidgetControls()
         {
-            _isUpdatingWidgetControls = true;
-            try
-            {
-                BoxTrackerWidgetCheckBox.IsChecked = _widgetWindowManager.IsBoxTrackerEnabled;
-            }
-            finally
-            {
-                _isUpdatingWidgetControls = false;
-            }
+            WidgetSettingsView.SetBoxTrackerEnabled(_widgetWindowManager.IsBoxTrackerEnabled);
         }
 
         private void RefreshWidgetSettingsRecoveryMessage()
         {
-            WidgetSettingsLoadRecovery? recovery = _widgetWindowManager.SettingsLoadRecovery;
-            if (recovery is null)
-            {
-                WidgetSettingsRecoveryInfoBar.IsOpen = false;
-                return;
-            }
-
-            WidgetSettingsRecoveryInfoBar.Title = AppStrings.Get("WidgetSettingsRecoveryTitle");
-            WidgetSettingsRecoveryInfoBar.Message = string.IsNullOrWhiteSpace(recovery.BackupPath)
-                ? AppStrings.Get("WidgetSettingsRecoveryNoBackupMessage")
-                : AppStrings.Format("WidgetSettingsRecoveryMessageFormat", recovery.BackupPath);
-            WidgetSettingsRecoveryInfoBar.IsOpen = true;
+            WidgetSettingsView.ShowSettingsRecovery(_widgetWindowManager.SettingsLoadRecovery);
         }
 
         private void RefreshThemeControls()
