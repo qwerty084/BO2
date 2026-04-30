@@ -15,11 +15,19 @@ namespace BO2.Services
 
         public StatsRefreshSnapshot Read(DetectedGame? detectedGame, DateTimeOffset receivedAt)
         {
-            PlayerStatsReadResult readResult = _gameSession.ReadPlayerStats(detectedGame);
-            GameEventMonitorStatus eventStatus = _gameSession.ReadEventMonitorStatus(
-                receivedAt,
-                readResult.DetectedGame?.ProcessId);
-            return new StatsRefreshSnapshot(readResult, eventStatus);
+            long diagnosticsStartedAt = RefreshDiagnostics.Start();
+            try
+            {
+                PlayerStatsReadResult readResult = _gameSession.ReadPlayerStats(detectedGame);
+                GameEventMonitorStatus eventStatus = _gameSession.ReadEventMonitorStatus(
+                    receivedAt,
+                    readResult.DetectedGame?.ProcessId);
+                return new StatsRefreshSnapshot(readResult, eventStatus);
+            }
+            finally
+            {
+                RefreshDiagnostics.WriteElapsed("stats refresh", diagnosticsStartedAt);
+            }
         }
     }
 

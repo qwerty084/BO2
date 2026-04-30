@@ -40,6 +40,8 @@ dotnet test .\BO2.Tests\BO2.Tests.csproj
 
 `BO2.Tests` is a non-UI xUnit project. It links testable service source files directly and uses fakes for process discovery, memory reads, and resource strings so tests stay deterministic and do not require WinAppSDK runtime startup or a live game process.
 
+Live Steam Zombies verification is covered by the [native smoke test](docs/native-smoke-test.md).
+
 ## Runtime Notes
 
 - The app reads process memory and monitor snapshots but does not write game memory.

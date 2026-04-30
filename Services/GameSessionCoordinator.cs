@@ -66,7 +66,15 @@ namespace BO2.Services
 
         public DetectedGame? DetectByPolling()
         {
-            return _pollingProcessDetector.Detect();
+            long diagnosticsStartedAt = RefreshDiagnostics.Start();
+            try
+            {
+                return _pollingProcessDetector.Detect();
+            }
+            finally
+            {
+                RefreshDiagnostics.WriteElapsed("process polling detect", diagnosticsStartedAt);
+            }
         }
 
         public PlayerStatsReadResult ReadPlayerStats(DetectedGame? detectedGame)
