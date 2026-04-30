@@ -4,8 +4,11 @@ using BO2.Widgets;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 using System;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -19,13 +22,24 @@ namespace BO2
         private bool _refreshPending;
         private int _cleanupRequested;
         private readonly WidgetWindowManager _widgetWindowManager;
+        private readonly AppPreferencesStore _preferencesStore = AppPreferencesStore.CreateDefault();
+        private AppPreferences _preferences = AppPreferences.CreateDefault();
         private bool _isUpdatingWidgetControls;
+        private bool _isUpdatingThemeMode;
+        private long _paneOpenChangedToken;
+        private Storyboard? _settingsCogStoryboard;
 
         public MainWindow()
         {
+            _preferences = _preferencesStore.Load();
             ViewModel = new MainWindowViewModel(DispatcherQueue);
             ViewModel.RefreshRequested += OnViewModelRefreshRequested;
             InitializeComponent();
+            TryDisableWindowCornerRounding();
+            ApplyThemeMode(_preferences.ThemeMode);
+            _paneOpenChangedToken = RootNavigationView.RegisterPropertyChangedCallback(
+                NavigationView.IsPaneOpenProperty,
+                OnNavigationPaneOpenChanged);
             _widgetWindowManager = new WidgetWindowManager();
             _widgetWindowManager.SettingsChanged += OnWidgetSettingsChanged;
             ViewModel.EventStatusUpdated += OnEventStatusUpdated;
@@ -39,6 +53,8 @@ namespace BO2
             Closed += OnClosed;
             RootNavigationView.SelectedItem = HomeNavigationItem;
             ShowHome();
+            RefreshPaneFooterVisibility();
+            RefreshThemeControls();
             RefreshWidgetControls();
             _widgetWindowManager.RestoreEnabledWidgets();
             QueueRefresh();
@@ -68,9 +84,70 @@ namespace BO2
             }
         }
 
+        private async void OnDisconnectButtonClick(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                await ViewModel.DisconnectAsync(_refreshCancellationTokenSource.Token);
+                QueueRefresh();
+            }
+            catch (OperationCanceledException) when (_refreshCancellationTokenSource.IsCancellationRequested)
+            {
+            }
+        }
+
+        private void OnSettingsPaneItemTapped(object sender, TappedRoutedEventArgs e)
+        {
+            PlaySettingsCogAnimation();
+            ShowSettings();
+        }
+
+        private void PlaySettingsCogAnimation()
+        {
+            _settingsCogStoryboard?.Stop();
+            SettingsPaneIconRotation.Angle = 0;
+
+            DoubleAnimation spinAnimation = new()
+            {
+                From = 0,
+                To = 360,
+                Duration = new Duration(TimeSpan.FromMilliseconds(260)),
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+
+            Storyboard.SetTarget(spinAnimation, SettingsPaneIconRotation);
+            Storyboard.SetTargetProperty(spinAnimation, "Angle");
+
+            _settingsCogStoryboard = new Storyboard();
+            _settingsCogStoryboard.Children.Add(spinAnimation);
+            _settingsCogStoryboard.Begin();
+        }
+
+        private void OnNavigationPaneOpenChanged(DependencyObject sender, DependencyProperty dp)
+        {
+            RefreshPaneFooterVisibility();
+        }
+
+        private void RefreshPaneFooterVisibility()
+        {
+            bool isPaneOpen = RootNavigationView.IsPaneOpen;
+            ConnectionPaneFooter.Visibility = isPaneOpen ? Visibility.Visible : Visibility.Collapsed;
+            PaneFooterHost.Padding = isPaneOpen
+                ? new Thickness(18, 0, 18, 16)
+                : new Thickness(6, 0, 6, 16);
+        }
+
         private void OnClosed(object sender, WindowEventArgs args)
         {
             Closed -= OnClosed;
+            if (_paneOpenChangedToken != 0)
+            {
+                RootNavigationView.UnregisterPropertyChangedCallback(
+                    NavigationView.IsPaneOpenProperty,
+                    _paneOpenChangedToken);
+                _paneOpenChangedToken = 0;
+            }
+
             _refreshTimer.Stop();
             _refreshTimer.Tick -= OnRefreshTimerTick;
             ViewModel.RefreshRequested -= OnViewModelRefreshRequested;
@@ -102,7 +179,16 @@ namespace BO2
                 return;
             }
 
-            ShowHome();
+            if (ReferenceEquals(sender.SelectedItem, HomeNavigationItem))
+            {
+                ShowHome();
+                return;
+            }
+
+            if (ReferenceEquals(sender.SelectedItem, SettingsNavigationItem))
+            {
+                ShowSettings();
+            }
         }
 
         private void ShowHome()
@@ -110,10 +196,20 @@ namespace BO2
             PageTitle.Text = AppStrings.Get("NavigationHome");
             HomeContent.Visibility = Visibility.Visible;
             SettingsContent.Visibility = Visibility.Collapsed;
+
+            if (!ReferenceEquals(RootNavigationView.SelectedItem, HomeNavigationItem))
+            {
+                RootNavigationView.SelectedItem = HomeNavigationItem;
+            }
         }
 
         private void ShowSettings()
         {
+            if (!ReferenceEquals(RootNavigationView.SelectedItem, SettingsNavigationItem))
+            {
+                RootNavigationView.SelectedItem = SettingsNavigationItem;
+            }
+
             PageTitle.Text = AppStrings.Get("NavigationSettings");
             HomeContent.Visibility = Visibility.Collapsed;
             SettingsContent.Visibility = Visibility.Visible;
@@ -137,6 +233,19 @@ namespace BO2
             }
 
             _widgetWindowManager.SetBoxTrackerEnabled(BoxTrackerWidgetCheckBox.IsChecked == true);
+        }
+
+        private void OnThemeModeSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isUpdatingThemeMode)
+            {
+                return;
+            }
+
+            ThemeMode themeMode = ReadSelectedThemeMode();
+            _preferences.ThemeMode = themeMode;
+            _preferencesStore.Save(_preferences);
+            ApplyThemeMode(themeMode);
         }
 
         private async void OnConfigureSelectedWidgetClick(object sender, RoutedEventArgs e)
@@ -176,19 +285,40 @@ namespace BO2
             content.Children.Add(alwaysOnTopCheckBox);
             content.Children.Add(centerAlignCheckBox);
 
+            ScrollViewer dialogContent = new()
+            {
+                Content = content,
+                IsTabStop = true,
+                Padding = new Thickness(0, 0, 20, 0),
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                HorizontalScrollMode = ScrollMode.Disabled
+            };
+
             ContentDialog dialog = new()
             {
                 Title = AppStrings.Get("BoxTrackerWidgetConfigTitle"),
-                Content = new ScrollViewer { Content = content },
+                Content = dialogContent,
                 PrimaryButtonText = AppStrings.Get("WidgetConfigSaveButton"),
                 CloseButtonText = AppStrings.Get("WidgetConfigCancelButton"),
-                DefaultButton = ContentDialogButton.Primary
+                DefaultButton = ContentDialogButton.Primary,
+                RequestedTheme = ResolveElementTheme(_preferences.ThemeMode)
             };
 
             if (Content is FrameworkElement rootElement)
             {
                 dialog.XamlRoot = rootElement.XamlRoot;
             }
+
+            dialog.Opened += (_, _) =>
+            {
+                _ = dialog.DispatcherQueue.TryEnqueue(
+                    Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                    () =>
+                    {
+                        _ = dialogContent.Focus(FocusState.Programmatic);
+                        dialogContent.IsTabStop = false;
+                    });
+            };
 
             ContentDialogResult result = await dialog.ShowAsync();
             if (result != ContentDialogResult.Primary)
@@ -217,6 +347,51 @@ namespace BO2
             {
                 _isUpdatingWidgetControls = false;
             }
+        }
+
+        private void RefreshThemeControls()
+        {
+            _isUpdatingThemeMode = true;
+            try
+            {
+                ThemeModeComboBox.SelectedIndex = _preferences.ThemeMode switch
+                {
+                    ThemeMode.Light => 1,
+                    ThemeMode.Dark => 2,
+                    _ => 0
+                };
+            }
+            finally
+            {
+                _isUpdatingThemeMode = false;
+            }
+        }
+
+        private ThemeMode ReadSelectedThemeMode()
+        {
+            if (ThemeModeComboBox.SelectedItem is ComboBoxItem item
+                && item.Tag is string tag
+                && Enum.TryParse(tag, out ThemeMode themeMode))
+            {
+                return themeMode;
+            }
+
+            return ThemeMode.System;
+        }
+
+        private void ApplyThemeMode(ThemeMode themeMode)
+        {
+            RootNavigationView.RequestedTheme = ResolveElementTheme(themeMode);
+        }
+
+        private static ElementTheme ResolveElementTheme(ThemeMode themeMode)
+        {
+            return themeMode switch
+            {
+                ThemeMode.Light => ElementTheme.Light,
+                ThemeMode.Dark => ElementTheme.Dark,
+                _ => ElementTheme.Default
+            };
         }
 
         private void QueueRefresh()
@@ -282,6 +457,29 @@ namespace BO2
             };
         }
 
+        private void TryDisableWindowCornerRounding()
+        {
+            if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
+            {
+                return;
+            }
+
+            try
+            {
+                nint hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+                int cornerPreference = DwmWindowCornerPreferenceDoNotRound;
+
+                _ = DwmSetWindowAttribute(
+                    hWnd,
+                    DwmWindowCornerPreferenceAttribute,
+                    ref cornerPreference,
+                    Marshal.SizeOf<int>());
+            }
+            catch (Exception)
+            {
+            }
+        }
+
         private static FrameworkElement CreateLabeledColorPicker(string label, ColorPicker colorPicker)
         {
             StackPanel panel = new()
@@ -291,7 +489,7 @@ namespace BO2
             panel.Children.Add(new TextBlock
             {
                 Text = label,
-                Foreground = new SolidColorBrush(Colors.Gray)
+                Style = (Style)Application.Current.Resources["BO2CaptionTextBlockStyle"]
             });
             panel.Children.Add(colorPicker);
             return panel;
@@ -306,5 +504,15 @@ namespace BO2
 
             return (int)Math.Round(numberBox.Value);
         }
+
+        private const uint DwmWindowCornerPreferenceAttribute = 33;
+        private const int DwmWindowCornerPreferenceDoNotRound = 1;
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmSetWindowAttribute(
+            nint hWnd,
+            uint dwAttribute,
+            ref int pvAttribute,
+            int cbAttribute);
     }
 }

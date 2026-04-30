@@ -92,6 +92,47 @@ namespace BO2.Services
             return DecodeSnapshot(snapshot, receivedAt);
         }
 
+        public void RequestStop(int? targetProcessId)
+        {
+            if (targetProcessId is int processId and > 0)
+            {
+                SignalStopEvent(processId);
+                ResetSharedMemory();
+            }
+            else
+            {
+                ResetSharedMemory(signalStop: true);
+            }
+
+            _targetProcessId = null;
+        }
+
+        public bool IsStopComplete(int targetProcessId)
+        {
+            if (targetProcessId <= 0)
+            {
+                return true;
+            }
+
+            try
+            {
+                using EventWaitHandle stopEventHandle = EventWaitHandle.OpenExisting(BuildStopEventHandleName(targetProcessId));
+                return false;
+            }
+            catch (WaitHandleCannotBeOpenedException)
+            {
+                return true;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
+
         public void Dispose()
         {
             ResetSharedMemory(signalStop: true);
@@ -323,6 +364,33 @@ namespace BO2.Services
             {
                 ResetSharedMemory();
                 return false;
+            }
+        }
+
+        private void SignalStopEvent(int targetProcessId)
+        {
+            try
+            {
+                if (_targetProcessId == targetProcessId && _stopEventHandle is not null)
+                {
+                    _stopEventHandle.Set();
+                    return;
+                }
+
+                using EventWaitHandle stopEventHandle = EventWaitHandle.OpenExisting(BuildStopEventHandleName(targetProcessId));
+                stopEventHandle.Set();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (WaitHandleCannotBeOpenedException)
+            {
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
             }
         }
 

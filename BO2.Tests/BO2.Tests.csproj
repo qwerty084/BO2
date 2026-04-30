@@ -26,6 +26,9 @@
        replaced by the test stub in Fakes/ so WinAppSDK ResourceLoader is never invoked. -->
   <ItemGroup>
     <Compile Include="..\Services\ConnectionState.cs"           Link="Services\ConnectionState.cs" />
+    <Compile Include="..\Services\AppPreferences.cs"            Link="Services\AppPreferences.cs" />
+    <Compile Include="..\Services\AppPreferencesStore.cs"       Link="Services\AppPreferencesStore.cs" />
+    <Compile Include="..\Services\ThemeMode.cs"                 Link="Services\ThemeMode.cs" />
     <Compile Include="..\Services\DetectedGame.cs"              Link="Services\DetectedGame.cs" />
     <Compile Include="..\Services\DllInjectionResult.cs"        Link="Services\DllInjectionResult.cs" />
     <Compile Include="..\Services\DllInjectionState.cs"         Link="Services\DllInjectionState.cs" />
