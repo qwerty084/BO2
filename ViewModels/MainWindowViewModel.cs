@@ -4,8 +4,6 @@ using Microsoft.UI.Xaml;
 using System;
 using System.ComponentModel;
 using System.Linq;
-using System.Management;
-using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,17 +17,13 @@ namespace BO2.ViewModels
         private static readonly TimeSpan MonitorDisconnectTimeout = TimeSpan.FromSeconds(3);
 
         private readonly DispatcherQueue _dispatcherQueue;
-        private readonly GameMemoryReader _memoryReader = new();
-        private readonly GameProcessDetectionService _processDetectionService = new();
-        private readonly IGameProcessDetector _pollingProcessDetector = new GameProcessDetector();
-        private readonly DllInjector _dllInjector = new();
-        private readonly IGameEventMonitor _eventMonitor = new GameEventMonitor();
+        private readonly GameSessionCoordinator _gameSession;
+        private readonly StatsRefreshService _statsRefreshService;
         private readonly SemaphoreSlim _operationSemaphore = new(1, 1);
         private DllInjectionResult _lastInjectionResult = DllInjectionResult.NotAttempted;
         private int? _lastInjectionProcessId;
         private DateTimeOffset? _lastInjectionAttemptedAt;
         private DetectedGame? _detectedGame;
-        private bool _usePollingProcessDetection;
         private bool _isConnecting;
         private bool _isDisconnecting;
         private int? _disconnectProcessId;
@@ -72,21 +66,23 @@ namespace BO2.ViewModels
         private GameEventMonitorStatus _latestEventStatus = GameEventMonitorStatus.WaitingForMonitor;
 
         public MainWindowViewModel(DispatcherQueue dispatcherQueue)
+            : this(dispatcherQueue, new GameSessionCoordinator())
         {
+        }
+
+        internal MainWindowViewModel(DispatcherQueue dispatcherQueue, GameSessionCoordinator gameSession)
+        {
+            ArgumentNullException.ThrowIfNull(dispatcherQueue);
+            ArgumentNullException.ThrowIfNull(gameSession);
+
             _dispatcherQueue = dispatcherQueue;
+            _gameSession = gameSession;
+            _statsRefreshService = new StatsRefreshService(_gameSession);
             _formatter = new StatFormatter(AppStrings.Get("UnavailableValue"));
-            _processDetectionService.DetectedGameChanged += OnDetectedGameChanged;
+            _gameSession.DetectedGameChanged += OnDetectedGameChanged;
 
-            try
-            {
-                _processDetectionService.Start();
-            }
-            catch (Exception ex) when (ex is ManagementException or UnauthorizedAccessException or COMException)
-            {
-                _usePollingProcessDetection = true;
-            }
-
-            _detectedGame = _processDetectionService.CurrentGame;
+            _gameSession.Start();
+            _detectedGame = _gameSession.CurrentGame;
             ApplyConnectionStatus(_detectedGame);
             UpdateConnectButtonState(_detectedGame);
         }
@@ -317,10 +313,10 @@ namespace BO2.ViewModels
             try
             {
                 DetectedGame? detectedGame = _detectedGame;
-                if (_usePollingProcessDetection)
+                if (_gameSession.UsesPollingProcessDetection)
                 {
                     detectedGame = await Task.Run(
-                        _pollingProcessDetector.Detect,
+                        _gameSession.DetectByPolling,
                         cancellationToken);
                     await RunOnDispatcherAsync(
                         () => ApplyPolledDetectedGame(detectedGame),
@@ -355,10 +351,19 @@ namespace BO2.ViewModels
                     DllInjectionResult injectionResult) = await Task.Run(
                     () =>
                     {
-                        PlayerStatsReadResult readResult = _memoryReader.ReadPlayerStats(detectedGame);
-                        GameEventMonitorStatus eventStatus = ReadEventMonitorStatus(readResult.DetectedGame);
-                        ApplyMonitorReadinessTimeout(readResult.DetectedGame, eventStatus, DateTimeOffset.UtcNow);
-                        return (readResult, eventStatus, _lastInjectionResult);
+                        DateTimeOffset receivedAt = DateTimeOffset.UtcNow;
+                        int? ownedMonitorProcessId = IsMonitorConnectedFor(detectedGame)
+                            ? detectedGame?.ProcessId
+                            : null;
+                        StatsRefreshSnapshot snapshot = _statsRefreshService.Read(
+                            detectedGame,
+                            receivedAt,
+                            ownedMonitorProcessId);
+                        ApplyMonitorReadinessTimeout(
+                            snapshot.ReadResult.DetectedGame,
+                            snapshot.EventStatus,
+                            receivedAt);
+                        return (snapshot.ReadResult, snapshot.EventStatus, _lastInjectionResult);
                     },
                     cancellationToken);
                 await RunOnDispatcherAsync(
@@ -414,7 +419,7 @@ namespace BO2.ViewModels
                     cancellationToken);
 
                 DllInjectionResult injectionResult = await Task.Run(
-                    () => _dllInjector.Inject(detectedGame),
+                    () => _gameSession.Inject(detectedGame),
                     cancellationToken);
                 if (!Equals(_detectedGame, detectedGame))
                 {
@@ -435,7 +440,7 @@ namespace BO2.ViewModels
                 if (IsMonitorLoadedInjectionState(injectionResult.State))
                 {
                     attemptedAt = DateTimeOffset.UtcNow;
-                    eventStatus = _eventMonitor.ReadStatus(DateTimeOffset.UtcNow, detectedGame.ProcessId);
+                    eventStatus = _gameSession.ReadEventMonitorStatus(DateTimeOffset.UtcNow, detectedGame.ProcessId);
                 }
 
                 _lastInjectionProcessId = detectedGame.ProcessId;
@@ -499,7 +504,7 @@ namespace BO2.ViewModels
                 _isDisconnecting = true;
                 _disconnectProcessId = monitorProcessId;
                 _disconnectRequestedAt = DateTimeOffset.UtcNow;
-                _eventMonitor.RequestStop(monitorProcessId);
+                _gameSession.RequestMonitorStop(monitorProcessId);
                 await RunOnDispatcherAsync(
                     () => ApplyDisconnectingState(detectedGame),
                     cancellationToken);
@@ -518,10 +523,8 @@ namespace BO2.ViewModels
         public void Dispose()
         {
             _disposed = true;
-            _processDetectionService.DetectedGameChanged -= OnDetectedGameChanged;
-            _processDetectionService.Dispose();
-            _eventMonitor.Dispose();
-            _memoryReader.Dispose();
+            _gameSession.DetectedGameChanged -= OnDetectedGameChanged;
+            _gameSession.Dispose();
             _operationSemaphore.Dispose();
         }
 
@@ -764,16 +767,6 @@ namespace BO2.ViewModels
             return AppStrings.Format("CurrentRoundFormat", sessionEvent.LevelTime, sessionEvent.EventName);
         }
 
-        private GameEventMonitorStatus ReadEventMonitorStatus(DetectedGame? detectedGame)
-        {
-            if (!IsMonitorConnectedFor(detectedGame))
-            {
-                return GameEventMonitorStatus.WaitingForMonitor;
-            }
-
-            return _eventMonitor.ReadStatus(DateTimeOffset.UtcNow, detectedGame?.ProcessId);
-        }
-
         private bool IsMonitorDisconnectComplete(DateTimeOffset now)
         {
             if (!_isDisconnecting)
@@ -786,7 +779,7 @@ namespace BO2.ViewModels
                 return true;
             }
 
-            if (_eventMonitor.IsStopComplete(processId))
+            if (_gameSession.IsMonitorStopComplete(processId))
             {
                 return true;
             }
@@ -832,7 +825,7 @@ namespace BO2.ViewModels
                 return;
             }
 
-            _eventMonitor.RequestStop(_lastInjectionProcessId);
+            _gameSession.RequestMonitorStop(_lastInjectionProcessId);
             _lastInjectionResult = new DllInjectionResult(
                 DllInjectionState.Failed,
                 AppStrings.Get("DllInjectionReadinessTimedOut"));
@@ -1032,7 +1025,7 @@ namespace BO2.ViewModels
             _lastInjectionResult = DllInjectionResult.NotAttempted;
             if (requestStop)
             {
-                _eventMonitor.RequestStop(monitorProcessId);
+                _gameSession.RequestMonitorStop(monitorProcessId);
             }
         }
 

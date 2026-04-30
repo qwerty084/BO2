@@ -501,6 +501,15 @@
   <data name="WidgetsSettingsDescription.Text" xml:space="preserve">
     <value>Enable separate widget windows for capture tools.</value>
   </data>
+  <data name="WidgetSettingsRecoveryTitle" xml:space="preserve">
+    <value>Widget settings reset</value>
+  </data>
+  <data name="WidgetSettingsRecoveryMessageFormat" xml:space="preserve">
+    <value>The saved widget settings could not be loaded. A backup was saved to {0}, and defaults were restored.</value>
+  </data>
+  <data name="WidgetSettingsRecoveryNoBackupMessage" xml:space="preserve">
+    <value>The saved widget settings could not be loaded, and defaults were restored. The original file could not be backed up.</value>
+  </data>
   <data name="BoxTrackerWidgetCheckBox.Content" xml:space="preserve">
     <value>Box Tracker</value>
   </data>

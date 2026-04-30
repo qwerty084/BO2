@@ -39,6 +39,7 @@
     <Compile Include="..\Services\ProcessLifecycleEventArgs.cs" Link="Services\ProcessLifecycleEventArgs.cs" />
     <Compile Include="..\Services\GameProcessDefinition.cs"     Link="Services\GameProcessDefinition.cs" />
     <Compile Include="..\Services\GameProcessDetectionService.cs" Link="Services\GameProcessDetectionService.cs" />
+    <Compile Include="..\Services\GameSessionCoordinator.cs"    Link="Services\GameSessionCoordinator.cs" />
     <Compile Include="..\Services\GameVariant.cs"               Link="Services\GameVariant.cs" />
     <Compile Include="..\Services\GameCompatibilityState.cs"    Link="Services\GameCompatibilityState.cs" />
     <Compile Include="..\Services\GameEvent.cs"                 Link="Services\GameEvent.cs" />
@@ -53,6 +54,7 @@
     <Compile Include="..\Services\WidgetSettingsDocument.cs"    Link="Services\WidgetSettingsDocument.cs" />
     <Compile Include="..\Services\WidgetSettingsStore.cs"       Link="Services\WidgetSettingsStore.cs" />
     <Compile Include="..\Services\IGameEventMonitor.cs"         Link="Services\IGameEventMonitor.cs" />
+    <Compile Include="..\Services\RefreshDiagnostics.cs"        Link="Services\RefreshDiagnostics.cs" />
     <Compile Include="..\Services\IProcessInfoProvider.cs"      Link="Services\IProcessInfoProvider.cs" />
     <Compile Include="..\Services\IProcessMemoryAccessor.cs"    Link="Services\IProcessMemoryAccessor.cs" />
     <Compile Include="..\Services\GameMemoryReader.cs"          Link="Services\GameMemoryReader.cs" />
@@ -63,6 +65,7 @@
     <Compile Include="..\Services\PlayerStatAddressMap.cs"      Link="Services\PlayerStatAddressMap.cs" />
     <Compile Include="..\Services\PlayerStats.cs"               Link="Services\PlayerStats.cs" />
     <Compile Include="..\Services\PlayerStatsReadResult.cs"     Link="Services\PlayerStatsReadResult.cs" />
+    <Compile Include="..\Services\StatsRefreshService.cs"       Link="Services\StatsRefreshService.cs" />
     <Compile Include="..\Services\StatFormatter.cs"             Link="Services\StatFormatter.cs" />
   </ItemGroup>
 

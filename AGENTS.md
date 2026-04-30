@@ -32,5 +32,5 @@
 - Preserve `_window` field pattern in `App.xaml.cs`; app keeps window reference at application level, not transient local during launch.
 - Add shared styles, brushes, app-wide resources in `App.xaml`, not directly in `MainWindow.xaml`.
 - Packaging assets: keep manifest asset basenames stable. `Package.appxmanifest` references `Assets\Square150x150Logo.png`; physical files in `Assets\` use scale-qualified filenames such as `.scale-200.png`.
-- Be careful with manifest capabilities and packaging settings. App declares both `runFullTrust` and `systemAIModels`.
+- Be careful with manifest capabilities and packaging settings. App declares the restricted `runFullTrust` capability for desktop process access.
 - If change depends on output architecture or native/runtime packaging behavior, specify `Platform=x86`; the app only supports 32-bit Windows builds.

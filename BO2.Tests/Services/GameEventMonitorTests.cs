@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.IO.MemoryMappedFiles;
 using System.Text;
 using System.Threading;
 using BO2.Services;
@@ -239,6 +240,60 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void ReadStatus_WhenReadinessSignalIsMissing_ReturnsWaitingForMonitor()
+        {
+            int processId = NextMonitorTestProcessId();
+            using EventWaitHandle eventHandle = new(false, EventResetMode.ManualReset, GameEventMonitor.BuildEventHandleName(processId));
+            using EventWaitHandle stopEvent = new(false, EventResetMode.ManualReset, GameEventMonitor.BuildStopEventHandleName(processId));
+            using MemoryMappedFile sharedMemory = MemoryMappedFile.CreateNew(
+                GameEventMonitor.BuildSharedMemoryName(processId),
+                GameEventMonitor.SharedMemorySize);
+            byte[] snapshot = CreateSnapshot(
+                GameCompatibilityState.Compatible,
+                droppedEventCount: 0,
+                droppedNotifyCount: 0,
+                publishedNotifyCount: 1,
+                eventCount: 1);
+            WriteEvent(snapshot, 0, GameEventType.BoxEvent, 12, "randomization_done", weaponName: "ray_gun_zm");
+            WriteSnapshotToSharedMemory(sharedMemory, snapshot);
+            using var monitor = new GameEventMonitor();
+
+            GameEventMonitorStatus status = monitor.ReadStatus(DateTimeOffset.UtcNow, processId);
+
+            Assert.Equal(GameCompatibilityState.WaitingForMonitor, status.CompatibilityState);
+            Assert.Empty(status.RecentEvents);
+        }
+
+        [Fact]
+        public void ReadStatus_WhenReadinessSignalIsObserved_DecodesSnapshot()
+        {
+            int processId = NextMonitorTestProcessId();
+            using EventWaitHandle eventHandle = new(false, EventResetMode.ManualReset, GameEventMonitor.BuildEventHandleName(processId));
+            using EventWaitHandle stopEvent = new(false, EventResetMode.ManualReset, GameEventMonitor.BuildStopEventHandleName(processId));
+            using MemoryMappedFile sharedMemory = MemoryMappedFile.CreateNew(
+                GameEventMonitor.BuildSharedMemoryName(processId),
+                GameEventMonitor.SharedMemorySize);
+            byte[] snapshot = CreateSnapshot(
+                GameCompatibilityState.Compatible,
+                droppedEventCount: 0,
+                droppedNotifyCount: 0,
+                publishedNotifyCount: 1,
+                eventCount: 1);
+            WriteEvent(snapshot, 0, GameEventType.BoxEvent, 12, "randomization_done", weaponName: "ray_gun_zm");
+            WriteSnapshotToSharedMemory(sharedMemory, snapshot);
+            eventHandle.Set();
+            using var monitor = new GameEventMonitor();
+
+            GameEventMonitorStatus status = monitor.ReadStatus(DateTimeOffset.UtcNow, processId);
+
+            Assert.Equal(GameCompatibilityState.Compatible, status.CompatibilityState);
+            GameEvent gameEvent = Assert.Single(status.RecentEvents);
+            Assert.Equal(GameEventType.BoxEvent, gameEvent.EventType);
+            Assert.Equal("randomization_done", gameEvent.EventName);
+            Assert.Equal("ray_gun_zm", gameEvent.WeaponName);
+        }
+
+        [Fact]
         public void DecodeSnapshot_UsesNativeTickForStableEventTimestamp()
         {
             byte[] snapshot = CreateSnapshot(
@@ -302,6 +357,15 @@ namespace BO2.Tests.Services
                 weaponNameBytes.AsSpan(0, Math.Min(weaponNameBytes.Length, GameEventMonitor.MaxWeaponNameBytes))
                     .CopyTo(snapshot.AsSpan(offset + GameEventMonitor.WeaponNameOffset, GameEventMonitor.MaxWeaponNameBytes));
             }
+        }
+
+        private static void WriteSnapshotToSharedMemory(MemoryMappedFile sharedMemory, byte[] snapshot)
+        {
+            using MemoryMappedViewAccessor accessor = sharedMemory.CreateViewAccessor(
+                0,
+                GameEventMonitor.SharedMemorySize,
+                MemoryMappedFileAccess.Write);
+            accessor.WriteArray(0, snapshot, 0, snapshot.Length);
         }
 
         private static int NextMonitorTestProcessId()
