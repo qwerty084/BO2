@@ -355,61 +355,26 @@ namespace BO2.ViewModels
             await _operationSemaphore.WaitAsync(cancellationToken);
             try
             {
-                DetectedGame? detectedGame = _detectedGame;
-                if (detectedGame is null || !_connectionSession.CanAttemptConnect(detectedGame))
+                GameConnectionRefreshResult connectingSnapshot = await Task.Run(
+                    _connectionSession.BeginConnect,
+                    cancellationToken);
+                await RunOnDispatcherAsync(
+                    () => ApplyRefreshSnapshot(connectingSnapshot),
+                    cancellationToken);
+
+                if (!connectingSnapshot.IsConnecting)
                 {
-                    await RunOnDispatcherAsync(
-                        () =>
-                        {
-                            ApplyConnectionStatus(detectedGame);
-                            UpdateConnectButtonState(detectedGame);
-                        },
-                        cancellationToken);
                     return;
                 }
-
-                _connectionSession.BeginConnect();
-                await RunOnDispatcherAsync(
-                    () =>
-                    {
-                        ApplyConnectionStatus(detectedGame);
-                        InjectionStatusText = AppStrings.Get("DllInjectionConnecting");
-                        EventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForConnect");
-                        UpdateConnectButtonState(detectedGame);
-                    },
-                    cancellationToken);
 
                 DllInjectionResult injectionResult = await Task.Run(
-                    () => _connectionSession.Inject(detectedGame),
+                    _connectionSession.Inject,
                     cancellationToken);
-                if (!Equals(_detectedGame, detectedGame))
-                {
-                    _connectionSession.CancelConnect();
-                    await RunOnDispatcherAsync(
-                        () =>
-                        {
-                            ApplyConnectionStatus(_detectedGame);
-                            ApplyEventMonitorStatus(_detectedGame, _connectionSession.LastInjectionResult, GameEventMonitorStatus.WaitingForMonitor);
-                            UpdateConnectButtonState(_detectedGame);
-                        },
-                        cancellationToken);
-                    return;
-                }
-
-                GameConnectionConnectResult connectResult = await Task.Run(
-                    () => _connectionSession.CompleteConnect(detectedGame, injectionResult),
+                GameConnectionRefreshResult connectedSnapshot = await Task.Run(
+                    () => _connectionSession.CompleteConnect(injectionResult),
                     cancellationToken);
-
                 await RunOnDispatcherAsync(
-                    () =>
-                    {
-                        ApplyConnectionStatus(detectedGame);
-                        ApplyEventMonitorStatus(
-                            detectedGame,
-                            connectResult.InjectionResult,
-                            connectResult.EventStatus);
-                        UpdateConnectButtonState(detectedGame);
-                    },
+                    () => ApplyRefreshSnapshot(connectedSnapshot),
                     cancellationToken);
             }
             catch (InvalidOperationException ex) when (!cancellationToken.IsCancellationRequested)

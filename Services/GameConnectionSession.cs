@@ -14,6 +14,7 @@ namespace BO2.Services
         private DllInjectionResult _lastInjectionResult = DllInjectionResult.NotAttempted;
         private int? _lastInjectionProcessId;
         private DateTimeOffset? _lastInjectionAttemptedAt;
+        private DetectedGame? _connectTargetGame;
         private int? _disconnectProcessId;
         private DateTimeOffset? _disconnectRequestedAt;
 
@@ -72,17 +73,7 @@ namespace BO2.Services
             {
                 DateTimeOffset receivedAt = _timeProvider.GetUtcNow();
                 DetectedGame? detectedGame = RefreshCurrentGame();
-                int? ownedMonitorProcessId = IsMonitorConnectedFor(detectedGame)
-                    ? detectedGame?.ProcessId
-                    : null;
-                PlayerStatsReadResult readResult = _gameSession.ReadPlayerStats(detectedGame);
-                GameEventMonitorStatus eventStatus = ownedMonitorProcessId is int processId
-                    && readResult.DetectedGame?.ProcessId == processId
-                    ? _gameSession.ReadEventMonitorStatus(receivedAt, processId)
-                    : GameEventMonitorStatus.WaitingForMonitor;
-
-                ApplyMonitorReadinessTimeout(readResult.DetectedGame, eventStatus, receivedAt);
-                return CreateRefreshResult(detectedGame, readResult, eventStatus);
+                return ReadSnapshot(detectedGame, receivedAt);
             }
             finally
             {
@@ -114,13 +105,28 @@ namespace BO2.Services
                 && IsMonitorLoadedInjectionState(_lastInjectionResult.State);
         }
 
-        public void BeginConnect()
+        public GameConnectionRefreshResult BeginConnect()
         {
+            DetectedGame? detectedGame = RefreshCurrentGame();
+            if (IsConnecting)
+            {
+                return CreateStatusSnapshot(detectedGame);
+            }
+
+            if (!CanAttemptConnect(detectedGame))
+            {
+                _connectTargetGame = null;
+                return CreateStatusSnapshot(detectedGame);
+            }
+
+            _connectTargetGame = detectedGame;
             IsConnecting = true;
+            return CreateStatusSnapshot(detectedGame);
         }
 
         public void CancelConnect()
         {
+            _connectTargetGame = null;
             IsConnecting = false;
         }
 
@@ -128,33 +134,43 @@ namespace BO2.Services
         {
             IsConnecting = false;
             IsDisconnecting = false;
+            _connectTargetGame = null;
             _disconnectProcessId = null;
             _disconnectRequestedAt = null;
         }
 
-        public DllInjectionResult Inject(DetectedGame detectedGame)
+        public DllInjectionResult Inject()
         {
-            return _gameSession.Inject(detectedGame);
-        }
-
-        public GameConnectionConnectResult CompleteConnect(
-            DetectedGame detectedGame,
-            DllInjectionResult injectionResult)
-        {
-            GameEventMonitorStatus eventStatus = GameEventMonitorStatus.WaitingForMonitor;
-            DateTimeOffset? attemptedAt = null;
-            if (IsMonitorLoadedInjectionState(injectionResult.State))
+            DetectedGame? connectTargetGame = _connectTargetGame;
+            DetectedGame? detectedGame = RefreshCurrentGame();
+            if (!IsConnecting || connectTargetGame is null || !Equals(detectedGame, connectTargetGame))
             {
-                attemptedAt = _timeProvider.GetUtcNow();
-                eventStatus = _gameSession.ReadEventMonitorStatus(attemptedAt.Value, detectedGame.ProcessId);
+                return DllInjectionResult.NotAttempted;
             }
 
-            _lastInjectionProcessId = detectedGame.ProcessId;
-            _lastInjectionResult = injectionResult;
-            _lastInjectionAttemptedAt = attemptedAt;
+            return _gameSession.Inject(connectTargetGame);
+        }
+
+        public GameConnectionRefreshResult CompleteConnect(DllInjectionResult injectionResult)
+        {
+            ArgumentNullException.ThrowIfNull(injectionResult);
+
+            DateTimeOffset receivedAt = _timeProvider.GetUtcNow();
+            DetectedGame? connectTargetGame = _connectTargetGame;
+            DetectedGame? detectedGame = RefreshCurrentGame();
+            if (IsConnecting && connectTargetGame is not null && Equals(detectedGame, connectTargetGame))
+            {
+                _lastInjectionProcessId = connectTargetGame.ProcessId;
+                _lastInjectionResult = injectionResult;
+                _lastInjectionAttemptedAt = IsMonitorLoadedInjectionState(injectionResult.State)
+                    ? receivedAt
+                    : null;
+            }
+
+            _connectTargetGame = null;
             IsConnecting = false;
 
-            return new GameConnectionConnectResult(injectionResult, eventStatus);
+            return ReadSnapshot(detectedGame, receivedAt);
         }
 
         public bool TryBeginDisconnect()
@@ -209,6 +225,7 @@ namespace BO2.Services
             int? monitorProcessId = _lastInjectionProcessId;
             IsConnecting = false;
             IsDisconnecting = false;
+            _connectTargetGame = null;
             _disconnectProcessId = null;
             _disconnectRequestedAt = null;
             _lastInjectionProcessId = null;
@@ -268,6 +285,58 @@ namespace BO2.Services
             return CurrentGame;
         }
 
+        private GameConnectionRefreshResult ReadSnapshot(
+            DetectedGame? detectedGame,
+            DateTimeOffset receivedAt)
+        {
+            int? ownedMonitorProcessId = IsMonitorConnectedFor(detectedGame)
+                ? detectedGame?.ProcessId
+                : null;
+            PlayerStatsReadResult readResult = _gameSession.ReadPlayerStats(detectedGame);
+            GameEventMonitorStatus eventStatus = ownedMonitorProcessId is int processId
+                && readResult.DetectedGame?.ProcessId == processId
+                ? _gameSession.ReadEventMonitorStatus(receivedAt, processId)
+                : GameEventMonitorStatus.WaitingForMonitor;
+
+            ApplyMonitorReadinessTimeout(readResult.DetectedGame, eventStatus, receivedAt);
+            return CreateRefreshResult(detectedGame, readResult, eventStatus);
+        }
+
+        private GameConnectionRefreshResult CreateStatusSnapshot(DetectedGame? detectedGame)
+        {
+            return CreateRefreshResult(
+                detectedGame,
+                CreateStatusReadResult(detectedGame),
+                GameEventMonitorStatus.WaitingForMonitor);
+        }
+
+        private static PlayerStatsReadResult CreateStatusReadResult(DetectedGame? detectedGame)
+        {
+            if (detectedGame is null)
+            {
+                return PlayerStatsReadResult.GameNotRunning;
+            }
+
+            if (detectedGame.AddressMap is null)
+            {
+                string statusText = string.IsNullOrWhiteSpace(detectedGame.UnsupportedReason)
+                    ? AppStrings.Format("UnsupportedStatusFormat", detectedGame.DisplayName)
+                    : AppStrings.Format("UnsupportedStatusWithReasonFormat", detectedGame.DisplayName, detectedGame.UnsupportedReason);
+
+                return new PlayerStatsReadResult(
+                    detectedGame,
+                    null,
+                    statusText,
+                    ConnectionState.Unsupported);
+            }
+
+            return new PlayerStatsReadResult(
+                detectedGame,
+                null,
+                AppStrings.Format("GameDetectedConnectPromptFormat", detectedGame.DisplayName),
+                ConnectionState.Detected);
+        }
+
         private void ApplyDetectedGame(DetectedGame? detectedGame, bool notify)
         {
             EventHandler<DetectedGameChangedEventArgs>? handler;
@@ -306,10 +375,6 @@ namespace BO2.Services
                 IsMonitorConnectedFor(detectedGame));
         }
     }
-
-    internal readonly record struct GameConnectionConnectResult(
-        DllInjectionResult InjectionResult,
-        GameEventMonitorStatus EventStatus);
 
     internal readonly record struct GameConnectionRefreshResult(
         DetectedGame? CurrentGame,

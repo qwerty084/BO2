@@ -113,6 +113,118 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void Connect_WhenCurrentGameSupported_InjectsCurrentGameAndRecordsMonitorOwnership()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            int? injectedProcessId = null;
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            DllInjector dllInjector = CreateDllInjector(
+                fileExists: _ => true,
+                injectLibrary: (processId, _) => injectedProcessId = processId);
+            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, dllInjector: dllInjector);
+
+            GameConnectionRefreshResult connectingSnapshot = session.BeginConnect();
+            DllInjectionResult injectionResult = session.Inject();
+            GameConnectionRefreshResult connectedSnapshot = session.CompleteConnect(injectionResult);
+
+            Assert.True(connectingSnapshot.IsConnecting);
+            Assert.False(connectingSnapshot.CanAttemptConnect);
+            Assert.Equal(DllInjectionState.Loaded, injectionResult.State);
+            Assert.Equal(1001, injectedProcessId);
+            Assert.False(connectedSnapshot.IsConnecting);
+            Assert.Same(detectedGame, connectedSnapshot.CurrentGame);
+            Assert.Equal(DllInjectionState.Loaded, connectedSnapshot.InjectionResult.State);
+            Assert.True(connectedSnapshot.IsMonitorConnectedForCurrentGame);
+            Assert.True(session.IsMonitorConnectedFor(detectedGame));
+            Assert.Equal(1, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(1001, eventMonitor.LastTargetProcessId);
+        }
+
+        [Fact]
+        public void Connect_WhenCurrentGameUnsupported_DoesNotAttemptInjection()
+        {
+            DetectedGame detectedGame = CreateUnsupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame);
+
+            GameConnectionRefreshResult connectingSnapshot = session.BeginConnect();
+            DllInjectionResult injectionResult = session.Inject();
+
+            Assert.False(connectingSnapshot.IsConnecting);
+            Assert.False(session.IsConnecting);
+            Assert.Equal(DllInjectionState.NotAttempted, injectionResult.State);
+            Assert.Equal(DllInjectionState.NotAttempted, connectingSnapshot.InjectionResult.State);
+            Assert.False(connectingSnapshot.CanAttemptConnect);
+            Assert.False(connectingSnapshot.IsMonitorConnectedForCurrentGame);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+        }
+
+        [Fact]
+        public void Connect_WhenNoCurrentGame_DoesNotAttemptInjection()
+        {
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            GameConnectionSession session = CreateStartedSession(eventMonitor);
+
+            GameConnectionRefreshResult connectingSnapshot = session.BeginConnect();
+            DllInjectionResult injectionResult = session.Inject();
+
+            Assert.False(connectingSnapshot.IsConnecting);
+            Assert.False(session.IsConnecting);
+            Assert.Null(connectingSnapshot.CurrentGame);
+            Assert.Equal(DllInjectionState.NotAttempted, injectionResult.State);
+            Assert.False(connectingSnapshot.CanAttemptConnect);
+            Assert.False(connectingSnapshot.IsMonitorConnectedForCurrentGame);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+        }
+
+        [Fact]
+        public void Connect_WhenCurrentGameChangesDuringInjection_DoesNotRecordStaleMonitorOwnership()
+        {
+            DetectedGame originalGame = CreateSupportedGame(processId: 1001);
+            DetectedGame changedGame = CreateSupportedGame(processId: 2002);
+            int? injectedProcessId = null;
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            SessionContext? context = null;
+            DllInjector dllInjector = CreateDllInjector(
+                fileExists: _ => true,
+                injectLibrary: (processId, _) =>
+                {
+                    injectedProcessId = processId;
+                    context!.EventDetector.Result = changedGame;
+                    context.LifecycleEventSource.RaiseStarted(changedGame.ProcessName, changedGame.ProcessId);
+                });
+            context = CreateSessionContext(eventMonitor, detectedGame: originalGame, dllInjector: dllInjector);
+            context.Session.Start();
+
+            GameConnectionRefreshResult connectingSnapshot = context.Session.BeginConnect();
+            DllInjectionResult injectionResult = context.Session.Inject();
+            GameConnectionRefreshResult connectedSnapshot = context.Session.CompleteConnect(injectionResult);
+
+            Assert.True(connectingSnapshot.IsConnecting);
+            Assert.Equal(DllInjectionState.Loaded, injectionResult.State);
+            Assert.Equal(1001, injectedProcessId);
+            Assert.Same(changedGame, connectedSnapshot.CurrentGame);
+            Assert.Equal(DllInjectionState.NotAttempted, connectedSnapshot.InjectionResult.State);
+            Assert.False(connectedSnapshot.HasInjectionAttemptForCurrentGame);
+            Assert.False(connectedSnapshot.IsMonitorConnectedForCurrentGame);
+            Assert.False(context.Session.IsMonitorConnectedFor(originalGame));
+            Assert.False(context.Session.IsMonitorConnectedFor(changedGame));
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+        }
+
+        [Fact]
         public void Read_WhenMonitorIsConnectedForCurrentGame_ReadsEventMonitor()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
@@ -123,7 +235,7 @@ namespace BO2.Tests.Services
             };
             var timeProvider = new FakeTimeProvider();
             GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, timeProvider);
-            session.CompleteConnect(detectedGame, CreateLoadedInjectionResult());
+            CompleteConnectWithLoadedMonitor(session);
 
             GameConnectionRefreshResult snapshot = session.Read();
 
@@ -145,7 +257,7 @@ namespace BO2.Tests.Services
             };
             SessionContext context = CreateSessionContext(eventMonitor, detectedGame: connectedGame);
             context.Session.Start();
-            context.Session.CompleteConnect(connectedGame, CreateLoadedInjectionResult());
+            CompleteConnectWithLoadedMonitor(context.Session);
             eventMonitor.ResetCalls();
             context.EventDetector.Result = detectedGame;
             context.LifecycleEventSource.RaiseStarted(detectedGame.ProcessName, detectedGame.ProcessId);
@@ -172,7 +284,7 @@ namespace BO2.Tests.Services
             };
             var timeProvider = new FakeTimeProvider();
             GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, timeProvider);
-            session.CompleteConnect(detectedGame, CreateLoadedInjectionResult());
+            CompleteConnectWithLoadedMonitor(session);
             eventMonitor.ResetCalls();
 
             timeProvider.Advance(TimeSpan.FromSeconds(16));
@@ -193,7 +305,7 @@ namespace BO2.Tests.Services
                 Status = CreateCompatibleStatus()
             };
             GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame);
-            session.CompleteConnect(detectedGame, CreateLoadedInjectionResult());
+            CompleteConnectWithLoadedMonitor(session);
             eventMonitor.ResetCalls();
 
             bool beganDisconnect = session.TryBeginDisconnect();
@@ -214,8 +326,8 @@ namespace BO2.Tests.Services
                 Status = compatibleStatus
             };
             GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame);
-            session.CompleteConnect(detectedGame, CreateLoadedInjectionResult());
-            session.BeginConnect();
+            CompleteConnectWithLoadedMonitor(session);
+            session.TryBeginDisconnect();
             eventMonitor.ResetCalls();
 
             session.ClearTransientOperationState();
@@ -241,7 +353,7 @@ namespace BO2.Tests.Services
             };
             var timeProvider = new FakeTimeProvider();
             GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, timeProvider);
-            session.CompleteConnect(detectedGame, CreateLoadedInjectionResult());
+            CompleteConnectWithLoadedMonitor(session);
             session.TryBeginDisconnect();
 
             Assert.False(session.IsMonitorDisconnectComplete());
@@ -258,7 +370,7 @@ namespace BO2.Tests.Services
             };
             var timeProvider = new FakeTimeProvider();
             GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, timeProvider);
-            session.CompleteConnect(detectedGame, CreateLoadedInjectionResult());
+            CompleteConnectWithLoadedMonitor(session);
             session.TryBeginDisconnect();
 
             timeProvider.Advance(TimeSpan.FromSeconds(3));
@@ -270,13 +382,15 @@ namespace BO2.Tests.Services
             FakeGameEventMonitor eventMonitor,
             DetectedGame? detectedGame = null,
             TimeProvider? timeProvider = null,
-            FakeProcessMemoryAccessor? memoryAccessor = null)
+            FakeProcessMemoryAccessor? memoryAccessor = null,
+            DllInjector? dllInjector = null)
         {
             SessionContext context = CreateSessionContext(
                 eventMonitor,
                 timeProvider,
                 detectedGame,
-                memoryAccessor: memoryAccessor);
+                memoryAccessor: memoryAccessor,
+                dllInjector: dllInjector);
             context.Session.Start();
             return context.Session;
         }
@@ -287,7 +401,8 @@ namespace BO2.Tests.Services
             DetectedGame? detectedGame = null,
             DetectedGame? pollingDetectedGame = null,
             FakeProcessMemoryAccessor? memoryAccessor = null,
-            FakeProcessLifecycleEventSource? lifecycleEventSource = null)
+            FakeProcessLifecycleEventSource? lifecycleEventSource = null,
+            DllInjector? dllInjector = null)
         {
             FakeGameProcessDetector eventDetector = new()
             {
@@ -304,7 +419,7 @@ namespace BO2.Tests.Services
                 new GameMemoryReader(memoryAccessor),
                 new GameProcessDetectionService(eventDetector, lifecycleEventSource),
                 pollingProcessDetector,
-                CreateDllInjector(),
+                dllInjector ?? CreateDllInjector(),
                 eventMonitor);
             GameConnectionSession session = new(coordinator, timeProvider ?? TimeProvider.System);
             return new SessionContext(
@@ -336,16 +451,25 @@ namespace BO2.Tests.Services
                 "Unsupported variant");
         }
 
-        private static DllInjector CreateDllInjector()
+        private static DllInjector CreateDllInjector(
+            Func<string, bool>? fileExists = null,
+            Action<int, string>? injectLibrary = null)
         {
             return new DllInjector(
                 () => false,
                 () => string.Empty,
-                _ => false,
+                fileExists ?? (_ => false),
                 _ => DllInjector.DllPayloadValidationResult.Valid,
                 _ => false,
-                (_, _) => { },
+                injectLibrary ?? ((_, _) => { }),
                 (_, _) => { });
+        }
+
+        private static GameConnectionRefreshResult CompleteConnectWithLoadedMonitor(GameConnectionSession session)
+        {
+            GameConnectionRefreshResult connectingSnapshot = session.BeginConnect();
+            Assert.True(connectingSnapshot.IsConnecting);
+            return session.CompleteConnect(CreateLoadedInjectionResult());
         }
 
         private static DllInjectionResult CreateLoadedInjectionResult()
