@@ -34,3 +34,17 @@
 - Packaging assets: keep manifest asset basenames stable. `Package.appxmanifest` references `Assets\Square150x150Logo.png`; physical files in `Assets\` use scale-qualified filenames such as `.scale-200.png`.
 - Be careful with manifest capabilities and packaging settings. App declares the restricted `runFullTrust` capability for desktop process access.
 - If change depends on output architecture or native/runtime packaging behavior, specify `Platform=x86`; the app only supports 32-bit Windows builds.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs are tracked as local markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+This repo uses the default five-label triage vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This repo uses a single-context domain docs layout. See `docs/agents/domain.md`.
