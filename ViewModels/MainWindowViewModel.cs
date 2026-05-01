@@ -327,15 +327,39 @@ namespace BO2.ViewModels
             await _operationSemaphore.WaitAsync(cancellationToken);
             try
             {
-                GameConnectionRefreshResult connectedSnapshot = await Task.Run(
-                    () => _connectionSession.Connect(connectingSnapshot =>
-                        RunOnDispatcherAsync(
-                            () => ApplyRefreshSnapshot(connectingSnapshot),
-                            cancellationToken).GetAwaiter().GetResult()),
-                    cancellationToken);
-                await RunOnDispatcherAsync(
-                    () => ApplyRefreshSnapshot(connectedSnapshot),
-                    cancellationToken);
+                bool connectPending = false;
+                try
+                {
+                    GameConnectionRefreshResult connectingSnapshot = await Task.Run(
+                        _connectionSession.BeginConnect,
+                        cancellationToken);
+                    connectPending = connectingSnapshot.IsConnecting;
+                    await RunOnDispatcherAsync(
+                        () => ApplyRefreshSnapshot(connectingSnapshot),
+                        cancellationToken);
+                    if (!connectingSnapshot.IsConnecting)
+                    {
+                        connectPending = false;
+                        return;
+                    }
+
+                    GameConnectionRefreshResult connectedSnapshot = await Task.Run(
+                        _connectionSession.CompleteConnect,
+                        cancellationToken);
+                    connectPending = false;
+                    await RunOnDispatcherAsync(
+                        () => ApplyRefreshSnapshot(connectedSnapshot),
+                        cancellationToken);
+                }
+                catch
+                {
+                    if (connectPending)
+                    {
+                        _connectionSession.CancelConnect();
+                    }
+
+                    throw;
+                }
             }
             catch (InvalidOperationException ex) when (!cancellationToken.IsCancellationRequested)
             {

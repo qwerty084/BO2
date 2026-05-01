@@ -197,7 +197,7 @@ namespace BO2.Services
             }
         }
 
-        public GameConnectionRefreshResult Connect(Action<GameConnectionRefreshResult>? connectingSnapshotAvailable = null)
+        public GameConnectionRefreshResult Connect()
         {
             GameConnectionRefreshResult connectingSnapshot = BeginConnect();
             if (!connectingSnapshot.IsConnecting)
@@ -205,19 +205,10 @@ namespace BO2.Services
                 return connectingSnapshot;
             }
 
-            try
-            {
-                connectingSnapshotAvailable?.Invoke(connectingSnapshot);
-                return CompleteConnect(Inject());
-            }
-            catch
-            {
-                RollbackFailedConnect(connectingSnapshot.CurrentGame);
-                throw;
-            }
+            return CompleteConnect();
         }
 
-        private GameConnectionRefreshResult BeginConnect()
+        public GameConnectionRefreshResult BeginConnect()
         {
             DetectedGame? detectedGame = RefreshCurrentGame();
             lock (_syncRoot)
@@ -236,6 +227,34 @@ namespace BO2.Services
                 _connectTargetGame = detectedGame;
                 _isConnecting = true;
                 return CreateStatusSnapshotLocked(detectedGame);
+            }
+        }
+
+        public GameConnectionRefreshResult CompleteConnect()
+        {
+            DetectedGame? connectTargetGame = GetConnectTargetGame();
+            try
+            {
+                return CompleteConnect(Inject());
+            }
+            catch
+            {
+                RollbackFailedConnect(connectTargetGame);
+                throw;
+            }
+        }
+
+        public void CancelConnect()
+        {
+            lock (_syncRoot)
+            {
+                if (!_isConnecting)
+                {
+                    return;
+                }
+
+                _connectTargetGame = null;
+                _isConnecting = false;
             }
         }
 
@@ -261,6 +280,14 @@ namespace BO2.Services
             if (stopRequest.shouldRequestStop)
             {
                 _eventMonitor.RequestStop(stopRequest.monitorProcessId);
+            }
+        }
+
+        private DetectedGame? GetConnectTargetGame()
+        {
+            lock (_syncRoot)
+            {
+                return _connectTargetGame;
             }
         }
 
