@@ -230,7 +230,7 @@ namespace BO2.Tests.Services
         public void IsStopComplete_WhenStopEventCloses_ReturnsTrue()
         {
             int processId = NextMonitorTestProcessId();
-            EventWaitHandle stopEvent = new(false, EventResetMode.ManualReset, GameEventMonitor.BuildStopEventHandleName(processId));
+            using EventWaitHandle stopEvent = new(false, EventResetMode.ManualReset, GameEventMonitor.BuildStopEventHandleName(processId));
             using var monitor = new GameEventMonitor();
             Assert.False(monitor.IsStopComplete(processId));
 

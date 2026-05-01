@@ -55,7 +55,7 @@ namespace BO2.Views
 
             BoxTrackerEnabledChanged?.Invoke(
                 this,
-                new BoxTrackerEnabledChangedEventArgs(BoxTrackerWidgetCheckBox.IsChecked == true));
+                new BoxTrackerEnabledChangedEventArgs(BoxTrackerWidgetCheckBox.IsChecked.GetValueOrDefault()));
         }
 
         private void OnConfigureSelectedWidgetClick(object sender, RoutedEventArgs e)

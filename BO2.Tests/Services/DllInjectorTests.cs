@@ -37,7 +37,7 @@ namespace BO2.Tests.Services
         [Fact]
         public void ResolveMonitorPath_UsesAppBaseDirectory()
         {
-            string expectedPath = Path.Combine(AppContext.BaseDirectory, "BO2Monitor.dll");
+            string expectedPath = Path.GetFullPath(Path.Join(AppContext.BaseDirectory, "BO2Monitor.dll"));
 
             string actualPath = DllInjector.ResolveMonitorPath();
 
@@ -47,7 +47,7 @@ namespace BO2.Tests.Services
         [Fact]
         public void ResolveWow64HelperPath_UsesAppBaseDirectory()
         {
-            string expectedPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "BO2InjectorHelper.exe"));
+            string expectedPath = Path.GetFullPath(Path.Join(AppContext.BaseDirectory, "BO2InjectorHelper.exe"));
 
             string actualPath = DllInjector.ResolveWow64HelperPath();
 
@@ -171,7 +171,7 @@ namespace BO2.Tests.Services
         [Fact]
         public void HasExpectedPeMachine_WhenMachineMatches_ReturnsTrue()
         {
-            string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".dll");
+            string path = Path.GetFullPath(Path.Join(Path.GetTempPath(), Guid.NewGuid() + ".dll"));
             try
             {
                 File.WriteAllBytes(path, CreateMinimalPe(machine: 0x014c));
@@ -187,7 +187,7 @@ namespace BO2.Tests.Services
         [Fact]
         public void HasExpectedPeMachine_WhenMachineDiffers_ReturnsFalse()
         {
-            string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".dll");
+            string path = Path.GetFullPath(Path.Join(Path.GetTempPath(), Guid.NewGuid() + ".dll"));
             try
             {
                 File.WriteAllBytes(path, CreateMinimalPe(machine: 0x8664));
@@ -203,7 +203,7 @@ namespace BO2.Tests.Services
         [Fact]
         public void ValidateInjectorHelper_WhenMachineMatches_ReturnsValid()
         {
-            string path = Path.Combine(AppContext.BaseDirectory, Guid.NewGuid() + ".exe");
+            string path = Path.GetFullPath(Path.Join(AppContext.BaseDirectory, Guid.NewGuid() + ".exe"));
             try
             {
                 File.WriteAllBytes(path, CreateMinimalPe(machine: 0x014c));
@@ -221,7 +221,7 @@ namespace BO2.Tests.Services
         [Fact]
         public void ValidateInjectorHelper_WhenMachineDiffers_ReturnsInvalid()
         {
-            string path = Path.Combine(AppContext.BaseDirectory, Guid.NewGuid() + ".exe");
+            string path = Path.GetFullPath(Path.Join(AppContext.BaseDirectory, Guid.NewGuid() + ".exe"));
             try
             {
                 File.WriteAllBytes(path, CreateMinimalPe(machine: 0x8664));

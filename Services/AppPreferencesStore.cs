@@ -16,7 +16,7 @@ namespace BO2.Services
         public static AppPreferencesStore CreateDefault()
         {
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string preferencesPath = Path.Combine(appData, "BO2", "preferences.json");
+            string preferencesPath = Path.GetFullPath(Path.Join(appData, "BO2", "preferences.json"));
             return new AppPreferencesStore(preferencesPath);
         }
 

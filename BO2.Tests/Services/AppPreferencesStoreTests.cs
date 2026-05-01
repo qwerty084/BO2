@@ -87,11 +87,11 @@ namespace BO2.Tests.Services
 
         private static string CreatePreferencesPath()
         {
-            return Path.Combine(
+            return Path.GetFullPath(Path.Join(
                 Path.GetTempPath(),
                 "BO2.Tests",
                 Guid.NewGuid().ToString("N"),
-                "preferences.json");
+                "preferences.json"));
         }
     }
 }

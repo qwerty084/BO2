@@ -382,15 +382,19 @@ namespace BO2.Services
             }
             catch (ObjectDisposedException)
             {
+                return;
             }
             catch (WaitHandleCannotBeOpenedException)
             {
+                return;
             }
             catch (IOException)
             {
+                return;
             }
             catch (UnauthorizedAccessException)
             {
+                return;
             }
         }
 
@@ -404,6 +408,7 @@ namespace BO2.Services
                 }
                 catch (ObjectDisposedException)
                 {
+                    _stopEventHandle = null;
                 }
             }
 

@@ -96,7 +96,7 @@ namespace BO2.Tests.Services
         {
             var detector = new FakeGameProcessDetector();
             var eventSource = new FakeProcessLifecycleEventSource();
-            var service = new GameProcessDetectionService(detector, eventSource);
+            using var service = new GameProcessDetectionService(detector, eventSource);
             service.Start();
 
             service.Dispose();

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Management;
 
@@ -65,8 +66,9 @@ namespace BO2.Services
             {
                 existingWatcher.Stop();
             }
-            catch (ManagementException)
+            catch (ManagementException ex)
             {
+                Debug.WriteLine(ex);
             }
 
             existingWatcher.Dispose();

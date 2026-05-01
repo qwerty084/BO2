@@ -1,7 +1,7 @@
 using BO2.Services;
 using Microsoft.UI;
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using Windows.UI;
 
@@ -42,8 +42,8 @@ namespace BO2.Widgets
         private const int IdcArrow = 32512;
 
         private static readonly WndProcDelegate s_wndProc = WndProc;
-        private static readonly Dictionary<nint, BoxTrackerWidgetWindow> s_windows = new();
-        private static readonly object s_windowsLock = new();
+        private static readonly ConcurrentDictionary<nint, BoxTrackerWidgetWindow> s_windows = new();
+        private static readonly object s_windowClassLock = new();
         private static bool s_classRegistered;
 
         private nint _windowHandle;
@@ -78,10 +78,7 @@ namespace BO2.Widgets
                 throw new InvalidOperationException("Failed to create Box Tracker widget window.");
             }
 
-            lock (s_windowsLock)
-            {
-                s_windows[_windowHandle] = this;
-            }
+            s_windows[_windowHandle] = this;
         }
 
         public event EventHandler? Closed;
@@ -163,38 +160,35 @@ namespace BO2.Widgets
 
         private static void EnsureWindowClass()
         {
-            if (s_classRegistered)
+            lock (s_windowClassLock)
             {
-                return;
+                if (s_classRegistered)
+                {
+                    return;
+                }
+
+                nint hInstance = GetModuleHandle(null);
+                WindowClassEx windowClass = new()
+                {
+                    Size = (uint)Marshal.SizeOf<WindowClassEx>(),
+                    Instance = hInstance,
+                    Cursor = LoadCursor(nint.Zero, new nint(IdcArrow)),
+                    ClassName = WindowClassName,
+                    WindowProc = s_wndProc
+                };
+
+                if (RegisterClassEx(ref windowClass) == 0)
+                {
+                    throw new InvalidOperationException("Failed to register Box Tracker widget window class.");
+                }
+
+                s_classRegistered = true;
             }
-
-            nint hInstance = GetModuleHandle(null);
-            WindowClassEx windowClass = new()
-            {
-                Size = (uint)Marshal.SizeOf<WindowClassEx>(),
-                Instance = hInstance,
-                Cursor = LoadCursor(nint.Zero, new nint(IdcArrow)),
-                ClassName = WindowClassName,
-                WindowProc = s_wndProc
-            };
-
-            if (RegisterClassEx(ref windowClass) == 0)
-            {
-                throw new InvalidOperationException("Failed to register Box Tracker widget window class.");
-            }
-
-            s_classRegistered = true;
         }
 
         private static nint WndProc(nint hwnd, uint message, nint wParam, nint lParam)
         {
-            BoxTrackerWidgetWindow? window;
-            lock (s_windowsLock)
-            {
-                _ = s_windows.TryGetValue(hwnd, out window);
-            }
-
-            if (window is null)
+            if (!s_windows.TryGetValue(hwnd, out BoxTrackerWidgetWindow? window))
             {
                 return DefWindowProc(hwnd, message, wParam, lParam);
             }
@@ -320,10 +314,7 @@ namespace BO2.Widgets
             }
 
             nint windowHandle = _windowHandle;
-            lock (s_windowsLock)
-            {
-                s_windows.Remove(windowHandle);
-            }
+            s_windows.TryRemove(windowHandle, out _);
 
             _windowHandle = nint.Zero;
             _closed = true;

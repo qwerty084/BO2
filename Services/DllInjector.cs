@@ -142,12 +142,12 @@ namespace BO2.Services
 
         internal static string ResolveMonitorPath()
         {
-            return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, MonitorDllFileName));
+            return Path.GetFullPath(Path.Join(AppContext.BaseDirectory, MonitorDllFileName));
         }
 
         internal static string ResolveWow64HelperPath()
         {
-            return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, InjectorHelperFileName));
+            return Path.GetFullPath(Path.Join(AppContext.BaseDirectory, InjectorHelperFileName));
         }
 
         internal static DllPayloadValidationResult ValidateMonitorDll(string dllPath)
@@ -472,6 +472,7 @@ namespace BO2.Services
                 }
                 catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
                 {
+                    Debug.WriteLine(ex);
                 }
 
                 throw new InvalidOperationException(AppStrings.Format("DllInjectionWaitFailedFormat", "timeout"));

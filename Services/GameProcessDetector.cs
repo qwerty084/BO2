@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace BO2.Services
 {
@@ -96,15 +97,8 @@ namespace BO2.Services
                 return false;
             }
 
-            foreach (string knownProcessName in KnownProcessNames)
-            {
-                if (string.Equals(knownProcessName, normalizedProcessName, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return KnownProcessNames.Any(knownProcessName =>
+                string.Equals(knownProcessName, normalizedProcessName, StringComparison.OrdinalIgnoreCase));
         }
 
         public DetectedGame? Detect()

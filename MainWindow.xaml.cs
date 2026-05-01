@@ -22,7 +22,7 @@ namespace BO2
         private int _cleanupRequested;
         private readonly WidgetWindowManager _widgetWindowManager;
         private readonly AppPreferencesStore _preferencesStore = AppPreferencesStore.CreateDefault();
-        private AppPreferences _preferences = AppPreferences.CreateDefault();
+        private readonly AppPreferences _preferences;
         private bool _isUpdatingThemeMode;
         private long _paneOpenChangedToken;
         private Storyboard? _settingsCogStoryboard;
@@ -80,6 +80,7 @@ namespace BO2
             }
             catch (OperationCanceledException) when (_refreshCancellationTokenSource.IsCancellationRequested)
             {
+                return;
             }
         }
 
@@ -92,6 +93,7 @@ namespace BO2
             }
             catch (OperationCanceledException) when (_refreshCancellationTokenSource.IsCancellationRequested)
             {
+                return;
             }
         }
 
@@ -337,6 +339,7 @@ namespace BO2
             }
             catch (OperationCanceledException) when (_refreshCancellationTokenSource.IsCancellationRequested)
             {
+                return;
             }
             catch (Exception ex) when (!_refreshCancellationTokenSource.IsCancellationRequested)
             {
@@ -373,8 +376,13 @@ namespace BO2
                     ref cornerPreference,
                     Marshal.SizeOf<int>());
             }
-            catch (Exception)
+            catch (COMException)
             {
+                return;
+            }
+            catch (InvalidOperationException)
+            {
+                return;
             }
         }
 

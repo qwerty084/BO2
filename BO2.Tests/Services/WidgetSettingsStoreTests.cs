@@ -171,11 +171,11 @@ namespace BO2.Tests.Services
 
         private static string CreateSettingsPath()
         {
-            return Path.Combine(
+            return Path.GetFullPath(Path.Join(
                 Path.GetTempPath(),
                 "BO2.Tests",
                 Guid.NewGuid().ToString("N"),
-                "widgets.json");
+                "widgets.json"));
         }
     }
 }

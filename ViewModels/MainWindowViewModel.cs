@@ -460,9 +460,11 @@ namespace BO2.ViewModels
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                return;
             }
             catch (InvalidOperationException) when (cancellationToken.IsCancellationRequested)
             {
+                return;
             }
         }
 

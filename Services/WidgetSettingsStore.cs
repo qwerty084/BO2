@@ -21,7 +21,7 @@ namespace BO2.Services
         public static WidgetSettingsStore CreateDefault()
         {
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string settingsPath = Path.Combine(appData, "BO2", "widgets.json");
+            string settingsPath = Path.GetFullPath(Path.Join(appData, "BO2", "widgets.json"));
             return new WidgetSettingsStore(settingsPath);
         }
 
