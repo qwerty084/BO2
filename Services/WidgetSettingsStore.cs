@@ -9,11 +9,6 @@ namespace BO2.Services
 
     public sealed class WidgetSettingsStore
     {
-        private static readonly JsonSerializerOptions JsonOptions = new()
-        {
-            WriteIndented = true
-        };
-
         private readonly string _settingsPath;
 
         public WidgetSettingsStore(string settingsPath)
@@ -42,7 +37,9 @@ namespace BO2.Services
                 }
 
                 string json = File.ReadAllText(_settingsPath);
-                WidgetSettingsDocument? document = JsonSerializer.Deserialize<WidgetSettingsDocument>(json, JsonOptions);
+                WidgetSettingsDocument? document = JsonSerializer.Deserialize(
+                    json,
+                    SettingsJsonSerializerContext.Default.WidgetSettingsDocument);
                 if (document is null)
                 {
                     return RecoverDefault("Widget settings document was empty.");
@@ -81,7 +78,9 @@ namespace BO2.Services
             }
 
             string tempPath = _settingsPath + ".tmp";
-            string json = JsonSerializer.Serialize(document, JsonOptions);
+            string json = JsonSerializer.Serialize(
+                document,
+                SettingsJsonSerializerContext.Default.WidgetSettingsDocument);
             File.WriteAllText(tempPath, json);
             File.Move(tempPath, _settingsPath, overwrite: true);
         }

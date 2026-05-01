@@ -5,6 +5,7 @@
 - Build the solution with `dotnet build .\BO2.slnx`.
 - Build the 32-bit Windows app with `dotnet build .\BO2.csproj -p:Platform=x86`.
 - Run non-UI unit tests with: `dotnet test BO2.Tests\BO2.Tests.csproj`
+- When changing GitHub Actions workflows under `.github\workflows\`, test the affected workflow locally with `act` before handoff. For Windows jobs, prefer a host-backed run such as `act workflow_dispatch -W .github\workflows\build.yml -j windows -P windows-latest=-self-hosted`; clean up generated `.act-*` folders afterward.
 - Tests are pure xUnit (no WinAppSDK runtime); target `net8.0-windows10.0.19041.0` but do NOT reference WinUI.
 - No repo-specific lint or format command/config checked in.
 
