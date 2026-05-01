@@ -7,8 +7,10 @@ namespace BO2.Services
         private static readonly TimeSpan MonitorReadinessRetryTimeout = TimeSpan.FromSeconds(15);
         private static readonly TimeSpan MonitorDisconnectTimeout = TimeSpan.FromSeconds(3);
 
+        private readonly object _syncRoot = new();
         private readonly GameSessionCoordinator _gameSession;
         private readonly TimeProvider _timeProvider;
+        private DetectedGame? _currentGame;
         private DllInjectionResult _lastInjectionResult = DllInjectionResult.NotAttempted;
         private int? _lastInjectionProcessId;
         private DateTimeOffset? _lastInjectionAttemptedAt;
@@ -32,17 +34,24 @@ namespace BO2.Services
 
             _gameSession = gameSession;
             _timeProvider = timeProvider;
+            _currentGame = _gameSession.CurrentGame;
+            _gameSession.DetectedGameChanged += OnDetectedGameChanged;
         }
 
-        public event EventHandler<DetectedGameChangedEventArgs>? DetectedGameChanged
-        {
-            add => _gameSession.DetectedGameChanged += value;
-            remove => _gameSession.DetectedGameChanged -= value;
-        }
+        public event EventHandler<DetectedGameChangedEventArgs>? DetectedGameChanged;
 
         public bool UsesPollingProcessDetection => _gameSession.UsesPollingProcessDetection;
 
-        public DetectedGame? CurrentGame => _gameSession.CurrentGame;
+        public DetectedGame? CurrentGame
+        {
+            get
+            {
+                lock (_syncRoot)
+                {
+                    return _currentGame;
+                }
+            }
+        }
 
         public bool IsConnecting { get; private set; }
 
@@ -53,19 +62,16 @@ namespace BO2.Services
         public void Start()
         {
             _gameSession.Start();
+            ApplyDetectedGame(_gameSession.CurrentGame, notify: false);
         }
 
-        public DetectedGame? DetectByPolling()
-        {
-            return _gameSession.DetectByPolling();
-        }
-
-        public GameConnectionRefreshResult Read(DetectedGame? detectedGame)
+        public GameConnectionRefreshResult Read()
         {
             long diagnosticsStartedAt = RefreshDiagnostics.Start();
             try
             {
                 DateTimeOffset receivedAt = _timeProvider.GetUtcNow();
+                DetectedGame? detectedGame = RefreshCurrentGame();
                 int? ownedMonitorProcessId = IsMonitorConnectedFor(detectedGame)
                     ? detectedGame?.ProcessId
                     : null;
@@ -76,7 +82,7 @@ namespace BO2.Services
                     : GameEventMonitorStatus.WaitingForMonitor;
 
                 ApplyMonitorReadinessTimeout(readResult.DetectedGame, eventStatus, receivedAt);
-                return new GameConnectionRefreshResult(readResult, eventStatus, _lastInjectionResult);
+                return CreateRefreshResult(detectedGame, readResult, eventStatus);
             }
             finally
             {
@@ -216,6 +222,7 @@ namespace BO2.Services
 
         public void Dispose()
         {
+            _gameSession.DetectedGameChanged -= OnDetectedGameChanged;
             _gameSession.Dispose();
         }
 
@@ -245,6 +252,59 @@ namespace BO2.Services
                 AppStrings.Get("DllInjectionReadinessTimedOut"));
             _lastInjectionAttemptedAt = null;
         }
+
+        private void OnDetectedGameChanged(object? sender, DetectedGameChangedEventArgs args)
+        {
+            ApplyDetectedGame(args.DetectedGame, notify: true);
+        }
+
+        private DetectedGame? RefreshCurrentGame()
+        {
+            if (UsesPollingProcessDetection)
+            {
+                ApplyDetectedGame(_gameSession.DetectByPolling(), notify: false);
+            }
+
+            return CurrentGame;
+        }
+
+        private void ApplyDetectedGame(DetectedGame? detectedGame, bool notify)
+        {
+            EventHandler<DetectedGameChangedEventArgs>? handler;
+            lock (_syncRoot)
+            {
+                if (Equals(_currentGame, detectedGame))
+                {
+                    return;
+                }
+
+                _currentGame = detectedGame;
+                handler = DetectedGameChanged;
+            }
+
+            ResetMonitorConnectionState();
+            if (notify)
+            {
+                handler?.Invoke(this, new DetectedGameChangedEventArgs(detectedGame));
+            }
+        }
+
+        private GameConnectionRefreshResult CreateRefreshResult(
+            DetectedGame? detectedGame,
+            PlayerStatsReadResult readResult,
+            GameEventMonitorStatus eventStatus)
+        {
+            return new GameConnectionRefreshResult(
+                detectedGame,
+                readResult,
+                eventStatus,
+                _lastInjectionResult,
+                IsConnecting,
+                IsDisconnecting,
+                CanAttemptConnect(detectedGame),
+                HasInjectionAttemptFor(detectedGame),
+                IsMonitorConnectedFor(detectedGame));
+        }
     }
 
     internal readonly record struct GameConnectionConnectResult(
@@ -252,7 +312,13 @@ namespace BO2.Services
         GameEventMonitorStatus EventStatus);
 
     internal readonly record struct GameConnectionRefreshResult(
+        DetectedGame? CurrentGame,
         PlayerStatsReadResult ReadResult,
         GameEventMonitorStatus EventStatus,
-        DllInjectionResult InjectionResult);
+        DllInjectionResult InjectionResult,
+        bool IsConnecting,
+        bool IsDisconnecting,
+        bool CanAttemptConnect,
+        bool HasInjectionAttemptForCurrentGame,
+        bool IsMonitorConnectedForCurrentGame);
 }

@@ -306,17 +306,6 @@ namespace BO2.ViewModels
             await _operationSemaphore.WaitAsync(cancellationToken);
             try
             {
-                DetectedGame? detectedGame = _detectedGame;
-                if (_connectionSession.UsesPollingProcessDetection)
-                {
-                    detectedGame = await Task.Run(
-                        _connectionSession.DetectByPolling,
-                        cancellationToken);
-                    await RunOnDispatcherAsync(
-                        () => ApplyPolledDetectedGame(detectedGame),
-                        cancellationToken);
-                }
-
                 if (_connectionSession.IsDisconnecting)
                 {
                     bool isDisconnectComplete = await Task.Run(
@@ -340,23 +329,11 @@ namespace BO2.ViewModels
                     return;
                 }
 
-                (
-                    PlayerStatsReadResult readResult,
-                    GameEventMonitorStatus eventStatus,
-                    DllInjectionResult injectionResult) = await Task.Run(
-                    () =>
-                    {
-                        GameConnectionRefreshResult snapshot = _connectionSession.Read(detectedGame);
-                        return (snapshot.ReadResult, snapshot.EventStatus, snapshot.InjectionResult);
-                    },
+                GameConnectionRefreshResult snapshot = await Task.Run(
+                    _connectionSession.Read,
                     cancellationToken);
                 await RunOnDispatcherAsync(
-                    () =>
-                    {
-                        ApplyReadResult(readResult);
-                        ApplyEventMonitorStatus(readResult.DetectedGame, injectionResult, eventStatus);
-                        UpdateConnectButtonState(readResult.DetectedGame);
-                    },
+                    () => ApplyRefreshSnapshot(snapshot),
                     cancellationToken);
             }
             catch (InvalidOperationException ex) when (!cancellationToken.IsCancellationRequested)
@@ -567,6 +544,14 @@ namespace BO2.ViewModels
             catch (InvalidOperationException) when (cancellationToken.IsCancellationRequested)
             {
             }
+        }
+
+        private void ApplyRefreshSnapshot(GameConnectionRefreshResult snapshot)
+        {
+            _detectedGame = snapshot.CurrentGame;
+            ApplyReadResult(snapshot.ReadResult);
+            ApplyEventMonitorStatus(snapshot.CurrentGame, snapshot.InjectionResult, snapshot.EventStatus);
+            UpdateConnectButtonState(snapshot.CurrentGame);
         }
 
         private void ApplyReadResult(PlayerStatsReadResult result)
@@ -891,20 +876,9 @@ namespace BO2.ViewModels
             RefreshRequested?.Invoke(this, EventArgs.Empty);
         }
 
-        private void ApplyPolledDetectedGame(DetectedGame? detectedGame)
-        {
-            if (Equals(_detectedGame, detectedGame))
-            {
-                return;
-            }
-
-            ApplyDetectedGameState(detectedGame);
-        }
-
         private void ApplyDetectedGameState(DetectedGame? detectedGame)
         {
             _detectedGame = detectedGame;
-            _connectionSession.ResetMonitorConnectionState();
             DetectedGameText = detectedGame?.DisplayName ?? AppStrings.Get("NoGameDetected");
             ApplyConnectionStatus(detectedGame);
             ApplyEventMonitorStatus(detectedGame, _connectionSession.LastInjectionResult, GameEventMonitorStatus.WaitingForMonitor);
