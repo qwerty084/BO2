@@ -41,14 +41,40 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
+      - name: Restore and audit NuGet packages
+        shell: pwsh
+        run: |
+          dotnet restore .\BO2.slnx `
+            -p:NuGetAudit=true `
+            -p:NuGetAuditMode=all `
+            -p:NuGetAuditLevel=high `
+            -warnaserror:NU1903 `
+            -warnaserror:NU1904
+
       - name: Test non-UI services
         shell: pwsh
-        run: dotnet test .\BO2.Tests\BO2.Tests.csproj --configuration Release -p:TreatWarningsAsErrors=true
+        run: |
+          dotnet test .\BO2.Tests\BO2.Tests.csproj `
+            --configuration Release `
+            --no-restore `
+            -p:TreatWarningsAsErrors=true `
+            --collect:"XPlat Code Coverage" `
+            --results-directory .\TestResults `
+            -- `
+            DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-cobertura
+          path: TestResults/**/coverage.cobertura.xml
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Build solution
         shell: pwsh
-        run: dotnet build .\BO2.slnx --configuration Release -p:TreatWarningsAsErrors=true -p:WarningsNotAsErrors=IL2104
+        run: dotnet build .\BO2.slnx --configuration Release --no-restore -p:TreatWarningsAsErrors=true -p:WarningsNotAsErrors=IL2104
 
       - name: Build x86 app
         shell: pwsh
-        run: dotnet build .\BO2.csproj --configuration Release -p:Platform=x86 -p:TreatWarningsAsErrors=true -p:WarningsNotAsErrors=IL2104
+        run: dotnet build .\BO2.csproj --configuration Release --no-restore -p:Platform=x86 -p:TreatWarningsAsErrors=true -p:WarningsNotAsErrors=IL2104

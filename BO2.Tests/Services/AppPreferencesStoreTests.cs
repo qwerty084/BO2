@@ -36,6 +36,23 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void Save_WritesIndentedJson()
+        {
+            string preferencesPath = CreatePreferencesPath();
+            var store = new AppPreferencesStore(preferencesPath);
+            var preferences = new AppPreferences
+            {
+                ThemeMode = ThemeMode.Light
+            };
+
+            store.Save(preferences);
+            string json = File.ReadAllText(preferencesPath);
+
+            Assert.Contains("\n  \"Version\": 1", json, StringComparison.Ordinal);
+            Assert.Contains("\n  \"ThemeMode\": 1", json, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void Load_WhenJsonIsInvalid_ReturnsDefaultPreferences()
         {
             string preferencesPath = CreatePreferencesPath();
