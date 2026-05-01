@@ -258,7 +258,7 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void Connect_WhenCompletionThrows_ClearsTransientConnectState()
+        public void Connect_WhenCompletionThrows_StopsMonitorAndClearsConnectionState()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
             FakeGameEventMonitor eventMonitor = new()
@@ -275,6 +275,7 @@ namespace BO2.Tests.Services
                 memoryAccessor: memoryAccessor);
 
             GameConnectionRefreshResult? connectingSnapshot = null;
+            eventMonitor.ResetCalls();
             InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
                 () => session.Connect(snapshot => connectingSnapshot = snapshot));
 
@@ -282,9 +283,12 @@ namespace BO2.Tests.Services
             Assert.True(connectingSnapshot.HasValue);
             Assert.True(connectingSnapshot.Value.IsConnecting);
             Assert.False(session.IsConnecting);
-            Assert.False(session.CanAttemptConnect(detectedGame));
-            Assert.True(session.IsMonitorConnectedFor(detectedGame));
+            Assert.True(session.CanAttemptConnect(detectedGame));
+            Assert.False(session.IsMonitorConnectedFor(detectedGame));
+            Assert.Equal(DllInjectionState.NotAttempted, session.LastInjectionResult.State);
             Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(1, eventMonitor.RequestStopCallCount);
+            Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);
         }
 
         [Fact]

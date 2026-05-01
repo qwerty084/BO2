@@ -212,7 +212,7 @@ namespace BO2.Services
             }
             catch
             {
-                CancelConnect();
+                RollbackFailedConnect(connectingSnapshot.CurrentGame);
                 throw;
             }
         }
@@ -239,12 +239,28 @@ namespace BO2.Services
             }
         }
 
-        private void CancelConnect()
+        private void RollbackFailedConnect(DetectedGame? connectTargetGame)
         {
+            (int? monitorProcessId, bool shouldRequestStop) stopRequest = (null, false);
             lock (_syncRoot)
             {
-                _connectTargetGame = null;
-                _isConnecting = false;
+                if (_isConnecting)
+                {
+                    _connectTargetGame = null;
+                    _isConnecting = false;
+                    return;
+                }
+
+                if (connectTargetGame is not null && _lastInjectionProcessId == connectTargetGame.ProcessId)
+                {
+                    stopRequest = ResetMonitorConnectionStateLocked(
+                        IsMonitorLoadedInjectionState(_lastInjectionResult.State));
+                }
+            }
+
+            if (stopRequest.shouldRequestStop)
+            {
+                _eventMonitor.RequestStop(stopRequest.monitorProcessId);
             }
         }
 
