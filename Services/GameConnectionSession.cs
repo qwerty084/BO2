@@ -1,4 +1,6 @@
 using System;
+using System.Management;
+using System.Runtime.InteropServices;
 
 namespace BO2.Services
 {
@@ -7,76 +9,163 @@ namespace BO2.Services
         private static readonly TimeSpan MonitorReadinessRetryTimeout = TimeSpan.FromSeconds(15);
         private static readonly TimeSpan MonitorDisconnectTimeout = TimeSpan.FromSeconds(3);
 
-        private readonly GameSessionCoordinator _gameSession;
+        private readonly object _syncRoot = new();
+        private readonly GameMemoryReader _memoryReader;
+        private readonly GameProcessDetectionService _processDetectionService;
+        private readonly IGameProcessDetector _pollingProcessDetector;
+        private readonly DllInjector _dllInjector;
+        private readonly IGameEventMonitor _eventMonitor;
         private readonly TimeProvider _timeProvider;
+        private DetectedGame? _currentGame;
+        private bool _usesPollingProcessDetection;
+        private bool _isConnecting;
+        private bool _isDisconnecting;
         private DllInjectionResult _lastInjectionResult = DllInjectionResult.NotAttempted;
         private int? _lastInjectionProcessId;
         private DateTimeOffset? _lastInjectionAttemptedAt;
+        private DetectedGame? _connectTargetGame;
         private int? _disconnectProcessId;
         private DateTimeOffset? _disconnectRequestedAt;
 
         public GameConnectionSession()
-            : this(new GameSessionCoordinator(), TimeProvider.System)
+            : this(
+                new GameMemoryReader(),
+                new GameProcessDetectionService(),
+                new GameProcessDetector(),
+                new DllInjector(),
+                new GameEventMonitor(),
+                TimeProvider.System)
         {
         }
 
-        internal GameConnectionSession(GameSessionCoordinator gameSession)
-            : this(gameSession, TimeProvider.System)
+        internal GameConnectionSession(
+            GameMemoryReader memoryReader,
+            GameProcessDetectionService processDetectionService,
+            IGameProcessDetector pollingProcessDetector,
+            DllInjector dllInjector,
+            IGameEventMonitor eventMonitor)
+            : this(
+                memoryReader,
+                processDetectionService,
+                pollingProcessDetector,
+                dllInjector,
+                eventMonitor,
+                TimeProvider.System)
         {
         }
 
-        internal GameConnectionSession(GameSessionCoordinator gameSession, TimeProvider timeProvider)
+        internal GameConnectionSession(
+            GameMemoryReader memoryReader,
+            GameProcessDetectionService processDetectionService,
+            IGameProcessDetector pollingProcessDetector,
+            DllInjector dllInjector,
+            IGameEventMonitor eventMonitor,
+            TimeProvider timeProvider)
         {
-            ArgumentNullException.ThrowIfNull(gameSession);
+            ArgumentNullException.ThrowIfNull(memoryReader);
+            ArgumentNullException.ThrowIfNull(processDetectionService);
+            ArgumentNullException.ThrowIfNull(pollingProcessDetector);
+            ArgumentNullException.ThrowIfNull(dllInjector);
+            ArgumentNullException.ThrowIfNull(eventMonitor);
             ArgumentNullException.ThrowIfNull(timeProvider);
 
-            _gameSession = gameSession;
+            _memoryReader = memoryReader;
+            _processDetectionService = processDetectionService;
+            _pollingProcessDetector = pollingProcessDetector;
+            _dllInjector = dllInjector;
+            _eventMonitor = eventMonitor;
             _timeProvider = timeProvider;
+            _currentGame = _processDetectionService.CurrentGame;
+            _processDetectionService.DetectedGameChanged += OnDetectedGameChanged;
         }
 
-        public event EventHandler<DetectedGameChangedEventArgs>? DetectedGameChanged
+        public event EventHandler<DetectedGameChangedEventArgs>? DetectedGameChanged;
+
+        public bool UsesPollingProcessDetection
         {
-            add => _gameSession.DetectedGameChanged += value;
-            remove => _gameSession.DetectedGameChanged -= value;
+            get
+            {
+                lock (_syncRoot)
+                {
+                    return _usesPollingProcessDetection;
+                }
+            }
         }
 
-        public bool UsesPollingProcessDetection => _gameSession.UsesPollingProcessDetection;
+        public DetectedGame? CurrentGame
+        {
+            get
+            {
+                lock (_syncRoot)
+                {
+                    return _currentGame;
+                }
+            }
+        }
 
-        public DetectedGame? CurrentGame => _gameSession.CurrentGame;
+        public bool IsConnecting
+        {
+            get
+            {
+                lock (_syncRoot)
+                {
+                    return _isConnecting;
+                }
+            }
+        }
 
-        public bool IsConnecting { get; private set; }
+        public bool IsDisconnecting
+        {
+            get
+            {
+                lock (_syncRoot)
+                {
+                    return _isDisconnecting;
+                }
+            }
+        }
 
-        public bool IsDisconnecting { get; private set; }
-
-        public DllInjectionResult LastInjectionResult => _lastInjectionResult;
+        public DllInjectionResult LastInjectionResult
+        {
+            get
+            {
+                lock (_syncRoot)
+                {
+                    return _lastInjectionResult;
+                }
+            }
+        }
 
         public void Start()
         {
-            _gameSession.Start();
+            try
+            {
+                _processDetectionService.Start();
+            }
+            catch (Exception ex) when (ex is ManagementException or UnauthorizedAccessException or COMException)
+            {
+                lock (_syncRoot)
+                {
+                    _usesPollingProcessDetection = true;
+                }
+            }
+
+            ApplyDetectedGame(_processDetectionService.CurrentGame, notify: false);
         }
 
-        public DetectedGame? DetectByPolling()
-        {
-            return _gameSession.DetectByPolling();
-        }
-
-        public GameConnectionRefreshResult Read(DetectedGame? detectedGame)
+        public GameConnectionRefreshResult Read()
         {
             long diagnosticsStartedAt = RefreshDiagnostics.Start();
             try
             {
                 DateTimeOffset receivedAt = _timeProvider.GetUtcNow();
-                int? ownedMonitorProcessId = IsMonitorConnectedFor(detectedGame)
-                    ? detectedGame?.ProcessId
-                    : null;
-                PlayerStatsReadResult readResult = _gameSession.ReadPlayerStats(detectedGame);
-                GameEventMonitorStatus eventStatus = ownedMonitorProcessId is int processId
-                    && readResult.DetectedGame?.ProcessId == processId
-                    ? _gameSession.ReadEventMonitorStatus(receivedAt, processId)
-                    : GameEventMonitorStatus.WaitingForMonitor;
+                DetectedGame? detectedGame = RefreshCurrentGame();
+                if (IsDisconnecting)
+                {
+                    return ReadDisconnectSnapshot(detectedGame, receivedAt);
+                }
 
-                ApplyMonitorReadinessTimeout(readResult.DetectedGame, eventStatus, receivedAt);
-                return new GameConnectionRefreshResult(readResult, eventStatus, _lastInjectionResult);
+                return ReadSnapshot(detectedGame, receivedAt);
             }
             finally
             {
@@ -86,137 +175,174 @@ namespace BO2.Services
 
         public bool CanAttemptConnect(DetectedGame? detectedGame)
         {
-            return !IsConnecting
-                && !IsDisconnecting
-                && detectedGame is not null
-                && detectedGame.Variant == GameVariant.SteamZombies
-                && detectedGame.IsStatsSupported
-                && !IsMonitorConnectedFor(detectedGame);
+            lock (_syncRoot)
+            {
+                return CanAttemptConnectLocked(detectedGame);
+            }
         }
 
         public bool HasInjectionAttemptFor(DetectedGame? detectedGame)
         {
-            return detectedGame is not null
-                && _lastInjectionProcessId == detectedGame.ProcessId
-                && _lastInjectionResult.State != DllInjectionState.NotAttempted;
+            lock (_syncRoot)
+            {
+                return HasInjectionAttemptForLocked(detectedGame);
+            }
         }
 
         public bool IsMonitorConnectedFor(DetectedGame? detectedGame)
         {
-            return detectedGame is not null
-                && _lastInjectionProcessId == detectedGame.ProcessId
-                && IsMonitorLoadedInjectionState(_lastInjectionResult.State);
+            lock (_syncRoot)
+            {
+                return IsMonitorConnectedForLocked(detectedGame);
+            }
         }
 
-        public void BeginConnect()
+        public GameConnectionRefreshResult BeginConnect()
         {
-            IsConnecting = true;
+            DetectedGame? detectedGame = RefreshCurrentGame();
+            lock (_syncRoot)
+            {
+                if (_isConnecting)
+                {
+                    return CreateStatusSnapshotLocked(detectedGame);
+                }
+
+                if (!CanAttemptConnectLocked(detectedGame))
+                {
+                    _connectTargetGame = null;
+                    return CreateStatusSnapshotLocked(detectedGame);
+                }
+
+                _connectTargetGame = detectedGame;
+                _isConnecting = true;
+                return CreateStatusSnapshotLocked(detectedGame);
+            }
         }
 
         public void CancelConnect()
         {
-            IsConnecting = false;
+            lock (_syncRoot)
+            {
+                _connectTargetGame = null;
+                _isConnecting = false;
+            }
         }
 
         public void ClearTransientOperationState()
         {
-            IsConnecting = false;
-            IsDisconnecting = false;
-            _disconnectProcessId = null;
-            _disconnectRequestedAt = null;
+            lock (_syncRoot)
+            {
+                _isConnecting = false;
+                _isDisconnecting = false;
+                _connectTargetGame = null;
+                _disconnectProcessId = null;
+                _disconnectRequestedAt = null;
+            }
         }
 
-        public DllInjectionResult Inject(DetectedGame detectedGame)
+        public DllInjectionResult Inject()
         {
-            return _gameSession.Inject(detectedGame);
+            DetectedGame? detectedGame = RefreshCurrentGame();
+            DetectedGame? connectTargetGame;
+            lock (_syncRoot)
+            {
+                connectTargetGame = _connectTargetGame;
+                if (!_isConnecting || connectTargetGame is null || !Equals(detectedGame, connectTargetGame))
+                {
+                    return DllInjectionResult.NotAttempted;
+                }
+            }
+
+            return _dllInjector.Inject(connectTargetGame);
         }
 
-        public GameConnectionConnectResult CompleteConnect(
-            DetectedGame detectedGame,
-            DllInjectionResult injectionResult)
+        public GameConnectionRefreshResult CompleteConnect(DllInjectionResult injectionResult)
         {
-            GameEventMonitorStatus eventStatus = GameEventMonitorStatus.WaitingForMonitor;
-            DateTimeOffset? attemptedAt = null;
-            if (IsMonitorLoadedInjectionState(injectionResult.State))
+            ArgumentNullException.ThrowIfNull(injectionResult);
+
+            DateTimeOffset receivedAt = _timeProvider.GetUtcNow();
+            DetectedGame? detectedGame = RefreshCurrentGame();
+            lock (_syncRoot)
             {
-                attemptedAt = _timeProvider.GetUtcNow();
-                eventStatus = _gameSession.ReadEventMonitorStatus(attemptedAt.Value, detectedGame.ProcessId);
+                DetectedGame? connectTargetGame = _connectTargetGame;
+                if (_isConnecting && connectTargetGame is not null && Equals(detectedGame, connectTargetGame))
+                {
+                    _lastInjectionProcessId = connectTargetGame.ProcessId;
+                    _lastInjectionResult = injectionResult;
+                    _lastInjectionAttemptedAt = IsMonitorLoadedInjectionState(injectionResult.State)
+                        ? receivedAt
+                        : null;
+                }
+
+                _connectTargetGame = null;
+                _isConnecting = false;
             }
 
-            _lastInjectionProcessId = detectedGame.ProcessId;
-            _lastInjectionResult = injectionResult;
-            _lastInjectionAttemptedAt = attemptedAt;
-            IsConnecting = false;
-
-            return new GameConnectionConnectResult(injectionResult, eventStatus);
+            return ReadSnapshot(detectedGame, receivedAt);
         }
 
-        public bool TryBeginDisconnect()
+        public GameConnectionRefreshResult BeginDisconnect()
         {
-            if (IsDisconnecting)
+            DateTimeOffset receivedAt = _timeProvider.GetUtcNow();
+            DetectedGame? detectedGame = RefreshCurrentGame();
+            int? stopProcessId = null;
+            GameConnectionRefreshResult? result = null;
+            bool readSnapshot = false;
+            lock (_syncRoot)
             {
-                return true;
+                if (_isDisconnecting)
+                {
+                    return CreateDisconnectingSnapshotLocked(detectedGame);
+                }
+
+                int? monitorProcessId = _lastInjectionProcessId;
+                if (monitorProcessId is null || !IsMonitorLoadedInjectionState(_lastInjectionResult.State))
+                {
+                    ResetMonitorConnectionStateLocked(requestStop: false);
+                    readSnapshot = true;
+                }
+                else
+                {
+                    _isConnecting = false;
+                    _connectTargetGame = null;
+                    _isDisconnecting = true;
+                    _disconnectProcessId = monitorProcessId;
+                    _disconnectRequestedAt = receivedAt;
+                    stopProcessId = monitorProcessId;
+                    result = CreateDisconnectingSnapshotLocked(detectedGame);
+                }
             }
 
-            int? monitorProcessId = _lastInjectionProcessId;
-            if (monitorProcessId is null || !IsMonitorLoadedInjectionState(_lastInjectionResult.State))
+            if (stopProcessId is not null)
             {
-                return false;
+                _eventMonitor.RequestStop(stopProcessId);
             }
 
-            IsConnecting = false;
-            IsDisconnecting = true;
-            _disconnectProcessId = monitorProcessId;
-            _disconnectRequestedAt = _timeProvider.GetUtcNow();
-            _gameSession.RequestMonitorStop(monitorProcessId);
-            return true;
-        }
-
-        public bool IsMonitorDisconnectComplete()
-        {
-            if (!IsDisconnecting)
-            {
-                return true;
-            }
-
-            if (_disconnectProcessId is not int processId)
-            {
-                return true;
-            }
-
-            if (_gameSession.IsMonitorStopComplete(processId))
-            {
-                return true;
-            }
-
-            return _disconnectRequestedAt is DateTimeOffset requestedAt
-                && _timeProvider.GetUtcNow() - requestedAt >= MonitorDisconnectTimeout;
-        }
-
-        public void CompleteDisconnect()
-        {
-            ResetMonitorConnectionState(requestStop: false);
+            return readSnapshot
+                ? ReadSnapshot(detectedGame, receivedAt)
+                : result!.Value;
         }
 
         public void ResetMonitorConnectionState(bool requestStop = true)
         {
-            int? monitorProcessId = _lastInjectionProcessId;
-            IsConnecting = false;
-            IsDisconnecting = false;
-            _disconnectProcessId = null;
-            _disconnectRequestedAt = null;
-            _lastInjectionProcessId = null;
-            _lastInjectionAttemptedAt = null;
-            _lastInjectionResult = DllInjectionResult.NotAttempted;
-            if (requestStop)
+            (int? monitorProcessId, bool shouldRequestStop) stopRequest;
+            lock (_syncRoot)
             {
-                _gameSession.RequestMonitorStop(monitorProcessId);
+                stopRequest = ResetMonitorConnectionStateLocked(requestStop);
+            }
+
+            if (stopRequest.shouldRequestStop)
+            {
+                _eventMonitor.RequestStop(stopRequest.monitorProcessId);
             }
         }
 
         public void Dispose()
         {
-            _gameSession.Dispose();
+            _processDetectionService.DetectedGameChanged -= OnDetectedGameChanged;
+            _processDetectionService.Dispose();
+            _eventMonitor.Dispose();
+            _memoryReader.Dispose();
         }
 
         private static bool IsMonitorLoadedInjectionState(DllInjectionState state)
@@ -224,7 +350,54 @@ namespace BO2.Services
             return state is DllInjectionState.Loaded or DllInjectionState.AlreadyInjected;
         }
 
-        private void ApplyMonitorReadinessTimeout(
+        private GameConnectionRefreshResult ReadDisconnectSnapshot(
+            DetectedGame? detectedGame,
+            DateTimeOffset receivedAt)
+        {
+            int? disconnectProcessId;
+            DateTimeOffset? disconnectRequestedAt;
+            bool isDisconnecting;
+            lock (_syncRoot)
+            {
+                isDisconnecting = _isDisconnecting;
+                disconnectProcessId = _disconnectProcessId;
+                disconnectRequestedAt = _disconnectRequestedAt;
+            }
+
+            if (!isDisconnecting)
+            {
+                return ReadSnapshot(detectedGame, receivedAt);
+            }
+
+            bool isComplete = disconnectProcessId is not int processId
+                || _eventMonitor.IsStopComplete(processId)
+                || (disconnectRequestedAt is DateTimeOffset requestedAt
+                    && receivedAt - requestedAt >= MonitorDisconnectTimeout);
+            if (!isComplete)
+            {
+                lock (_syncRoot)
+                {
+                    if (_isDisconnecting && _disconnectProcessId == disconnectProcessId)
+                    {
+                        return CreateDisconnectingSnapshotLocked(detectedGame);
+                    }
+                }
+
+                return ReadSnapshot(detectedGame, receivedAt);
+            }
+
+            lock (_syncRoot)
+            {
+                if (_isDisconnecting && _disconnectProcessId == disconnectProcessId)
+                {
+                    ResetMonitorConnectionStateLocked(requestStop: false);
+                }
+            }
+
+            return ReadSnapshot(detectedGame, receivedAt);
+        }
+
+        private (int? monitorProcessId, bool shouldRequestStop) ApplyMonitorReadinessTimeoutLocked(
             DetectedGame? detectedGame,
             GameEventMonitorStatus eventStatus,
             DateTimeOffset now)
@@ -236,23 +409,227 @@ namespace BO2.Services
                 || _lastInjectionAttemptedAt is not DateTimeOffset attemptedAt
                 || now - attemptedAt < MonitorReadinessRetryTimeout)
             {
-                return;
+                return (null, false);
             }
 
-            _gameSession.RequestMonitorStop(_lastInjectionProcessId);
+            int? monitorProcessId = _lastInjectionProcessId;
             _lastInjectionResult = new DllInjectionResult(
                 DllInjectionState.Failed,
                 AppStrings.Get("DllInjectionReadinessTimedOut"));
             _lastInjectionAttemptedAt = null;
+            return (monitorProcessId, true);
+        }
+
+        private void OnDetectedGameChanged(object? sender, DetectedGameChangedEventArgs args)
+        {
+            ApplyDetectedGame(args.DetectedGame, notify: true);
+        }
+
+        private DetectedGame? RefreshCurrentGame()
+        {
+            if (UsesPollingProcessDetection)
+            {
+                ApplyDetectedGame(DetectByPolling(), notify: false);
+            }
+
+            return CurrentGame;
+        }
+
+        private DetectedGame? DetectByPolling()
+        {
+            long diagnosticsStartedAt = RefreshDiagnostics.Start();
+            try
+            {
+                return _pollingProcessDetector.Detect();
+            }
+            finally
+            {
+                RefreshDiagnostics.WriteElapsed("process polling detect", diagnosticsStartedAt);
+            }
+        }
+
+        private GameConnectionRefreshResult ReadSnapshot(
+            DetectedGame? detectedGame,
+            DateTimeOffset receivedAt)
+        {
+            PlayerStatsReadResult readResult = _memoryReader.ReadPlayerStats(detectedGame);
+            int? ownedMonitorProcessId;
+            lock (_syncRoot)
+            {
+                if (!Equals(_currentGame, detectedGame))
+                {
+                    return CreateStatusSnapshotLocked(_currentGame);
+                }
+
+                ownedMonitorProcessId = detectedGame is not null
+                    && IsMonitorConnectedForLocked(detectedGame)
+                    && readResult.DetectedGame?.ProcessId == detectedGame.ProcessId
+                        ? detectedGame.ProcessId
+                        : null;
+            }
+
+            GameEventMonitorStatus eventStatus = ownedMonitorProcessId is int processId
+                ? _eventMonitor.ReadStatus(receivedAt, processId)
+                : GameEventMonitorStatus.WaitingForMonitor;
+
+            GameConnectionRefreshResult result;
+            (int? monitorProcessId, bool shouldRequestStop) stopRequest;
+            lock (_syncRoot)
+            {
+                if (!Equals(_currentGame, detectedGame))
+                {
+                    return CreateStatusSnapshotLocked(_currentGame);
+                }
+
+                stopRequest = ApplyMonitorReadinessTimeoutLocked(readResult.DetectedGame, eventStatus, receivedAt);
+                result = CreateRefreshResultLocked(detectedGame, readResult, eventStatus);
+            }
+
+            if (stopRequest.shouldRequestStop)
+            {
+                _eventMonitor.RequestStop(stopRequest.monitorProcessId);
+            }
+
+            return result;
+        }
+
+        private static PlayerStatsReadResult CreateStatusReadResult(DetectedGame? detectedGame)
+        {
+            if (detectedGame is null)
+            {
+                return PlayerStatsReadResult.GameNotRunning;
+            }
+
+            if (detectedGame.AddressMap is null)
+            {
+                string statusText = string.IsNullOrWhiteSpace(detectedGame.UnsupportedReason)
+                    ? AppStrings.Format("UnsupportedStatusFormat", detectedGame.DisplayName)
+                    : AppStrings.Format("UnsupportedStatusWithReasonFormat", detectedGame.DisplayName, detectedGame.UnsupportedReason);
+
+                return new PlayerStatsReadResult(
+                    detectedGame,
+                    null,
+                    statusText,
+                    ConnectionState.Unsupported);
+            }
+
+            return new PlayerStatsReadResult(
+                detectedGame,
+                null,
+                AppStrings.Format("GameDetectedConnectPromptFormat", detectedGame.DisplayName),
+                ConnectionState.Detected);
+        }
+
+        private void ApplyDetectedGame(DetectedGame? detectedGame, bool notify)
+        {
+            EventHandler<DetectedGameChangedEventArgs>? handler;
+            (int? monitorProcessId, bool shouldRequestStop) stopRequest;
+            lock (_syncRoot)
+            {
+                if (Equals(_currentGame, detectedGame))
+                {
+                    return;
+                }
+
+                _currentGame = detectedGame;
+                handler = DetectedGameChanged;
+                stopRequest = ResetMonitorConnectionStateLocked();
+            }
+
+            if (stopRequest.shouldRequestStop)
+            {
+                _eventMonitor.RequestStop(stopRequest.monitorProcessId);
+            }
+
+            if (notify)
+            {
+                handler?.Invoke(this, new DetectedGameChangedEventArgs(detectedGame));
+            }
+        }
+
+        private GameConnectionRefreshResult CreateStatusSnapshotLocked(DetectedGame? detectedGame)
+        {
+            return CreateRefreshResultLocked(
+                detectedGame,
+                CreateStatusReadResult(detectedGame),
+                GameEventMonitorStatus.WaitingForMonitor);
+        }
+
+        private GameConnectionRefreshResult CreateDisconnectingSnapshotLocked(DetectedGame? detectedGame)
+        {
+            return CreateRefreshResultLocked(
+                detectedGame,
+                CreateStatusReadResult(detectedGame),
+                GameEventMonitorStatus.WaitingForMonitor);
+        }
+
+        private GameConnectionRefreshResult CreateRefreshResultLocked(
+            DetectedGame? detectedGame,
+            PlayerStatsReadResult readResult,
+            GameEventMonitorStatus eventStatus)
+        {
+            return new GameConnectionRefreshResult(
+                detectedGame,
+                readResult,
+                eventStatus,
+                _lastInjectionResult,
+                _isConnecting,
+                _isDisconnecting,
+                CanAttemptConnectLocked(detectedGame),
+                HasInjectionAttemptForLocked(detectedGame),
+                IsMonitorConnectedForLocked(detectedGame));
+        }
+
+        private bool CanAttemptConnectLocked(DetectedGame? detectedGame)
+        {
+            return !_isConnecting
+                && !_isDisconnecting
+                && detectedGame is not null
+                && detectedGame.Variant == GameVariant.SteamZombies
+                && detectedGame.IsStatsSupported
+                && !IsMonitorConnectedForLocked(detectedGame);
+        }
+
+        private bool HasInjectionAttemptForLocked(DetectedGame? detectedGame)
+        {
+            return detectedGame is not null
+                && _lastInjectionProcessId == detectedGame.ProcessId
+                && _lastInjectionResult.State != DllInjectionState.NotAttempted;
+        }
+
+        private bool IsMonitorConnectedForLocked(DetectedGame? detectedGame)
+        {
+            return detectedGame is not null
+                && _lastInjectionProcessId == detectedGame.ProcessId
+                && IsMonitorLoadedInjectionState(_lastInjectionResult.State);
+        }
+
+        private (int? monitorProcessId, bool shouldRequestStop) ResetMonitorConnectionStateLocked(bool requestStop = true)
+        {
+            int? monitorProcessId = _lastInjectionProcessId;
+            bool stopAlreadyRequested = _isDisconnecting
+                && monitorProcessId is not null
+                && _disconnectProcessId == monitorProcessId;
+            _isConnecting = false;
+            _isDisconnecting = false;
+            _connectTargetGame = null;
+            _disconnectProcessId = null;
+            _disconnectRequestedAt = null;
+            _lastInjectionProcessId = null;
+            _lastInjectionAttemptedAt = null;
+            _lastInjectionResult = DllInjectionResult.NotAttempted;
+            return (monitorProcessId, requestStop && !stopAlreadyRequested);
         }
     }
 
-    internal readonly record struct GameConnectionConnectResult(
-        DllInjectionResult InjectionResult,
-        GameEventMonitorStatus EventStatus);
-
     internal readonly record struct GameConnectionRefreshResult(
+        DetectedGame? CurrentGame,
         PlayerStatsReadResult ReadResult,
         GameEventMonitorStatus EventStatus,
-        DllInjectionResult InjectionResult);
+        DllInjectionResult InjectionResult,
+        bool IsConnecting,
+        bool IsDisconnecting,
+        bool CanAttemptConnect,
+        bool HasInjectionAttemptForCurrentGame,
+        bool IsMonitorConnectedForCurrentGame);
 }
