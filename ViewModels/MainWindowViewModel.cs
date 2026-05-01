@@ -56,12 +56,7 @@ namespace BO2.ViewModels
         private GameEventMonitorStatus _latestEventStatus = GameEventMonitorStatus.WaitingForMonitor;
 
         public MainWindowViewModel(DispatcherQueue dispatcherQueue)
-            : this(dispatcherQueue, new GameSessionCoordinator())
-        {
-        }
-
-        internal MainWindowViewModel(DispatcherQueue dispatcherQueue, GameSessionCoordinator gameSession)
-            : this(dispatcherQueue, new GameConnectionSession(gameSession))
+            : this(dispatcherQueue, new GameConnectionSession())
         {
         }
 

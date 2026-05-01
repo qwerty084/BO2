@@ -39,7 +39,6 @@
     <Compile Include="..\Services\ProcessLifecycleEventArgs.cs" Link="Services\ProcessLifecycleEventArgs.cs" />
     <Compile Include="..\Services\GameProcessDefinition.cs"     Link="Services\GameProcessDefinition.cs" />
     <Compile Include="..\Services\GameProcessDetectionService.cs" Link="Services\GameProcessDetectionService.cs" />
-    <Compile Include="..\Services\GameSessionCoordinator.cs"    Link="Services\GameSessionCoordinator.cs" />
     <Compile Include="..\Services\GameVariant.cs"               Link="Services\GameVariant.cs" />
     <Compile Include="..\Services\GameCompatibilityState.cs"    Link="Services\GameCompatibilityState.cs" />
     <Compile Include="..\Services\GameEvent.cs"                 Link="Services\GameEvent.cs" />

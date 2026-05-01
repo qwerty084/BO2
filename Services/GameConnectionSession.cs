@@ -1,4 +1,6 @@
 using System;
+using System.Management;
+using System.Runtime.InteropServices;
 
 namespace BO2.Services
 {
@@ -8,9 +10,14 @@ namespace BO2.Services
         private static readonly TimeSpan MonitorDisconnectTimeout = TimeSpan.FromSeconds(3);
 
         private readonly object _syncRoot = new();
-        private readonly GameSessionCoordinator _gameSession;
+        private readonly GameMemoryReader _memoryReader;
+        private readonly GameProcessDetectionService _processDetectionService;
+        private readonly IGameProcessDetector _pollingProcessDetector;
+        private readonly DllInjector _dllInjector;
+        private readonly IGameEventMonitor _eventMonitor;
         private readonly TimeProvider _timeProvider;
         private DetectedGame? _currentGame;
+        private bool _usesPollingProcessDetection;
         private DllInjectionResult _lastInjectionResult = DllInjectionResult.NotAttempted;
         private int? _lastInjectionProcessId;
         private DateTimeOffset? _lastInjectionAttemptedAt;
@@ -19,29 +26,60 @@ namespace BO2.Services
         private DateTimeOffset? _disconnectRequestedAt;
 
         public GameConnectionSession()
-            : this(new GameSessionCoordinator(), TimeProvider.System)
+            : this(
+                new GameMemoryReader(),
+                new GameProcessDetectionService(),
+                new GameProcessDetector(),
+                new DllInjector(),
+                new GameEventMonitor(),
+                TimeProvider.System)
         {
         }
 
-        internal GameConnectionSession(GameSessionCoordinator gameSession)
-            : this(gameSession, TimeProvider.System)
+        internal GameConnectionSession(
+            GameMemoryReader memoryReader,
+            GameProcessDetectionService processDetectionService,
+            IGameProcessDetector pollingProcessDetector,
+            DllInjector dllInjector,
+            IGameEventMonitor eventMonitor)
+            : this(
+                memoryReader,
+                processDetectionService,
+                pollingProcessDetector,
+                dllInjector,
+                eventMonitor,
+                TimeProvider.System)
         {
         }
 
-        internal GameConnectionSession(GameSessionCoordinator gameSession, TimeProvider timeProvider)
+        internal GameConnectionSession(
+            GameMemoryReader memoryReader,
+            GameProcessDetectionService processDetectionService,
+            IGameProcessDetector pollingProcessDetector,
+            DllInjector dllInjector,
+            IGameEventMonitor eventMonitor,
+            TimeProvider timeProvider)
         {
-            ArgumentNullException.ThrowIfNull(gameSession);
+            ArgumentNullException.ThrowIfNull(memoryReader);
+            ArgumentNullException.ThrowIfNull(processDetectionService);
+            ArgumentNullException.ThrowIfNull(pollingProcessDetector);
+            ArgumentNullException.ThrowIfNull(dllInjector);
+            ArgumentNullException.ThrowIfNull(eventMonitor);
             ArgumentNullException.ThrowIfNull(timeProvider);
 
-            _gameSession = gameSession;
+            _memoryReader = memoryReader;
+            _processDetectionService = processDetectionService;
+            _pollingProcessDetector = pollingProcessDetector;
+            _dllInjector = dllInjector;
+            _eventMonitor = eventMonitor;
             _timeProvider = timeProvider;
-            _currentGame = _gameSession.CurrentGame;
-            _gameSession.DetectedGameChanged += OnDetectedGameChanged;
+            _currentGame = _processDetectionService.CurrentGame;
+            _processDetectionService.DetectedGameChanged += OnDetectedGameChanged;
         }
 
         public event EventHandler<DetectedGameChangedEventArgs>? DetectedGameChanged;
 
-        public bool UsesPollingProcessDetection => _gameSession.UsesPollingProcessDetection;
+        public bool UsesPollingProcessDetection => _usesPollingProcessDetection;
 
         public DetectedGame? CurrentGame
         {
@@ -62,8 +100,16 @@ namespace BO2.Services
 
         public void Start()
         {
-            _gameSession.Start();
-            ApplyDetectedGame(_gameSession.CurrentGame, notify: false);
+            try
+            {
+                _processDetectionService.Start();
+            }
+            catch (Exception ex) when (ex is ManagementException or UnauthorizedAccessException or COMException)
+            {
+                _usesPollingProcessDetection = true;
+            }
+
+            ApplyDetectedGame(_processDetectionService.CurrentGame, notify: false);
         }
 
         public GameConnectionRefreshResult Read()
@@ -153,7 +199,7 @@ namespace BO2.Services
                 return DllInjectionResult.NotAttempted;
             }
 
-            return _gameSession.Inject(connectTargetGame);
+            return _dllInjector.Inject(connectTargetGame);
         }
 
         public GameConnectionRefreshResult CompleteConnect(DllInjectionResult injectionResult)
@@ -199,7 +245,7 @@ namespace BO2.Services
             IsDisconnecting = true;
             _disconnectProcessId = monitorProcessId;
             _disconnectRequestedAt = receivedAt;
-            _gameSession.RequestMonitorStop(monitorProcessId);
+            _eventMonitor.RequestStop(monitorProcessId);
             return CreateDisconnectingSnapshot(detectedGame);
         }
 
@@ -219,14 +265,16 @@ namespace BO2.Services
             _lastInjectionResult = DllInjectionResult.NotAttempted;
             if (requestStop && !stopAlreadyRequested)
             {
-                _gameSession.RequestMonitorStop(monitorProcessId);
+                _eventMonitor.RequestStop(monitorProcessId);
             }
         }
 
         public void Dispose()
         {
-            _gameSession.DetectedGameChanged -= OnDetectedGameChanged;
-            _gameSession.Dispose();
+            _processDetectionService.DetectedGameChanged -= OnDetectedGameChanged;
+            _processDetectionService.Dispose();
+            _eventMonitor.Dispose();
+            _memoryReader.Dispose();
         }
 
         private static bool IsMonitorLoadedInjectionState(DllInjectionState state)
@@ -259,7 +307,7 @@ namespace BO2.Services
                 return true;
             }
 
-            if (_gameSession.IsMonitorStopComplete(processId))
+            if (_eventMonitor.IsStopComplete(processId))
             {
                 return true;
             }
@@ -288,7 +336,7 @@ namespace BO2.Services
                 return;
             }
 
-            _gameSession.RequestMonitorStop(_lastInjectionProcessId);
+            _eventMonitor.RequestStop(_lastInjectionProcessId);
             _lastInjectionResult = new DllInjectionResult(
                 DllInjectionState.Failed,
                 AppStrings.Get("DllInjectionReadinessTimedOut"));
@@ -304,10 +352,23 @@ namespace BO2.Services
         {
             if (UsesPollingProcessDetection)
             {
-                ApplyDetectedGame(_gameSession.DetectByPolling(), notify: false);
+                ApplyDetectedGame(DetectByPolling(), notify: false);
             }
 
             return CurrentGame;
+        }
+
+        private DetectedGame? DetectByPolling()
+        {
+            long diagnosticsStartedAt = RefreshDiagnostics.Start();
+            try
+            {
+                return _pollingProcessDetector.Detect();
+            }
+            finally
+            {
+                RefreshDiagnostics.WriteElapsed("process polling detect", diagnosticsStartedAt);
+            }
         }
 
         private GameConnectionRefreshResult ReadSnapshot(
@@ -317,10 +378,10 @@ namespace BO2.Services
             int? ownedMonitorProcessId = IsMonitorConnectedFor(detectedGame)
                 ? detectedGame?.ProcessId
                 : null;
-            PlayerStatsReadResult readResult = _gameSession.ReadPlayerStats(detectedGame);
+            PlayerStatsReadResult readResult = _memoryReader.ReadPlayerStats(detectedGame);
             GameEventMonitorStatus eventStatus = ownedMonitorProcessId is int processId
                 && readResult.DetectedGame?.ProcessId == processId
-                ? _gameSession.ReadEventMonitorStatus(receivedAt, processId)
+                ? _eventMonitor.ReadStatus(receivedAt, processId)
                 : GameEventMonitorStatus.WaitingForMonitor;
 
             ApplyMonitorReadinessTimeout(readResult.DetectedGame, eventStatus, receivedAt);

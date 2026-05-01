@@ -489,13 +489,13 @@ namespace BO2.Tests.Services
             memoryAccessor ??= new FakeProcessMemoryAccessor();
             lifecycleEventSource ??= new FakeProcessLifecycleEventSource();
 
-            GameSessionCoordinator coordinator = new(
+            GameConnectionSession session = new(
                 new GameMemoryReader(memoryAccessor),
                 new GameProcessDetectionService(eventDetector, lifecycleEventSource),
                 pollingProcessDetector,
                 dllInjector ?? CreateDllInjector(),
-                eventMonitor);
-            GameConnectionSession session = new(coordinator, timeProvider ?? TimeProvider.System);
+                eventMonitor,
+                timeProvider ?? TimeProvider.System);
             return new SessionContext(
                 session,
                 eventDetector,
