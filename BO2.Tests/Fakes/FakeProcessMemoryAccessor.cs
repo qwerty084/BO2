@@ -17,6 +17,8 @@ namespace BO2.Tests.Fakes
 
         public Exception? AttachException { get; set; }
 
+        public Action<int, string>? AttachCallback { get; set; }
+
         public int AttachCallCount { get; private set; }
 
         public int CloseCallCount { get; private set; }
@@ -46,6 +48,7 @@ namespace BO2.Tests.Fakes
         public void Attach(int processId, string processName)
         {
             AttachCallCount++;
+            AttachCallback?.Invoke(processId, processName);
 
             if (AttachException is not null)
             {

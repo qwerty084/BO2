@@ -275,6 +275,45 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void Read_WhenCurrentGameChangesDuringStatsRead_ReturnsCurrentStatusSnapshot()
+        {
+            DetectedGame connectedGame = CreateSupportedGame(processId: 1001);
+            DetectedGame detectedGame = CreateSupportedGame(processId: 2002);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            SessionContext context = CreateSessionContext(
+                eventMonitor,
+                detectedGame: connectedGame,
+                memoryAccessor: memoryAccessor);
+            context.Session.Start();
+            CompleteConnectWithLoadedMonitor(context.Session);
+            eventMonitor.ResetCalls();
+            memoryAccessor.AttachCallback = (_, _) =>
+            {
+                context.EventDetector.Result = detectedGame;
+                context.LifecycleEventSource.RaiseStarted(detectedGame.ProcessName, detectedGame.ProcessId);
+            };
+
+            GameConnectionRefreshResult snapshot = context.Session.Read();
+
+            Assert.Same(detectedGame, snapshot.CurrentGame);
+            Assert.Same(detectedGame, snapshot.ReadResult.DetectedGame);
+            Assert.Null(snapshot.ReadResult.Stats);
+            Assert.Equal(ConnectionState.Detected, snapshot.ReadResult.ConnectionState);
+            Assert.Equal(DllInjectionState.NotAttempted, snapshot.InjectionResult.State);
+            Assert.False(snapshot.HasInjectionAttemptForCurrentGame);
+            Assert.False(snapshot.IsMonitorConnectedForCurrentGame);
+            Assert.False(context.Session.IsMonitorConnectedFor(connectedGame));
+            Assert.False(context.Session.IsMonitorConnectedFor(detectedGame));
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(1, eventMonitor.RequestStopCallCount);
+            Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);
+        }
+
+        [Fact]
         public void Read_WhenMonitorReadinessTimesOut_RequestsStopAndMarksInjectionFailed()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
