@@ -135,7 +135,7 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void Read_WhenCurrentGameChangesAfterConnect_DoesNotReadEventMonitor()
+        public void Read_WhenCurrentGameChangesAfterConnect_StopsOldMonitorAndDoesNotReadEventMonitor()
         {
             DetectedGame connectedGame = CreateSupportedGame(processId: 1001);
             DetectedGame detectedGame = CreateSupportedGame(processId: 2002);
@@ -146,16 +146,20 @@ namespace BO2.Tests.Services
             SessionContext context = CreateSessionContext(eventMonitor, detectedGame: connectedGame);
             context.Session.Start();
             context.Session.CompleteConnect(connectedGame, CreateLoadedInjectionResult());
+            eventMonitor.ResetCalls();
             context.EventDetector.Result = detectedGame;
             context.LifecycleEventSource.RaiseStarted(detectedGame.ProcessName, detectedGame.ProcessId);
-            eventMonitor.ResetCalls();
 
             GameConnectionRefreshResult snapshot = context.Session.Read();
 
             Assert.Same(detectedGame, snapshot.CurrentGame);
+            Assert.Equal(DllInjectionState.NotAttempted, snapshot.InjectionResult.State);
             Assert.Equal(GameCompatibilityState.WaitingForMonitor, snapshot.EventStatus.CompatibilityState);
+            Assert.False(snapshot.HasInjectionAttemptForCurrentGame);
             Assert.False(snapshot.IsMonitorConnectedForCurrentGame);
             Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(1, eventMonitor.RequestStopCallCount);
+            Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);
         }
 
         [Fact]

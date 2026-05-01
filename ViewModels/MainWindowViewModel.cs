@@ -549,15 +549,41 @@ namespace BO2.ViewModels
         private void ApplyRefreshSnapshot(GameConnectionRefreshResult snapshot)
         {
             _detectedGame = snapshot.CurrentGame;
-            ApplyReadResult(snapshot.ReadResult);
-            ApplyEventMonitorStatus(snapshot.CurrentGame, snapshot.InjectionResult, snapshot.EventStatus);
-            UpdateConnectButtonState(snapshot.CurrentGame);
+            bool readResultIsForCurrentGame = Equals(snapshot.ReadResult.DetectedGame, snapshot.CurrentGame);
+            ApplyReadResult(
+                snapshot.ReadResult,
+                snapshot.IsConnecting,
+                snapshot.IsDisconnecting,
+                readResultIsForCurrentGame && snapshot.IsMonitorConnectedForCurrentGame);
+            ApplyEventMonitorStatus(
+                snapshot.CurrentGame,
+                snapshot.InjectionResult,
+                snapshot.EventStatus,
+                snapshot.IsConnecting,
+                snapshot.IsDisconnecting,
+                snapshot.HasInjectionAttemptForCurrentGame,
+                snapshot.IsMonitorConnectedForCurrentGame);
+            UpdateConnectButtonState(
+                snapshot.CurrentGame,
+                snapshot.CanAttemptConnect,
+                snapshot.IsConnecting,
+                snapshot.IsDisconnecting,
+                snapshot.IsMonitorConnectedForCurrentGame);
         }
 
-        private void ApplyReadResult(PlayerStatsReadResult result)
+        private void ApplyReadResult(
+            PlayerStatsReadResult result,
+            bool isConnecting,
+            bool isDisconnecting,
+            bool isMonitorConnectedForDetectedGame)
         {
             DetectedGameText = result.DetectedGame?.DisplayName ?? AppStrings.Get("NoGameDetected");
-            ApplyConnectionStatus(result.DetectedGame, result.StatusText);
+            ApplyConnectionStatus(
+                result.DetectedGame,
+                result.StatusText,
+                isConnecting,
+                isDisconnecting,
+                isMonitorConnectedForDetectedGame);
 
             if (result.Stats is null)
             {
@@ -583,6 +609,21 @@ namespace BO2.ViewModels
 
         private void ApplyConnectionStatus(DetectedGame? detectedGame, string? connectedStatusText = null)
         {
+            ApplyConnectionStatus(
+                detectedGame,
+                connectedStatusText,
+                _connectionSession.IsConnecting,
+                _connectionSession.IsDisconnecting,
+                _connectionSession.IsMonitorConnectedFor(detectedGame));
+        }
+
+        private void ApplyConnectionStatus(
+            DetectedGame? detectedGame,
+            string? connectedStatusText,
+            bool isConnecting,
+            bool isDisconnecting,
+            bool isMonitorConnectedForDetectedGame)
+        {
             if (detectedGame is null)
             {
                 StatusText = AppStrings.Get("GameNotRunning");
@@ -597,21 +638,21 @@ namespace BO2.ViewModels
                 return;
             }
 
-            if (_connectionSession.IsDisconnecting)
+            if (isDisconnecting)
             {
                 StatusText = AppStrings.Get("ConnectionStatusDisconnecting");
                 SetConnectionState(detectedGame, ConnectionState.Disconnecting);
                 return;
             }
 
-            if (_connectionSession.IsConnecting)
+            if (isConnecting)
             {
                 StatusText = AppStrings.Get("ConnectionStatusConnecting");
                 SetConnectionState(detectedGame, ConnectionState.Detected);
                 return;
             }
 
-            if (_connectionSession.IsMonitorConnectedFor(detectedGame))
+            if (isMonitorConnectedForDetectedGame)
             {
                 StatusText = connectedStatusText ?? AppStrings.Format("ConnectedStatusFormat", detectedGame.DisplayName);
                 SetConnectionState(detectedGame, ConnectionState.Connected);
@@ -770,9 +811,28 @@ namespace BO2.ViewModels
             DllInjectionResult injectionResult,
             GameEventMonitorStatus eventStatus)
         {
+            ApplyEventMonitorStatus(
+                detectedGame,
+                injectionResult,
+                eventStatus,
+                _connectionSession.IsConnecting,
+                _connectionSession.IsDisconnecting,
+                _connectionSession.HasInjectionAttemptFor(detectedGame),
+                _connectionSession.IsMonitorConnectedFor(detectedGame));
+        }
+
+        private void ApplyEventMonitorStatus(
+            DetectedGame? detectedGame,
+            DllInjectionResult injectionResult,
+            GameEventMonitorStatus eventStatus,
+            bool isConnecting,
+            bool isDisconnecting,
+            bool hasInjectionAttemptForDetectedGame,
+            bool isMonitorConnectedForDetectedGame)
+        {
             LatestEventStatus = eventStatus;
 
-            if (_connectionSession.IsDisconnecting)
+            if (isDisconnecting)
             {
                 ApplyDisconnectingState(detectedGame);
                 return;
@@ -807,11 +867,11 @@ namespace BO2.ViewModels
             }
 
             EventCompatibilityText = AppStrings.Get("GameProcessDetectorDisplayNameSteamZombies");
-            if (!_connectionSession.IsMonitorConnectedFor(detectedGame))
+            if (!isMonitorConnectedForDetectedGame)
             {
-                InjectionStatusText = _connectionSession.IsConnecting
+                InjectionStatusText = isConnecting
                     ? AppStrings.Get("DllInjectionConnecting")
-                    : _connectionSession.HasInjectionAttemptFor(detectedGame)
+                    : hasInjectionAttemptForDetectedGame
                         ? injectionResult.Message
                         : AppStrings.Get("DllInjectionWaitingForConnect");
                 EventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForConnect");
@@ -888,28 +948,60 @@ namespace BO2.ViewModels
 
         private void UpdateConnectButtonState(DetectedGame? detectedGame)
         {
-            ConnectButtonText = GetConnectButtonText(detectedGame);
-            IsConnectButtonEnabled = _connectionSession.CanAttemptConnect(detectedGame);
+            UpdateConnectButtonState(
+                detectedGame,
+                _connectionSession.CanAttemptConnect(detectedGame),
+                _connectionSession.IsConnecting,
+                _connectionSession.IsDisconnecting,
+                _connectionSession.IsMonitorConnectedFor(detectedGame));
+        }
+
+        private void UpdateConnectButtonState(
+            DetectedGame? detectedGame,
+            bool canAttemptConnect,
+            bool isConnecting,
+            bool isDisconnecting,
+            bool isMonitorConnectedForDetectedGame)
+        {
+            ConnectButtonText = GetConnectButtonText(
+                detectedGame,
+                isConnecting,
+                isDisconnecting,
+                isMonitorConnectedForDetectedGame);
+            IsConnectButtonEnabled = canAttemptConnect;
         }
 
         private string GetConnectButtonText(DetectedGame? detectedGame)
+        {
+            return GetConnectButtonText(
+                detectedGame,
+                _connectionSession.IsConnecting,
+                _connectionSession.IsDisconnecting,
+                _connectionSession.IsMonitorConnectedFor(detectedGame));
+        }
+
+        private static string GetConnectButtonText(
+            DetectedGame? detectedGame,
+            bool isConnecting,
+            bool isDisconnecting,
+            bool isMonitorConnectedForDetectedGame)
         {
             if (detectedGame is null)
             {
                 return AppStrings.Get("ConnectButtonWaitingForGameText");
             }
 
-            if (_connectionSession.IsConnecting)
+            if (isConnecting)
             {
                 return AppStrings.Get("ConnectButtonConnectingText");
             }
 
-            if (_connectionSession.IsDisconnecting)
+            if (isDisconnecting)
             {
                 return AppStrings.Get("ConnectionCardStatusDisconnecting");
             }
 
-            if (_connectionSession.IsMonitorConnectedFor(detectedGame))
+            if (isMonitorConnectedForDetectedGame)
             {
                 return AppStrings.Get("ConnectButtonConnectedText");
             }
