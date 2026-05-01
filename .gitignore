@@ -8,3 +8,6 @@ obj/
 .agents/skills/
 .reverse/
 .scratch
+.act-artifacts/
+.act-dotnet/
+.act-toolcache/
