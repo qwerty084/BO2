@@ -375,8 +375,8 @@ namespace BO2.Services
             DetectedGame? detectedGame,
             DateTimeOffset receivedAt)
         {
-            int? ownedMonitorProcessId = IsMonitorConnectedFor(detectedGame)
-                ? detectedGame?.ProcessId
+            int? ownedMonitorProcessId = detectedGame is not null && IsMonitorConnectedFor(detectedGame)
+                ? detectedGame.ProcessId
                 : null;
             PlayerStatsReadResult readResult = _memoryReader.ReadPlayerStats(detectedGame);
             GameEventMonitorStatus eventStatus = ownedMonitorProcessId is int processId
