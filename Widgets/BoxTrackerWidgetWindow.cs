@@ -43,6 +43,7 @@ namespace BO2.Widgets
 
         private static readonly WndProcDelegate s_wndProc = WndProc;
         private static readonly Dictionary<nint, BoxTrackerWidgetWindow> s_windows = new();
+        private static readonly object s_windowsLock = new();
         private static bool s_classRegistered;
 
         private nint _windowHandle;
@@ -77,7 +78,10 @@ namespace BO2.Widgets
                 throw new InvalidOperationException("Failed to create Box Tracker widget window.");
             }
 
-            s_windows[_windowHandle] = this;
+            lock (s_windowsLock)
+            {
+                s_windows[_windowHandle] = this;
+            }
         }
 
         public event EventHandler? Closed;
@@ -184,7 +188,13 @@ namespace BO2.Widgets
 
         private static nint WndProc(nint hwnd, uint message, nint wParam, nint lParam)
         {
-            if (!s_windows.TryGetValue(hwnd, out BoxTrackerWidgetWindow? window))
+            BoxTrackerWidgetWindow? window;
+            lock (s_windowsLock)
+            {
+                _ = s_windows.TryGetValue(hwnd, out window);
+            }
+
+            if (window is null)
             {
                 return DefWindowProc(hwnd, message, wParam, lParam);
             }
@@ -309,7 +319,12 @@ namespace BO2.Widgets
                 return;
             }
 
-            s_windows.Remove(_windowHandle);
+            nint windowHandle = _windowHandle;
+            lock (s_windowsLock)
+            {
+                s_windows.Remove(windowHandle);
+            }
+
             _windowHandle = nint.Zero;
             _closed = true;
             Closed?.Invoke(this, EventArgs.Empty);
