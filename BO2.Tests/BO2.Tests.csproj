@@ -16,6 +16,10 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="coverlet.collector" Version="6.0.4">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <!-- FakeTimeProvider for deterministic cache-expiry tests -->
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="8.1.0" />
     <!-- Needed to compile WindowsProcessInfoProvider (linked below) -->
@@ -52,6 +56,7 @@
     <Compile Include="..\Services\WidgetSettings.cs"            Link="Services\WidgetSettings.cs" />
     <Compile Include="..\Services\WidgetSettingsDocument.cs"    Link="Services\WidgetSettingsDocument.cs" />
     <Compile Include="..\Services\WidgetSettingsStore.cs"       Link="Services\WidgetSettingsStore.cs" />
+    <Compile Include="..\Services\SettingsJsonSerializerContext.cs" Link="Services\SettingsJsonSerializerContext.cs" />
     <Compile Include="..\Services\IGameEventMonitor.cs"         Link="Services\IGameEventMonitor.cs" />
     <Compile Include="..\Services\RefreshDiagnostics.cs"        Link="Services\RefreshDiagnostics.cs" />
     <Compile Include="..\Services\IProcessInfoProvider.cs"      Link="Services\IProcessInfoProvider.cs" />

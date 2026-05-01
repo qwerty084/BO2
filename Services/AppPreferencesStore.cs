@@ -6,11 +6,6 @@ namespace BO2.Services
 {
     public sealed class AppPreferencesStore
     {
-        private static readonly JsonSerializerOptions JsonOptions = new()
-        {
-            WriteIndented = true
-        };
-
         private readonly string _preferencesPath;
 
         public AppPreferencesStore(string preferencesPath)
@@ -35,7 +30,9 @@ namespace BO2.Services
                 }
 
                 string json = File.ReadAllText(_preferencesPath);
-                AppPreferences? preferences = JsonSerializer.Deserialize<AppPreferences>(json, JsonOptions);
+                AppPreferences? preferences = JsonSerializer.Deserialize(
+                    json,
+                    SettingsJsonSerializerContext.Default.AppPreferences);
                 if (preferences is null || preferences.Version > AppPreferences.CurrentVersion)
                 {
                     return AppPreferences.CreateDefault();
@@ -68,7 +65,9 @@ namespace BO2.Services
             }
 
             string tempPath = _preferencesPath + ".tmp";
-            string json = JsonSerializer.Serialize(preferences, JsonOptions);
+            string json = JsonSerializer.Serialize(
+                preferences,
+                SettingsJsonSerializerContext.Default.AppPreferences);
             File.WriteAllText(tempPath, json);
             File.Move(tempPath, _preferencesPath, overwrite: true);
         }

@@ -65,6 +65,21 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void Save_WritesIndentedJson()
+        {
+            string settingsPath = CreateSettingsPath();
+            var store = new WidgetSettingsStore(settingsPath);
+            WidgetSettingsDocument document = WidgetSettingsDocument.CreateDefault();
+
+            store.Save(document);
+            string json = File.ReadAllText(settingsPath);
+
+            Assert.Contains("\n  \"Version\": 1", json, StringComparison.Ordinal);
+            Assert.Contains("\n  \"Widgets\": {", json, StringComparison.Ordinal);
+            Assert.Contains("\n    \"BoxTracker\": {", json, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void Load_WhenJsonIsInvalid_ReturnsDefaultSettings()
         {
             string settingsPath = CreateSettingsPath();
