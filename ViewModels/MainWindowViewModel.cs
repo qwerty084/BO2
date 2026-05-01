@@ -453,9 +453,10 @@ namespace BO2.ViewModels
 
         private async Task TryApplyReadErrorAsync(string message, CancellationToken cancellationToken)
         {
+            DetectedGame? detectedGame = _connectionSession.CurrentGame;
             try
             {
-                await RunOnDispatcherAsync(() => ApplyReadError(message), cancellationToken);
+                await RunOnDispatcherAsync(() => ApplyReadError(message, detectedGame), cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -926,10 +927,12 @@ namespace BO2.ViewModels
             return AppStrings.Get("ConnectButtonText");
         }
 
-        private void ApplyReadError(string message)
+        private void ApplyReadError(string message, DetectedGame? detectedGame)
         {
+            _detectedGame = detectedGame;
             _connectionSession.ClearTransientOperationState();
             ClearStats();
+            DetectedGameText = detectedGame?.DisplayName ?? AppStrings.Get("NoGameDetected");
             EventCompatibilityText = AppStrings.Get("NoGameDetected");
             InjectionStatusText = AppStrings.Get("DllInjectionNotAttempted");
             EventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForMonitor");
@@ -939,8 +942,8 @@ namespace BO2.ViewModels
             BoxEventsText = AppStrings.Get("RecentEventsEmpty");
             RecentGameEventsText = AppStrings.Get("RecentEventsEmpty");
             StatusText = message;
-            SetConnectionState(_detectedGame, ConnectionState.Disconnected);
-            UpdateConnectButtonState(_detectedGame);
+            SetConnectionState(detectedGame, ConnectionState.Disconnected);
+            UpdateConnectButtonState(detectedGame);
         }
 
         private void SetConnectionState(DetectedGame? detectedGame, ConnectionState connectionState)
