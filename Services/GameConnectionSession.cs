@@ -73,6 +73,11 @@ namespace BO2.Services
             {
                 DateTimeOffset receivedAt = _timeProvider.GetUtcNow();
                 DetectedGame? detectedGame = RefreshCurrentGame();
+                if (IsDisconnecting)
+                {
+                    return ReadDisconnectSnapshot(detectedGame, receivedAt);
+                }
+
                 return ReadSnapshot(detectedGame, receivedAt);
             }
             finally
@@ -173,28 +178,76 @@ namespace BO2.Services
             return ReadSnapshot(detectedGame, receivedAt);
         }
 
-        public bool TryBeginDisconnect()
+        public GameConnectionRefreshResult BeginDisconnect()
         {
+            DateTimeOffset receivedAt = _timeProvider.GetUtcNow();
+            DetectedGame? detectedGame = RefreshCurrentGame();
             if (IsDisconnecting)
             {
-                return true;
+                return CreateDisconnectingSnapshot(detectedGame);
             }
 
             int? monitorProcessId = _lastInjectionProcessId;
             if (monitorProcessId is null || !IsMonitorLoadedInjectionState(_lastInjectionResult.State))
             {
-                return false;
+                ResetMonitorConnectionState(requestStop: false);
+                return ReadSnapshot(detectedGame, receivedAt);
             }
 
             IsConnecting = false;
+            _connectTargetGame = null;
             IsDisconnecting = true;
             _disconnectProcessId = monitorProcessId;
-            _disconnectRequestedAt = _timeProvider.GetUtcNow();
+            _disconnectRequestedAt = receivedAt;
             _gameSession.RequestMonitorStop(monitorProcessId);
-            return true;
+            return CreateDisconnectingSnapshot(detectedGame);
         }
 
-        public bool IsMonitorDisconnectComplete()
+        public void ResetMonitorConnectionState(bool requestStop = true)
+        {
+            int? monitorProcessId = _lastInjectionProcessId;
+            bool stopAlreadyRequested = IsDisconnecting
+                && monitorProcessId is not null
+                && _disconnectProcessId == monitorProcessId;
+            IsConnecting = false;
+            IsDisconnecting = false;
+            _connectTargetGame = null;
+            _disconnectProcessId = null;
+            _disconnectRequestedAt = null;
+            _lastInjectionProcessId = null;
+            _lastInjectionAttemptedAt = null;
+            _lastInjectionResult = DllInjectionResult.NotAttempted;
+            if (requestStop && !stopAlreadyRequested)
+            {
+                _gameSession.RequestMonitorStop(monitorProcessId);
+            }
+        }
+
+        public void Dispose()
+        {
+            _gameSession.DetectedGameChanged -= OnDetectedGameChanged;
+            _gameSession.Dispose();
+        }
+
+        private static bool IsMonitorLoadedInjectionState(DllInjectionState state)
+        {
+            return state is DllInjectionState.Loaded or DllInjectionState.AlreadyInjected;
+        }
+
+        private GameConnectionRefreshResult ReadDisconnectSnapshot(
+            DetectedGame? detectedGame,
+            DateTimeOffset receivedAt)
+        {
+            if (!IsMonitorDisconnectComplete(receivedAt))
+            {
+                return CreateDisconnectingSnapshot(detectedGame);
+            }
+
+            CompleteDisconnect();
+            return ReadSnapshot(detectedGame, receivedAt);
+        }
+
+        private bool IsMonitorDisconnectComplete(DateTimeOffset now)
         {
             if (!IsDisconnecting)
             {
@@ -212,40 +265,12 @@ namespace BO2.Services
             }
 
             return _disconnectRequestedAt is DateTimeOffset requestedAt
-                && _timeProvider.GetUtcNow() - requestedAt >= MonitorDisconnectTimeout;
+                && now - requestedAt >= MonitorDisconnectTimeout;
         }
 
-        public void CompleteDisconnect()
+        private void CompleteDisconnect()
         {
             ResetMonitorConnectionState(requestStop: false);
-        }
-
-        public void ResetMonitorConnectionState(bool requestStop = true)
-        {
-            int? monitorProcessId = _lastInjectionProcessId;
-            IsConnecting = false;
-            IsDisconnecting = false;
-            _connectTargetGame = null;
-            _disconnectProcessId = null;
-            _disconnectRequestedAt = null;
-            _lastInjectionProcessId = null;
-            _lastInjectionAttemptedAt = null;
-            _lastInjectionResult = DllInjectionResult.NotAttempted;
-            if (requestStop)
-            {
-                _gameSession.RequestMonitorStop(monitorProcessId);
-            }
-        }
-
-        public void Dispose()
-        {
-            _gameSession.DetectedGameChanged -= OnDetectedGameChanged;
-            _gameSession.Dispose();
-        }
-
-        private static bool IsMonitorLoadedInjectionState(DllInjectionState state)
-        {
-            return state is DllInjectionState.Loaded or DllInjectionState.AlreadyInjected;
         }
 
         private void ApplyMonitorReadinessTimeout(
@@ -303,6 +328,14 @@ namespace BO2.Services
         }
 
         private GameConnectionRefreshResult CreateStatusSnapshot(DetectedGame? detectedGame)
+        {
+            return CreateRefreshResult(
+                detectedGame,
+                CreateStatusReadResult(detectedGame),
+                GameEventMonitorStatus.WaitingForMonitor);
+        }
+
+        private GameConnectionRefreshResult CreateDisconnectingSnapshot(DetectedGame? detectedGame)
         {
             return CreateRefreshResult(
                 detectedGame,

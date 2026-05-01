@@ -306,29 +306,6 @@ namespace BO2.ViewModels
             await _operationSemaphore.WaitAsync(cancellationToken);
             try
             {
-                if (_connectionSession.IsDisconnecting)
-                {
-                    bool isDisconnectComplete = await Task.Run(
-                        _connectionSession.IsMonitorDisconnectComplete,
-                        cancellationToken);
-                    await RunOnDispatcherAsync(
-                        () =>
-                        {
-                            DetectedGame? currentGame = _detectedGame;
-                            if (isDisconnectComplete)
-                            {
-                                _connectionSession.CompleteDisconnect();
-                                CompleteMonitorDisconnect(currentGame);
-                            }
-                            else
-                            {
-                                ApplyDisconnectingState(currentGame);
-                            }
-                        },
-                        cancellationToken);
-                    return;
-                }
-
                 GameConnectionRefreshResult snapshot = await Task.Run(
                     _connectionSession.Read,
                     cancellationToken);
@@ -398,29 +375,11 @@ namespace BO2.ViewModels
             await _operationSemaphore.WaitAsync(cancellationToken);
             try
             {
-                DetectedGame? detectedGame = _detectedGame;
-                if (_connectionSession.IsDisconnecting)
-                {
-                    await RunOnDispatcherAsync(() => ApplyDisconnectingState(detectedGame), cancellationToken);
-                    return;
-                }
-
-                if (!_connectionSession.TryBeginDisconnect())
-                {
-                    await RunOnDispatcherAsync(
-                        () =>
-                        {
-                            _connectionSession.ResetMonitorConnectionState();
-                            ApplyConnectionStatus(detectedGame);
-                            ApplyEventMonitorStatus(detectedGame, _connectionSession.LastInjectionResult, GameEventMonitorStatus.WaitingForMonitor);
-                            UpdateConnectButtonState(detectedGame);
-                        },
-                        cancellationToken);
-                    return;
-                }
-
+                GameConnectionRefreshResult snapshot = await Task.Run(
+                    _connectionSession.BeginDisconnect,
+                    cancellationToken);
                 await RunOnDispatcherAsync(
-                    () => ApplyDisconnectingState(detectedGame),
+                    () => ApplyRefreshSnapshot(snapshot),
                     cancellationToken);
             }
             finally
@@ -728,13 +687,6 @@ namespace BO2.ViewModels
             }
 
             return AppStrings.Format("CurrentRoundFormat", sessionEvent.LevelTime, sessionEvent.EventName);
-        }
-
-        private void CompleteMonitorDisconnect(DetectedGame? detectedGame)
-        {
-            ApplyConnectionStatus(detectedGame);
-            ApplyEventMonitorStatus(detectedGame, _connectionSession.LastInjectionResult, GameEventMonitorStatus.WaitingForMonitor);
-            UpdateConnectButtonState(detectedGame);
         }
 
         private void ApplyDisconnectingState(DetectedGame? detectedGame)

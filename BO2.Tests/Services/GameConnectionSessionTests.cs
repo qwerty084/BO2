@@ -297,7 +297,7 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void TryBeginDisconnect_WhenMonitorIsConnected_RequestsStop()
+        public void BeginDisconnect_WhenMonitorIsConnected_RequestsStopAndReturnsDisconnectingSnapshot()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
             FakeGameEventMonitor eventMonitor = new()
@@ -308,12 +308,37 @@ namespace BO2.Tests.Services
             CompleteConnectWithLoadedMonitor(session);
             eventMonitor.ResetCalls();
 
-            bool beganDisconnect = session.TryBeginDisconnect();
+            GameConnectionRefreshResult snapshot = session.BeginDisconnect();
 
-            Assert.True(beganDisconnect);
             Assert.True(session.IsDisconnecting);
+            Assert.True(snapshot.IsDisconnecting);
+            Assert.False(snapshot.CanAttemptConnect);
+            Assert.True(snapshot.IsMonitorConnectedForCurrentGame);
+            Assert.Equal(GameCompatibilityState.WaitingForMonitor, snapshot.EventStatus.CompatibilityState);
             Assert.Equal(1, eventMonitor.RequestStopCallCount);
             Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);
+            Assert.Equal(0, eventMonitor.IsStopCompleteCallCount);
+        }
+
+        [Fact]
+        public void BeginDisconnect_WhenAlreadyDisconnecting_DoesNotRequestStopAgain()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame);
+            CompleteConnectWithLoadedMonitor(session);
+            session.BeginDisconnect();
+            eventMonitor.ResetCalls();
+
+            GameConnectionRefreshResult snapshot = session.BeginDisconnect();
+
+            Assert.True(session.IsDisconnecting);
+            Assert.True(snapshot.IsDisconnecting);
+            Assert.Equal(0, eventMonitor.RequestStopCallCount);
+            Assert.Equal(0, eventMonitor.IsStopCompleteCallCount);
         }
 
         [Fact]
@@ -327,7 +352,7 @@ namespace BO2.Tests.Services
             };
             GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame);
             CompleteConnectWithLoadedMonitor(session);
-            session.TryBeginDisconnect();
+            session.BeginDisconnect();
             eventMonitor.ResetCalls();
 
             session.ClearTransientOperationState();
@@ -343,7 +368,7 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void IsMonitorDisconnectComplete_WhenStopDoesNotCompleteBeforeTimeout_ReturnsFalse()
+        public void Read_WhenDisconnectStopDoesNotCompleteBeforeTimeout_ReturnsDisconnectingSnapshot()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
             FakeGameEventMonitor eventMonitor = new()
@@ -354,13 +379,51 @@ namespace BO2.Tests.Services
             var timeProvider = new FakeTimeProvider();
             GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, timeProvider);
             CompleteConnectWithLoadedMonitor(session);
-            session.TryBeginDisconnect();
+            session.BeginDisconnect();
+            eventMonitor.ResetCalls();
 
-            Assert.False(session.IsMonitorDisconnectComplete());
+            GameConnectionRefreshResult snapshot = session.Read();
+
+            Assert.True(session.IsDisconnecting);
+            Assert.True(snapshot.IsDisconnecting);
+            Assert.Equal(GameCompatibilityState.WaitingForMonitor, snapshot.EventStatus.CompatibilityState);
+            Assert.True(snapshot.IsMonitorConnectedForCurrentGame);
+            Assert.Equal(0, eventMonitor.RequestStopCallCount);
+            Assert.Equal(1, eventMonitor.IsStopCompleteCallCount);
+            Assert.Equal(1001, eventMonitor.LastStopCompleteTargetProcessId);
         }
 
         [Fact]
-        public void IsMonitorDisconnectComplete_WhenStopDoesNotCompleteAfterTimeout_ReturnsTrue()
+        public void Read_WhenDisconnectStopCompletes_ResetsMonitorOwnershipAndReturnsWaitingSnapshot()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                IsStopCompleteResult = true,
+                Status = CreateCompatibleStatus()
+            };
+            var timeProvider = new FakeTimeProvider();
+            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, timeProvider);
+            CompleteConnectWithLoadedMonitor(session);
+            session.BeginDisconnect();
+            eventMonitor.ResetCalls();
+
+            GameConnectionRefreshResult snapshot = session.Read();
+
+            Assert.False(session.IsDisconnecting);
+            Assert.False(snapshot.IsDisconnecting);
+            Assert.Equal(DllInjectionState.NotAttempted, snapshot.InjectionResult.State);
+            Assert.False(snapshot.HasInjectionAttemptForCurrentGame);
+            Assert.False(snapshot.IsMonitorConnectedForCurrentGame);
+            Assert.False(session.IsMonitorConnectedFor(detectedGame));
+            Assert.Equal(GameCompatibilityState.WaitingForMonitor, snapshot.EventStatus.CompatibilityState);
+            Assert.Equal(0, eventMonitor.RequestStopCallCount);
+            Assert.Equal(1, eventMonitor.IsStopCompleteCallCount);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+        }
+
+        [Fact]
+        public void Read_WhenDisconnectStopTimesOut_ResetsMonitorOwnershipAndReturnsWaitingSnapshot()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
             FakeGameEventMonitor eventMonitor = new()
@@ -371,11 +434,22 @@ namespace BO2.Tests.Services
             var timeProvider = new FakeTimeProvider();
             GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, timeProvider);
             CompleteConnectWithLoadedMonitor(session);
-            session.TryBeginDisconnect();
+            session.BeginDisconnect();
+            eventMonitor.ResetCalls();
 
             timeProvider.Advance(TimeSpan.FromSeconds(3));
+            GameConnectionRefreshResult snapshot = session.Read();
 
-            Assert.True(session.IsMonitorDisconnectComplete());
+            Assert.False(session.IsDisconnecting);
+            Assert.False(snapshot.IsDisconnecting);
+            Assert.Equal(DllInjectionState.NotAttempted, snapshot.InjectionResult.State);
+            Assert.False(snapshot.HasInjectionAttemptForCurrentGame);
+            Assert.False(snapshot.IsMonitorConnectedForCurrentGame);
+            Assert.False(session.IsMonitorConnectedFor(detectedGame));
+            Assert.Equal(GameCompatibilityState.WaitingForMonitor, snapshot.EventStatus.CompatibilityState);
+            Assert.Equal(0, eventMonitor.RequestStopCallCount);
+            Assert.Equal(1, eventMonitor.IsStopCompleteCallCount);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
         }
 
         private static GameConnectionSession CreateStartedSession(
@@ -512,11 +586,15 @@ namespace BO2.Tests.Services
 
             public int RequestStopCallCount { get; private set; }
 
+            public int IsStopCompleteCallCount { get; private set; }
+
             public DateTimeOffset? LastReceivedAt { get; private set; }
 
             public int? LastTargetProcessId { get; private set; }
 
             public int? LastStopTargetProcessId { get; private set; }
+
+            public int? LastStopCompleteTargetProcessId { get; private set; }
 
             public GameEventMonitorStatus ReadStatus(DateTimeOffset receivedAt, int? targetProcessId)
             {
@@ -534,6 +612,8 @@ namespace BO2.Tests.Services
 
             public bool IsStopComplete(int targetProcessId)
             {
+                IsStopCompleteCallCount++;
+                LastStopCompleteTargetProcessId = targetProcessId;
                 return IsStopCompleteResult;
             }
 
@@ -541,9 +621,11 @@ namespace BO2.Tests.Services
             {
                 ReadStatusCallCount = 0;
                 RequestStopCallCount = 0;
+                IsStopCompleteCallCount = 0;
                 LastReceivedAt = null;
                 LastTargetProcessId = null;
                 LastStopTargetProcessId = null;
+                LastStopCompleteTargetProcessId = null;
             }
 
             public void Dispose()
