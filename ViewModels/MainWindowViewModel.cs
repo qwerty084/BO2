@@ -327,23 +327,11 @@ namespace BO2.ViewModels
             await _operationSemaphore.WaitAsync(cancellationToken);
             try
             {
-                GameConnectionRefreshResult connectingSnapshot = await Task.Run(
-                    _connectionSession.BeginConnect,
-                    cancellationToken);
-                await RunOnDispatcherAsync(
-                    () => ApplyRefreshSnapshot(connectingSnapshot),
-                    cancellationToken);
-
-                if (!connectingSnapshot.IsConnecting)
-                {
-                    return;
-                }
-
-                DllInjectionResult injectionResult = await Task.Run(
-                    _connectionSession.Inject,
-                    cancellationToken);
                 GameConnectionRefreshResult connectedSnapshot = await Task.Run(
-                    () => _connectionSession.CompleteConnect(injectionResult),
+                    () => _connectionSession.Connect(connectingSnapshot =>
+                        RunOnDispatcherAsync(
+                            () => ApplyRefreshSnapshot(connectingSnapshot),
+                            cancellationToken).GetAwaiter().GetResult()),
                     cancellationToken);
                 await RunOnDispatcherAsync(
                     () => ApplyRefreshSnapshot(connectedSnapshot),
@@ -351,12 +339,10 @@ namespace BO2.ViewModels
             }
             catch (InvalidOperationException ex) when (!cancellationToken.IsCancellationRequested)
             {
-                _connectionSession.CancelConnect();
                 await TryApplyReadErrorAsync(ex.Message, cancellationToken);
             }
             catch (Win32Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
-                _connectionSession.CancelConnect();
                 await TryApplyReadErrorAsync(ex.Message, cancellationToken);
             }
             finally

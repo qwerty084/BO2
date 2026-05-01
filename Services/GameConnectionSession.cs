@@ -197,7 +197,27 @@ namespace BO2.Services
             }
         }
 
-        public GameConnectionRefreshResult BeginConnect()
+        public GameConnectionRefreshResult Connect(Action<GameConnectionRefreshResult>? connectingSnapshotAvailable = null)
+        {
+            GameConnectionRefreshResult connectingSnapshot = BeginConnect();
+            if (!connectingSnapshot.IsConnecting)
+            {
+                return connectingSnapshot;
+            }
+
+            try
+            {
+                connectingSnapshotAvailable?.Invoke(connectingSnapshot);
+                return CompleteConnect(Inject());
+            }
+            catch
+            {
+                CancelConnect();
+                throw;
+            }
+        }
+
+        private GameConnectionRefreshResult BeginConnect()
         {
             DetectedGame? detectedGame = RefreshCurrentGame();
             lock (_syncRoot)
@@ -219,7 +239,7 @@ namespace BO2.Services
             }
         }
 
-        public void CancelConnect()
+        private void CancelConnect()
         {
             lock (_syncRoot)
             {
@@ -240,7 +260,7 @@ namespace BO2.Services
             }
         }
 
-        public DllInjectionResult Inject()
+        private DllInjectionResult Inject()
         {
             DetectedGame? detectedGame = RefreshCurrentGame();
             DetectedGame? connectTargetGame;
@@ -256,7 +276,7 @@ namespace BO2.Services
             return _dllInjector.Inject(connectTargetGame);
         }
 
-        public GameConnectionRefreshResult CompleteConnect(DllInjectionResult injectionResult)
+        private GameConnectionRefreshResult CompleteConnect(DllInjectionResult injectionResult)
         {
             ArgumentNullException.ThrowIfNull(injectionResult);
 
