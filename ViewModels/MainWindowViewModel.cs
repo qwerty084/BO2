@@ -337,7 +337,6 @@ namespace BO2.ViewModels
                         cancellationToken);
                     if (!connectingSnapshot.IsConnecting)
                     {
-                        connectPending = false;
                         return;
                     }
 
