@@ -72,7 +72,7 @@ namespace BO2.Services
             _eventMonitor = eventMonitor;
             _timeProvider = timeProvider;
             _currentGame = _processDetectionService.CurrentGame;
-            _snapshot = GameConnectionSnapshot.FromRefreshResult(CreateStatusSnapshotLocked(_currentGame));
+            _snapshot = CreateSnapshot(CreateStatusSnapshotLocked(_currentGame));
             _processDetectionService.DetectedGameChanged += OnDetectedGameChanged;
         }
 
@@ -216,18 +216,18 @@ namespace BO2.Services
             GameConnectionRefreshResult connectingResult = BeginConnect();
             if (!connectingResult.IsConnecting)
             {
-                return GameConnectionSnapshot.FromRefreshResult(connectingResult);
+                return CreateSnapshot(connectingResult);
             }
 
-            return GameConnectionSnapshot.FromRefreshResult(CompleteConnect());
+            return CreateSnapshot(CompleteConnect());
         }
 
         public GameConnectionSnapshot Disconnect()
         {
-            return GameConnectionSnapshot.FromRefreshResult(BeginDisconnect());
+            return CreateSnapshot(BeginDisconnect());
         }
 
-        public GameConnectionRefreshResult BeginConnect()
+        private GameConnectionRefreshResult BeginConnect()
         {
             DetectedGame? detectedGame = RefreshCurrentGame();
             GameConnectionRefreshResult result;
@@ -242,7 +242,7 @@ namespace BO2.Services
             return PublishRefreshResult(result);
         }
 
-        public GameConnectionRefreshResult CompleteConnect()
+        private GameConnectionRefreshResult CompleteConnect()
         {
             GameConnectionSessionLifecycleGame? connectTargetGame = GetConnectTargetGame();
             try
@@ -253,24 +253,6 @@ namespace BO2.Services
             {
                 RollbackFailedConnect(connectTargetGame);
                 throw;
-            }
-        }
-
-        public void CancelConnect()
-        {
-            GameConnectionRefreshResult? snapshot = null;
-            lock (_syncRoot)
-            {
-                if (_lifecycle.IsConnecting)
-                {
-                    _lifecycle.CancelConnect();
-                    snapshot = CreateStatusSnapshotLocked(_currentGame);
-                }
-            }
-
-            if (snapshot is GameConnectionRefreshResult result)
-            {
-                PublishSnapshot(result);
             }
         }
 
@@ -589,7 +571,7 @@ namespace BO2.Services
                     currentLifecycleGame,
                     detectedLifecycleGame);
                 snapshotChangedArgs = UpdateSnapshotLocked(
-                    GameConnectionSnapshot.FromRefreshResult(CreateStatusSnapshotLocked(detectedGame)));
+                    CreateSnapshot(CreateStatusSnapshotLocked(detectedGame)));
             }
 
             if (stopRequest.ShouldRequestStop)
@@ -613,7 +595,7 @@ namespace BO2.Services
 
         private GameConnectionSnapshot PublishSnapshot(GameConnectionRefreshResult result)
         {
-            GameConnectionSnapshot snapshot = GameConnectionSnapshot.FromRefreshResult(result);
+            GameConnectionSnapshot snapshot = CreateSnapshot(result);
             GameConnectionSnapshotChangedEventArgs? args;
             lock (_syncRoot)
             {
@@ -727,31 +709,8 @@ namespace BO2.Services
                 lifecycleSnapshot.HasInjectionAttemptForCurrentGame,
                 lifecycleSnapshot.IsMonitorConnectedForCurrentGame);
         }
-    }
 
-    internal readonly record struct GameConnectionRefreshResult(
-        DetectedGame? CurrentGame,
-        PlayerStatsReadResult ReadResult,
-        GameEventMonitorStatus EventStatus,
-        DllInjectionResult InjectionResult,
-        bool IsConnecting,
-        bool IsDisconnecting,
-        bool CanAttemptConnect,
-        bool HasInjectionAttemptForCurrentGame,
-        bool IsMonitorConnectedForCurrentGame);
-
-    internal readonly record struct GameConnectionSnapshot(
-        DetectedGame? CurrentGame,
-        PlayerStatsReadResult ReadResult,
-        GameEventMonitorStatus EventStatus,
-        DllInjectionResult InjectionResult,
-        bool IsConnecting,
-        bool IsDisconnecting,
-        bool CanAttemptConnect,
-        bool HasInjectionAttemptForCurrentGame,
-        bool IsMonitorConnectedForCurrentGame)
-    {
-        public static GameConnectionSnapshot FromRefreshResult(GameConnectionRefreshResult result)
+        private static GameConnectionSnapshot CreateSnapshot(GameConnectionRefreshResult result)
         {
             return new GameConnectionSnapshot(
                 result.CurrentGame,
@@ -764,7 +723,29 @@ namespace BO2.Services
                 result.HasInjectionAttemptForCurrentGame,
                 result.IsMonitorConnectedForCurrentGame);
         }
+
+        private readonly record struct GameConnectionRefreshResult(
+            DetectedGame? CurrentGame,
+            PlayerStatsReadResult ReadResult,
+            GameEventMonitorStatus EventStatus,
+            DllInjectionResult InjectionResult,
+            bool IsConnecting,
+            bool IsDisconnecting,
+            bool CanAttemptConnect,
+            bool HasInjectionAttemptForCurrentGame,
+            bool IsMonitorConnectedForCurrentGame);
     }
+
+    internal readonly record struct GameConnectionSnapshot(
+        DetectedGame? CurrentGame,
+        PlayerStatsReadResult ReadResult,
+        GameEventMonitorStatus EventStatus,
+        DllInjectionResult InjectionResult,
+        bool IsConnecting,
+        bool IsDisconnecting,
+        bool CanAttemptConnect,
+        bool HasInjectionAttemptForCurrentGame,
+        bool IsMonitorConnectedForCurrentGame);
 
     internal sealed class GameConnectionSnapshotChangedEventArgs : EventArgs
     {
