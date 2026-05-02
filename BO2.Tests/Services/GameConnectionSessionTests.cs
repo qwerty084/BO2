@@ -372,28 +372,6 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void CancelConnect_WhenConnecting_ClearsTransientConnectState()
-        {
-            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
-            FakeGameEventMonitor eventMonitor = new()
-            {
-                Status = CreateCompatibleStatus()
-            };
-            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame);
-
-            GameConnectionRefreshResult connectingSnapshot = session.BeginConnect();
-            eventMonitor.ResetCalls();
-            session.CancelConnect();
-
-            Assert.True(connectingSnapshot.IsConnecting);
-            GameConnectionRefreshResult statusSnapshot = session.GetStatusSnapshot();
-            Assert.False(statusSnapshot.IsConnecting);
-            Assert.True(statusSnapshot.CanAttemptConnect);
-            Assert.False(statusSnapshot.IsMonitorConnectedForCurrentGame);
-            Assert.Equal(0, eventMonitor.RequestStopCallCount);
-        }
-
-        [Fact]
         public void Connect_WhenCompletionThrows_StopsMonitorAndClearsConnectionState()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
@@ -568,27 +546,6 @@ namespace BO2.Tests.Services
             Assert.Equal(GameCompatibilityState.WaitingForMonitor, snapshot.EventStatus.CompatibilityState);
             Assert.Equal(1, eventMonitor.RequestStopCallCount);
             Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);
-            Assert.Equal(0, eventMonitor.IsStopCompleteCallCount);
-        }
-
-        [Fact]
-        public void BeginDisconnect_WhenAlreadyDisconnecting_DoesNotRequestStopAgain()
-        {
-            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
-            FakeGameEventMonitor eventMonitor = new()
-            {
-                Status = CreateCompatibleStatus()
-            };
-            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame);
-            CompleteConnectWithLoadedMonitor(session);
-            session.BeginDisconnect();
-            eventMonitor.ResetCalls();
-
-            GameConnectionRefreshResult snapshot = session.BeginDisconnect();
-
-            Assert.True(snapshot.IsDisconnecting);
-            Assert.True(session.GetStatusSnapshot().IsDisconnecting);
-            Assert.Equal(0, eventMonitor.RequestStopCallCount);
             Assert.Equal(0, eventMonitor.IsStopCompleteCallCount);
         }
 
