@@ -222,6 +222,11 @@ namespace BO2.Services
             return GameConnectionSnapshot.FromRefreshResult(CompleteConnect());
         }
 
+        public GameConnectionSnapshot Disconnect()
+        {
+            return GameConnectionSnapshot.FromRefreshResult(BeginDisconnect());
+        }
+
         public GameConnectionRefreshResult BeginConnect()
         {
             DetectedGame? detectedGame = RefreshCurrentGame();
@@ -336,7 +341,7 @@ namespace BO2.Services
             return ReadSnapshot(detectedGame, receivedAt);
         }
 
-        public GameConnectionRefreshResult BeginDisconnect()
+        private GameConnectionRefreshResult BeginDisconnect()
         {
             DateTimeOffset receivedAt = _timeProvider.GetUtcNow();
             DetectedGame? detectedGame = RefreshCurrentGame();

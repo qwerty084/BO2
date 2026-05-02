@@ -379,10 +379,9 @@ namespace BO2.ViewModels
             await _operationSemaphore.WaitAsync(cancellationToken);
             try
             {
-                await Task.Run(
-                    _connectionSession.BeginDisconnect,
+                GameConnectionSnapshot snapshot = await Task.Run(
+                    _connectionSession.Disconnect,
                     cancellationToken);
-                GameConnectionSnapshot snapshot = _connectionSession.Snapshot;
                 await RunOnDispatcherAsync(
                     () => ApplyRefreshSnapshot(snapshot),
                     cancellationToken);
