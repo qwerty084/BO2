@@ -333,47 +333,38 @@ namespace BO2.Services
             DetectedGame? detectedGame,
             DateTimeOffset receivedAt)
         {
-            int? disconnectProcessId;
-            DateTimeOffset? disconnectRequestedAt;
-            bool isDisconnecting;
+            GameConnectionSessionDisconnectRefreshAction disconnectAction;
+            GameConnectionRefreshResult? result = null;
             lock (_syncRoot)
             {
-                isDisconnecting = _lifecycle.IsDisconnecting;
-                disconnectProcessId = _lifecycle.DisconnectProcessId;
-                disconnectRequestedAt = _lifecycle.DisconnectRequestedAt;
+                disconnectAction = _lifecycle.RefreshDisconnect();
+                if (!disconnectAction.ShouldReadSnapshot && !disconnectAction.ShouldCheckStopComplete)
+                {
+                    result = CreateDisconnectingSnapshotLocked(detectedGame);
+                }
             }
 
-            if (!isDisconnecting)
+            if (disconnectAction.ShouldCheckStopComplete
+                && disconnectAction.MonitorProcessId is int monitorProcessId)
             {
-                return ReadSnapshot(detectedGame, receivedAt);
-            }
-
-            bool isComplete = disconnectProcessId is not int processId
-                || _eventMonitor.IsStopComplete(processId)
-                || (disconnectRequestedAt is DateTimeOffset requestedAt
-                    && receivedAt - requestedAt >= MonitorDisconnectTimeout);
-            if (!isComplete)
-            {
+                bool isStopComplete = _eventMonitor.IsStopComplete(monitorProcessId);
                 lock (_syncRoot)
                 {
-                    if (_lifecycle.IsDisconnecting && _lifecycle.DisconnectProcessId == disconnectProcessId)
+                    disconnectAction = _lifecycle.CompleteDisconnectStopCheck(
+                        monitorProcessId,
+                        isStopComplete,
+                        receivedAt,
+                        MonitorDisconnectTimeout);
+                    if (!disconnectAction.ShouldReadSnapshot && !disconnectAction.ShouldCheckStopComplete)
                     {
-                        return CreateDisconnectingSnapshotLocked(detectedGame);
+                        result = CreateDisconnectingSnapshotLocked(detectedGame);
                     }
                 }
-
-                return ReadSnapshot(detectedGame, receivedAt);
             }
 
-            lock (_syncRoot)
-            {
-                if (_lifecycle.IsDisconnecting && _lifecycle.DisconnectProcessId == disconnectProcessId)
-                {
-                    _lifecycle.ResetMonitorConnectionState(requestStop: false);
-                }
-            }
-
-            return ReadSnapshot(detectedGame, receivedAt);
+            return disconnectAction.ShouldReadSnapshot
+                ? ReadSnapshot(detectedGame, receivedAt)
+                : result!.Value;
         }
 
         private GameConnectionSessionMonitorStopRequest ApplyMonitorReadinessTimeoutLocked(

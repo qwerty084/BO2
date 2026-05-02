@@ -133,6 +133,42 @@ namespace BO2.Services
             return GameConnectionSessionDisconnectAction.RequestStop(monitorProcessId);
         }
 
+        public GameConnectionSessionDisconnectRefreshAction RefreshDisconnect()
+        {
+            if (!_isDisconnecting)
+            {
+                return GameConnectionSessionDisconnectRefreshAction.ReadSnapshot;
+            }
+
+            if (_disconnectProcessId is not int monitorProcessId)
+            {
+                ResetMonitorConnectionState(requestStop: false);
+                return GameConnectionSessionDisconnectRefreshAction.ReadSnapshot;
+            }
+
+            return GameConnectionSessionDisconnectRefreshAction.CheckStopComplete(monitorProcessId);
+        }
+
+        public GameConnectionSessionDisconnectRefreshAction CompleteDisconnectStopCheck(
+            int monitorProcessId,
+            bool isStopComplete,
+            DateTimeOffset receivedAt,
+            TimeSpan disconnectTimeout)
+        {
+            if (!_isDisconnecting || _disconnectProcessId != monitorProcessId)
+            {
+                return GameConnectionSessionDisconnectRefreshAction.ReadSnapshot;
+            }
+
+            if (isStopComplete || HasDisconnectTimedOut(receivedAt, disconnectTimeout))
+            {
+                ResetMonitorConnectionState(requestStop: false);
+                return GameConnectionSessionDisconnectRefreshAction.ReadSnapshot;
+            }
+
+            return GameConnectionSessionDisconnectRefreshAction.CreateDisconnectingSnapshot(monitorProcessId);
+        }
+
         public GameConnectionSessionMonitorStopRequest ResetMonitorConnectionState(bool requestStop = true)
         {
             int? monitorProcessId = _lastInjectionProcessId;
@@ -220,6 +256,12 @@ namespace BO2.Services
 
         private bool IsMonitorLoaded => IsMonitorLoadedInjectionState(_lastInjectionResult.State);
 
+        private bool HasDisconnectTimedOut(DateTimeOffset receivedAt, TimeSpan disconnectTimeout)
+        {
+            return _disconnectRequestedAt is DateTimeOffset requestedAt
+                && receivedAt - requestedAt >= disconnectTimeout;
+        }
+
         private static bool IsMonitorLoadedInjectionState(DllInjectionState state)
         {
             return state is DllInjectionState.Loaded or DllInjectionState.AlreadyInjected;
@@ -279,6 +321,33 @@ namespace BO2.Services
             return new GameConnectionSessionDisconnectAction(
                 ShouldReadSnapshot: false,
                 ShouldRequestStop: true,
+                monitorProcessId);
+        }
+    }
+
+    internal readonly record struct GameConnectionSessionDisconnectRefreshAction(
+        bool ShouldReadSnapshot,
+        bool ShouldCheckStopComplete,
+        int? MonitorProcessId)
+    {
+        public static GameConnectionSessionDisconnectRefreshAction ReadSnapshot { get; } = new(
+            ShouldReadSnapshot: true,
+            ShouldCheckStopComplete: false,
+            MonitorProcessId: null);
+
+        public static GameConnectionSessionDisconnectRefreshAction CreateDisconnectingSnapshot(int monitorProcessId)
+        {
+            return new GameConnectionSessionDisconnectRefreshAction(
+                ShouldReadSnapshot: false,
+                ShouldCheckStopComplete: false,
+                monitorProcessId);
+        }
+
+        public static GameConnectionSessionDisconnectRefreshAction CheckStopComplete(int monitorProcessId)
+        {
+            return new GameConnectionSessionDisconnectRefreshAction(
+                ShouldReadSnapshot: false,
+                ShouldCheckStopComplete: true,
                 monitorProcessId);
         }
     }

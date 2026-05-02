@@ -231,12 +231,159 @@ namespace BO2.Tests.Services
             Assert.False(detectedSnapshot.IsMonitorConnectedForCurrentGame);
         }
 
+        [Fact]
+        public void BeginDisconnect_WhenOwnedMonitorExists_RecordsDisconnectTargetAndReturnsStopRequest()
+        {
+            GameConnectionSessionLifecycleGame detectedGame = CreateSupportedGame(processId: 1001);
+            GameConnectionSessionLifecycle lifecycle = CreateLifecycleWithLoadedMonitor(detectedGame);
+            DateTimeOffset requestedAt = new(2026, 5, 2, 1, 0, 0, TimeSpan.Zero);
+
+            GameConnectionSessionDisconnectAction action = lifecycle.BeginDisconnect(requestedAt);
+            GameConnectionSessionLifecycleSnapshot snapshot = lifecycle.CreateSnapshot(detectedGame);
+
+            Assert.False(action.ShouldReadSnapshot);
+            Assert.True(action.ShouldRequestStop);
+            Assert.Equal(1001, action.MonitorProcessId);
+            Assert.True(lifecycle.IsDisconnecting);
+            Assert.Equal(1001, lifecycle.DisconnectProcessId);
+            Assert.Equal(requestedAt, lifecycle.DisconnectRequestedAt);
+            Assert.True(snapshot.IsDisconnecting);
+            Assert.False(snapshot.CanAttemptConnect);
+            Assert.True(snapshot.IsMonitorConnectedForCurrentGame);
+        }
+
+        [Fact]
+        public void BeginDisconnect_WhenStopAlreadyRequested_DoesNotReturnDuplicateStopRequest()
+        {
+            GameConnectionSessionLifecycleGame detectedGame = CreateSupportedGame(processId: 1001);
+            GameConnectionSessionLifecycle lifecycle = CreateLifecycleWithLoadedMonitor(detectedGame);
+            DateTimeOffset requestedAt = new(2026, 5, 2, 1, 0, 0, TimeSpan.Zero);
+
+            GameConnectionSessionDisconnectAction firstAction = lifecycle.BeginDisconnect(requestedAt);
+            GameConnectionSessionDisconnectAction secondAction = lifecycle.BeginDisconnect(requestedAt.AddSeconds(1));
+
+            Assert.True(firstAction.ShouldRequestStop);
+            Assert.False(secondAction.ShouldReadSnapshot);
+            Assert.False(secondAction.ShouldRequestStop);
+            Assert.True(lifecycle.IsDisconnecting);
+            Assert.Equal(1001, lifecycle.DisconnectProcessId);
+            Assert.Equal(requestedAt, lifecycle.DisconnectRequestedAt);
+        }
+
+        [Fact]
+        public void CompleteDisconnectStopCheck_WhenStopCompletes_ResetsOwnershipAndReadsSnapshot()
+        {
+            GameConnectionSessionLifecycleGame detectedGame = CreateSupportedGame(processId: 1001);
+            GameConnectionSessionLifecycle lifecycle = CreateLifecycleWithLoadedMonitor(detectedGame);
+            DateTimeOffset requestedAt = new(2026, 5, 2, 1, 0, 0, TimeSpan.Zero);
+            lifecycle.BeginDisconnect(requestedAt);
+
+            GameConnectionSessionDisconnectRefreshAction action = lifecycle.CompleteDisconnectStopCheck(
+                monitorProcessId: 1001,
+                isStopComplete: true,
+                receivedAt: requestedAt.AddSeconds(1),
+                disconnectTimeout: TimeSpan.FromSeconds(3));
+            GameConnectionSessionLifecycleSnapshot snapshot = lifecycle.CreateSnapshot(detectedGame);
+
+            Assert.True(action.ShouldReadSnapshot);
+            Assert.False(action.ShouldCheckStopComplete);
+            Assert.False(lifecycle.IsDisconnecting);
+            Assert.Null(lifecycle.DisconnectProcessId);
+            Assert.Equal(DllInjectionState.NotAttempted, snapshot.InjectionResult.State);
+            Assert.True(snapshot.CanAttemptConnect);
+            Assert.False(snapshot.HasInjectionAttemptForCurrentGame);
+            Assert.False(snapshot.IsMonitorConnectedForCurrentGame);
+        }
+
+        [Fact]
+        public void CompleteDisconnectStopCheck_WhenStopTimeoutElapses_ResetsOwnershipAndReadsSnapshot()
+        {
+            GameConnectionSessionLifecycleGame detectedGame = CreateSupportedGame(processId: 1001);
+            GameConnectionSessionLifecycle lifecycle = CreateLifecycleWithLoadedMonitor(detectedGame);
+            DateTimeOffset requestedAt = new(2026, 5, 2, 1, 0, 0, TimeSpan.Zero);
+            lifecycle.BeginDisconnect(requestedAt);
+
+            GameConnectionSessionDisconnectRefreshAction action = lifecycle.CompleteDisconnectStopCheck(
+                monitorProcessId: 1001,
+                isStopComplete: false,
+                receivedAt: requestedAt.AddSeconds(3),
+                disconnectTimeout: TimeSpan.FromSeconds(3));
+            GameConnectionSessionLifecycleSnapshot snapshot = lifecycle.CreateSnapshot(detectedGame);
+
+            Assert.True(action.ShouldReadSnapshot);
+            Assert.False(action.ShouldCheckStopComplete);
+            Assert.False(lifecycle.IsDisconnecting);
+            Assert.Null(lifecycle.DisconnectProcessId);
+            Assert.Equal(DllInjectionState.NotAttempted, snapshot.InjectionResult.State);
+            Assert.True(snapshot.CanAttemptConnect);
+            Assert.False(snapshot.HasInjectionAttemptForCurrentGame);
+            Assert.False(snapshot.IsMonitorConnectedForCurrentGame);
+        }
+
+        [Fact]
+        public void CompleteDisconnectStopCheck_WhenStopIsPending_RemainsDisconnecting()
+        {
+            GameConnectionSessionLifecycleGame detectedGame = CreateSupportedGame(processId: 1001);
+            GameConnectionSessionLifecycle lifecycle = CreateLifecycleWithLoadedMonitor(detectedGame);
+            DateTimeOffset requestedAt = new(2026, 5, 2, 1, 0, 0, TimeSpan.Zero);
+            lifecycle.BeginDisconnect(requestedAt);
+
+            GameConnectionSessionDisconnectRefreshAction action = lifecycle.CompleteDisconnectStopCheck(
+                monitorProcessId: 1001,
+                isStopComplete: false,
+                receivedAt: requestedAt.AddSeconds(2),
+                disconnectTimeout: TimeSpan.FromSeconds(3));
+            GameConnectionSessionLifecycleSnapshot snapshot = lifecycle.CreateSnapshot(detectedGame);
+
+            Assert.False(action.ShouldReadSnapshot);
+            Assert.False(action.ShouldCheckStopComplete);
+            Assert.Equal(1001, action.MonitorProcessId);
+            Assert.True(lifecycle.IsDisconnecting);
+            Assert.True(snapshot.IsDisconnecting);
+            Assert.False(snapshot.CanAttemptConnect);
+            Assert.True(snapshot.IsMonitorConnectedForCurrentGame);
+        }
+
+        [Fact]
+        public void BeginDisconnect_WhenNoOwnedMonitor_ResetsStateWithoutStopRequest()
+        {
+            GameConnectionSessionLifecycle lifecycle = new();
+            GameConnectionSessionLifecycleGame detectedGame = CreateSupportedGame(processId: 1001);
+            lifecycle.BeginConnect(detectedGame);
+
+            GameConnectionSessionDisconnectAction action = lifecycle.BeginDisconnect(
+                new DateTimeOffset(2026, 5, 2, 1, 0, 0, TimeSpan.Zero));
+            GameConnectionSessionLifecycleSnapshot snapshot = lifecycle.CreateSnapshot(detectedGame);
+
+            Assert.True(action.ShouldReadSnapshot);
+            Assert.False(action.ShouldRequestStop);
+            Assert.Null(action.MonitorProcessId);
+            Assert.False(lifecycle.IsConnecting);
+            Assert.False(lifecycle.IsDisconnecting);
+            Assert.Null(lifecycle.DisconnectProcessId);
+            Assert.True(snapshot.CanAttemptConnect);
+            Assert.False(snapshot.HasInjectionAttemptForCurrentGame);
+            Assert.False(snapshot.IsMonitorConnectedForCurrentGame);
+        }
+
         private static GameConnectionSessionLifecycleGame CreateSupportedGame(int processId)
         {
             return new GameConnectionSessionLifecycleGame(
                 processId,
                 GameVariant.SteamZombies,
                 IsStatsSupported: true);
+        }
+
+        private static GameConnectionSessionLifecycle CreateLifecycleWithLoadedMonitor(
+            GameConnectionSessionLifecycleGame detectedGame)
+        {
+            GameConnectionSessionLifecycle lifecycle = new();
+            lifecycle.BeginConnect(detectedGame);
+            lifecycle.CompleteConnect(
+                detectedGame,
+                new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
+                new DateTimeOffset(2026, 5, 2, 0, 0, 0, TimeSpan.Zero));
+            return lifecycle;
         }
     }
 }
