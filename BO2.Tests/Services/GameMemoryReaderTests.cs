@@ -9,21 +9,18 @@ namespace BO2.Tests.Services
     public sealed class GameMemoryReaderTests
     {
         [Fact]
-        public void WhenNoGameDetected_ThenReturnsDisconnectedResultAndClosesMemoryAccessor()
+        public void ClearAttachedGame_ClosesMemoryAccessor()
         {
             var memoryAccessor = new FakeProcessMemoryAccessor();
             using var reader = new GameMemoryReader(memoryAccessor);
 
-            PlayerStatsReadResult result = reader.ReadPlayerStats(null);
+            reader.ClearAttachedGame();
 
-            Assert.Equal(ConnectionState.Disconnected, result.ConnectionState);
-            Assert.Null(result.DetectedGame);
-            Assert.Null(result.Stats);
             Assert.Equal(1, memoryAccessor.CloseCallCount);
         }
 
         [Fact]
-        public void WhenUnsupportedGameDetected_ThenReturnsUnsupportedResultWithoutReadingMemory()
+        public void WhenUnsupportedGameDetected_ThenThrowsAndClosesMemoryAccessor()
         {
             var detectedGame = new DetectedGame(
                 GameVariant.RedactedZombies,
@@ -35,11 +32,9 @@ namespace BO2.Tests.Services
             var memoryAccessor = new FakeProcessMemoryAccessor();
             using var reader = new GameMemoryReader(memoryAccessor);
 
-            PlayerStatsReadResult result = reader.ReadPlayerStats(detectedGame);
+            ArgumentException exception = Assert.Throws<ArgumentException>(() => reader.ReadPlayerStats(detectedGame));
 
-            Assert.Equal(ConnectionState.Unsupported, result.ConnectionState);
-            Assert.NotNull(result.DetectedGame);
-            Assert.Null(result.Stats);
+            Assert.Equal("detectedGame", exception.ParamName);
             Assert.Equal(0, memoryAccessor.AttachCallCount);
             Assert.Equal(1, memoryAccessor.CloseCallCount);
         }
@@ -56,7 +51,6 @@ namespace BO2.Tests.Services
 
             PlayerStatsReadResult result = reader.ReadPlayerStats(detectedGame);
 
-            Assert.Equal(ConnectionState.Connected, result.ConnectionState);
             Assert.NotNull(result.Stats);
             Assert.Equal(1500, result.Stats.Points);
             Assert.Equal(42, result.Stats.Kills);
@@ -65,7 +59,7 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void WhenSuppliedDetectedGameChanges_ThenNextReadUsesNewValueImmediately()
+        public void ClearAttachedGame_AfterRead_ClosesCurrentMemoryAccessor()
         {
             PlayerStatAddressMap addressMap = PlayerStatAddressMap.SteamZombies;
             DetectedGame detectedGame = MakeSupportedGame(addressMap);
@@ -73,12 +67,10 @@ namespace BO2.Tests.Services
             ConfigureRequiredScoreReads(memoryAccessor, addressMap, 1500, 42, 3, 7, 10);
             using var reader = new GameMemoryReader(memoryAccessor);
 
-            reader.ReadPlayerStats(detectedGame);
-            PlayerStatsReadResult result = reader.ReadPlayerStats(null);
+            PlayerStatsReadResult result = reader.ReadPlayerStats(detectedGame);
+            reader.ClearAttachedGame();
 
-            Assert.Equal(ConnectionState.Disconnected, result.ConnectionState);
-            Assert.Null(result.DetectedGame);
-            Assert.Null(result.Stats);
+            Assert.NotNull(result.Stats);
             Assert.Equal(1, memoryAccessor.AttachCallCount);
             Assert.True(memoryAccessor.CloseCallCount >= 1);
         }
@@ -95,7 +87,6 @@ namespace BO2.Tests.Services
 
             PlayerStatsReadResult result = reader.ReadPlayerStats(detectedGame);
 
-            Assert.Equal(ConnectionState.Connected, result.ConnectionState);
             Assert.NotNull(result.Stats);
             Assert.Null(result.Stats.Candidates.PositionX);
         }
@@ -111,10 +102,7 @@ namespace BO2.Tests.Services
 
             Assert.Throws<InvalidOperationException>(() => reader.ReadPlayerStats(detectedGame));
 
-            PlayerStatsReadResult result = reader.ReadPlayerStats(null);
-
-            Assert.Equal(ConnectionState.Disconnected, result.ConnectionState);
-            Assert.True(memoryAccessor.CloseCallCount >= 2);
+            Assert.Equal(1, memoryAccessor.CloseCallCount);
         }
 
         [Fact]
@@ -128,10 +116,7 @@ namespace BO2.Tests.Services
 
             Assert.Throws<FormatException>(() => reader.ReadPlayerStats(detectedGame));
 
-            PlayerStatsReadResult result = reader.ReadPlayerStats(null);
-
-            Assert.Equal(ConnectionState.Disconnected, result.ConnectionState);
-            Assert.True(memoryAccessor.CloseCallCount >= 2);
+            Assert.Equal(1, memoryAccessor.CloseCallCount);
         }
 
         [Fact]
@@ -148,11 +133,7 @@ namespace BO2.Tests.Services
             InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => reader.ReadPlayerStats(detectedGame));
 
             Assert.IsType<ArgumentOutOfRangeException>(exception.InnerException);
-
-            PlayerStatsReadResult result = reader.ReadPlayerStats(null);
-
-            Assert.Equal(ConnectionState.Disconnected, result.ConnectionState);
-            Assert.True(memoryAccessor.CloseCallCount >= 2);
+            Assert.Equal(1, memoryAccessor.CloseCallCount);
         }
 
         private static DetectedGame MakeSupportedGame(PlayerStatAddressMap addressMap)

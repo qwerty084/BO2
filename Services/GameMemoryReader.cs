@@ -19,26 +19,14 @@ namespace BO2.Services
             _processMemoryAccessor = processMemoryAccessor;
         }
 
-        public PlayerStatsReadResult ReadPlayerStats(DetectedGame? detectedGame)
+        public PlayerStatsReadResult ReadPlayerStats(DetectedGame detectedGame)
         {
-            if (detectedGame is null)
-            {
-                _processMemoryAccessor.Close();
-                return PlayerStatsReadResult.GameNotRunning;
-            }
+            ArgumentNullException.ThrowIfNull(detectedGame);
 
             if (detectedGame.AddressMap is null)
             {
-                _processMemoryAccessor.Close();
-                string statusText = string.IsNullOrWhiteSpace(detectedGame.UnsupportedReason)
-                    ? AppStrings.Format("UnsupportedStatusFormat", detectedGame.DisplayName)
-                    : AppStrings.Format("UnsupportedStatusWithReasonFormat", detectedGame.DisplayName, detectedGame.UnsupportedReason);
-
-                return new PlayerStatsReadResult(
-                    detectedGame,
-                    null,
-                    statusText,
-                    ConnectionState.Unsupported);
+                ClearAttachedGame();
+                throw new ArgumentException("Detected game must include a supported address map.", nameof(detectedGame));
             }
 
             try
@@ -56,9 +44,7 @@ namespace BO2.Services
 
                 return new PlayerStatsReadResult(
                     detectedGame,
-                    stats,
-                    AppStrings.Format("ConnectedStatusFormat", detectedGame.DisplayName),
-                    ConnectionState.Connected);
+                    stats);
             }
             catch (ArgumentException ex)
             {
@@ -87,6 +73,11 @@ namespace BO2.Services
         public void Dispose()
         {
             _processMemoryAccessor.Dispose();
+        }
+
+        internal void ClearAttachedGame()
+        {
+            _processMemoryAccessor.Close();
         }
 
         private PlayerCandidateStats ReadCandidateStats(
@@ -169,7 +160,7 @@ namespace BO2.Services
 
         private void HandleReadFailure()
         {
-            _processMemoryAccessor.Close();
+            ClearAttachedGame();
         }
     }
 }

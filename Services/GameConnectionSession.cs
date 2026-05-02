@@ -439,7 +439,7 @@ namespace BO2.Services
             DetectedGame? detectedGame,
             DateTimeOffset receivedAt)
         {
-            PlayerStatsReadResult readResult = _memoryReader.ReadPlayerStats(detectedGame);
+            PlayerStatsReadResult? readResult = ReadPlayerStats(detectedGame);
             int? ownedMonitorProcessId;
             lock (_syncRoot)
             {
@@ -451,7 +451,7 @@ namespace BO2.Services
                 ownedMonitorProcessId = detectedGame is not null
                     && _lifecycle.IsMonitorConnectedFor(
                         GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame))
-                    && readResult.DetectedGame?.ProcessId == detectedGame.ProcessId
+                    && readResult?.DetectedGame.ProcessId == detectedGame.ProcessId
                         ? detectedGame.ProcessId
                         : null;
             }
@@ -469,7 +469,7 @@ namespace BO2.Services
                     return CreateStatusSnapshotLocked(_currentGame);
                 }
 
-                stopRequest = ApplyMonitorReadinessTimeoutLocked(readResult.DetectedGame, eventStatus, receivedAt);
+                stopRequest = ApplyMonitorReadinessTimeoutLocked(readResult?.DetectedGame, eventStatus, receivedAt);
                 result = CreateRefreshResultLocked(detectedGame, readResult, eventStatus);
             }
 
@@ -481,52 +481,15 @@ namespace BO2.Services
             return result;
         }
 
-        private PlayerStatsReadResult CreateStatusReadResultLocked(DetectedGame? detectedGame)
+        private PlayerStatsReadResult? ReadPlayerStats(DetectedGame? detectedGame)
         {
-            if (detectedGame is null)
+            if (detectedGame?.AddressMap is null)
             {
-                return PlayerStatsReadResult.GameNotRunning;
+                _memoryReader.ClearAttachedGame();
+                return null;
             }
 
-            if (detectedGame.AddressMap is null)
-            {
-                string statusText = string.IsNullOrWhiteSpace(detectedGame.UnsupportedReason)
-                    ? AppStrings.Format("UnsupportedStatusFormat", detectedGame.DisplayName)
-                    : AppStrings.Format("UnsupportedStatusWithReasonFormat", detectedGame.DisplayName, detectedGame.UnsupportedReason);
-
-                return new PlayerStatsReadResult(
-                    detectedGame,
-                    null,
-                    statusText,
-                    ConnectionState.Unsupported);
-            }
-
-            if (_lifecycle.IsDisconnecting
-                && _lifecycle.IsMonitorConnectedFor(
-                    GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame)))
-            {
-                return new PlayerStatsReadResult(
-                    detectedGame,
-                    null,
-                    AppStrings.Get("ConnectionStatusDisconnecting"),
-                    ConnectionState.Disconnecting);
-            }
-
-            if (_lifecycle.IsMonitorConnectedFor(
-                GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame)))
-            {
-                return new PlayerStatsReadResult(
-                    detectedGame,
-                    null,
-                    AppStrings.Format("ConnectedStatusFormat", detectedGame.DisplayName),
-                    ConnectionState.Connected);
-            }
-
-            return new PlayerStatsReadResult(
-                detectedGame,
-                null,
-                AppStrings.Format("GameDetectedConnectPromptFormat", detectedGame.DisplayName),
-                ConnectionState.Detected);
+            return _memoryReader.ReadPlayerStats(detectedGame);
         }
 
         private void ApplyDetectedGame(DetectedGame? detectedGame)
@@ -652,7 +615,7 @@ namespace BO2.Services
         {
             return CreateRefreshResultLocked(
                 detectedGame,
-                CreateStatusReadResultLocked(detectedGame),
+                null,
                 GameEventMonitorStatus.WaitingForMonitor);
         }
 
@@ -660,13 +623,13 @@ namespace BO2.Services
         {
             return CreateRefreshResultLocked(
                 detectedGame,
-                CreateStatusReadResultLocked(detectedGame),
+                null,
                 GameEventMonitorStatus.WaitingForMonitor);
         }
 
         private GameConnectionRefreshResult CreateRefreshResultLocked(
             DetectedGame? detectedGame,
-            PlayerStatsReadResult readResult,
+            PlayerStatsReadResult? readResult,
             GameEventMonitorStatus eventStatus)
         {
             GameConnectionSessionLifecycleSnapshot lifecycleSnapshot = _lifecycle.CreateSnapshot(
@@ -699,7 +662,7 @@ namespace BO2.Services
 
         private readonly record struct GameConnectionRefreshResult(
             DetectedGame? CurrentGame,
-            PlayerStatsReadResult ReadResult,
+            PlayerStatsReadResult? ReadResult,
             GameEventMonitorStatus EventStatus,
             DllInjectionResult InjectionResult,
             bool IsConnecting,
@@ -711,7 +674,7 @@ namespace BO2.Services
 
     internal readonly record struct GameConnectionSnapshot(
         DetectedGame? CurrentGame,
-        PlayerStatsReadResult ReadResult,
+        PlayerStatsReadResult? ReadResult,
         GameEventMonitorStatus EventStatus,
         DllInjectionResult InjectionResult,
         bool IsConnecting,

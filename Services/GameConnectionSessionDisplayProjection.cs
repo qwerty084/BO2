@@ -41,7 +41,7 @@ namespace BO2.Services
         private static void ApplyReadResult(
             GameConnectionSessionDisplayProjection projection,
             DetectedGame? currentGame,
-            PlayerStatsReadResult result,
+            PlayerStatsReadResult? result,
             bool isConnecting,
             bool isDisconnecting,
             bool isMonitorConnectedForDetectedGame)
@@ -52,12 +52,11 @@ namespace BO2.Services
             ApplyConnectionStatus(
                 projection,
                 currentGame,
-                result.StatusText,
                 isConnecting,
                 isDisconnecting,
                 isMonitorConnectedForDetectedGame);
 
-            if (result.Stats is null)
+            if (result?.Stats is null)
             {
                 ClearStats(projection);
                 return;
@@ -96,7 +95,6 @@ namespace BO2.Services
         private static void ApplyConnectionStatus(
             GameConnectionSessionDisplayProjection projection,
             DetectedGame? detectedGame,
-            string? connectedStatusText,
             bool isConnecting,
             bool isDisconnecting,
             bool isMonitorConnectedForDetectedGame)
@@ -131,9 +129,9 @@ namespace BO2.Services
 
             if (isMonitorConnectedForDetectedGame)
             {
-                projection.StatusText = connectedStatusText is null
-                    ? DisplayText.Format("ConnectedStatusFormat", DisplayText.Plain(detectedGame.DisplayName))
-                    : DisplayText.Plain(connectedStatusText);
+                projection.StatusText = DisplayText.Format(
+                    "ConnectedStatusFormat",
+                    DisplayText.Plain(detectedGame.DisplayName));
                 SetConnectionState(projection, detectedGame, ConnectionState.Connected, isConnecting, isDisconnecting);
                 return;
             }

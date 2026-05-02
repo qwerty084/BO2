@@ -16,9 +16,7 @@ namespace BO2.Tests.ViewModels
             DetectedGame detectedGame = CreateSupportedGame(1001);
             var readResult = new PlayerStatsReadResult(
                 detectedGame,
-                CreateStats(),
-                "ConnectedStatus",
-                ConnectionState.Connected);
+                CreateStats());
 
             viewModel.ApplySnapshot(new GameConnectionSnapshot(
                 detectedGame,
