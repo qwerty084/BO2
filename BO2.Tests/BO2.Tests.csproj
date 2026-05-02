@@ -75,6 +75,7 @@
     <Compile Include="..\Services\GameConnectionSessionDisplayProjection.cs" Link="Services\GameConnectionSessionDisplayProjection.cs" />
     <Compile Include="..\Services\GameConnectionSessionDisplayRenderer.cs" Link="Services\GameConnectionSessionDisplayRenderer.cs" />
     <Compile Include="..\Services\StatFormatter.cs"             Link="Services\StatFormatter.cs" />
+    <Compile Include="..\ViewModels\HomeStatsViewModel.cs"      Link="ViewModels\HomeStatsViewModel.cs" />
   </ItemGroup>
 
 </Project>
