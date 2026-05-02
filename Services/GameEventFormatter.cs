@@ -5,17 +5,35 @@ namespace BO2.Services
 {
     internal static class GameEventFormatter
     {
+        private static readonly GameConnectionSessionDisplayRenderer Renderer = new();
+
         public static string FormatRecentBoxEvents(GameEventMonitorStatus eventStatus)
         {
-            return FormatRecentBoxEvents(eventStatus, AppStrings.Get("RecentEventsEmpty"));
+            return Renderer.Render(GameEventDisplayTextProjector.FormatRecentBoxEvents(
+                eventStatus,
+                DisplayText.Resource("RecentEventsEmpty")));
         }
 
         public static string FormatBoxTrackerEvents(GameEventMonitorStatus eventStatus)
         {
-            return FormatRecentBoxEvents(eventStatus, AppStrings.Get("BoxTrackerEmpty"));
+            return Renderer.Render(GameEventDisplayTextProjector.FormatRecentBoxEvents(
+                eventStatus,
+                DisplayText.Resource("BoxTrackerEmpty")));
         }
 
-        private static string FormatRecentBoxEvents(GameEventMonitorStatus eventStatus, string emptyText)
+        public static string FormatRecentGameEvents(GameEventMonitorStatus eventStatus)
+        {
+            return Renderer.Render(GameEventDisplayTextProjector.FormatRecentGameEvents(
+                eventStatus,
+                DisplayText.Resource("RecentEventsEmpty")));
+        }
+    }
+
+    internal static class GameEventDisplayTextProjector
+    {
+        public static DisplayText FormatRecentBoxEvents(
+            GameEventMonitorStatus eventStatus,
+            DisplayText emptyText)
         {
             GameEvent[] boxEvents = eventStatus.RecentEvents
                 .Where(gameEvent => gameEvent.EventType == GameEventType.BoxEvent)
@@ -26,12 +44,12 @@ namespace BO2.Services
                 return emptyText;
             }
 
-            return string.Join(
-                Environment.NewLine,
-                boxEvents.Select(FormatBoxEvent));
+            return DisplayText.Lines(boxEvents.Select(FormatBoxEvent).ToArray());
         }
 
-        public static string FormatRecentGameEvents(GameEventMonitorStatus eventStatus)
+        public static DisplayText FormatRecentGameEvents(
+            GameEventMonitorStatus eventStatus,
+            DisplayText emptyText)
         {
             GameEvent[] visibleEvents = eventStatus.RecentEvents
                 .Where(IsVisibleRecentEvent)
@@ -39,19 +57,10 @@ namespace BO2.Services
                 .ToArray();
             if (visibleEvents.Length == 0)
             {
-                return AppStrings.Get("RecentEventsEmpty");
+                return emptyText;
             }
 
-            return string.Join(
-                Environment.NewLine,
-                visibleEvents.Select(gameEvent => AppStrings.Format(
-                    "RecentEventFormat",
-                    gameEvent.ReceivedAt.ToLocalTime().ToString("HH:mm:ss"),
-                    gameEvent.EventType,
-                    gameEvent.EventName,
-                    gameEvent.LevelTime,
-                    gameEvent.OwnerId,
-                    gameEvent.StringValue)));
+            return DisplayText.Lines(visibleEvents.Select(FormatRecentGameEvent).ToArray());
         }
 
         private static bool IsVisibleRecentEvent(GameEvent gameEvent)
@@ -63,24 +72,35 @@ namespace BO2.Services
                 or GameEventType.NotifyObserved);
         }
 
-        private static string FormatBoxEvent(GameEvent gameEvent)
+        private static DisplayText FormatRecentGameEvent(GameEvent gameEvent)
         {
-            string receivedAt = gameEvent.ReceivedAt.ToLocalTime().ToString("HH:mm:ss");
+            return DisplayText.Format(
+                "RecentEventFormat",
+                DisplayText.LocalTime(gameEvent.ReceivedAt),
+                gameEvent.EventType,
+                gameEvent.EventName,
+                gameEvent.LevelTime,
+                gameEvent.OwnerId,
+                gameEvent.StringValue);
+        }
+
+        private static DisplayText FormatBoxEvent(GameEvent gameEvent)
+        {
             if (!string.IsNullOrWhiteSpace(gameEvent.WeaponName))
             {
                 string weaponDisplayName = WeaponDisplayNameResolver.FormatForEvent(gameEvent.WeaponName);
-                return AppStrings.Format(
+                return DisplayText.Format(
                     "BoxEventWithWeaponFormat",
-                    receivedAt,
+                    DisplayText.LocalTime(gameEvent.ReceivedAt),
                     gameEvent.EventName,
                     weaponDisplayName,
                     gameEvent.OwnerId,
                     gameEvent.StringValue);
             }
 
-            return AppStrings.Format(
+            return DisplayText.Format(
                 "BoxEventFormat",
-                receivedAt,
+                DisplayText.LocalTime(gameEvent.ReceivedAt),
                 gameEvent.EventName,
                 gameEvent.OwnerId,
                 gameEvent.StringValue);

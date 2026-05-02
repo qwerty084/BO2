@@ -16,6 +16,7 @@ namespace BO2.ViewModels
         private readonly DispatcherQueue _dispatcherQueue;
         private readonly GameConnectionSession _connectionSession;
         private readonly GameConnectionSessionDisplayProjector _displayProjector;
+        private readonly GameConnectionSessionDisplayRenderer _displayRenderer;
         private readonly SemaphoreSlim _operationSemaphore = new(1, 1);
         private bool _disposed;
         private string _pointsText = EmptyStatText;
@@ -65,7 +66,8 @@ namespace BO2.ViewModels
 
             _dispatcherQueue = dispatcherQueue;
             _connectionSession = connectionSession;
-            _displayProjector = new GameConnectionSessionDisplayProjector(AppStrings.Get("UnavailableValue"));
+            _displayProjector = new GameConnectionSessionDisplayProjector();
+            _displayRenderer = new GameConnectionSessionDisplayRenderer();
             _connectionSession.DetectedGameChanged += OnDetectedGameChanged;
 
             _connectionSession.Start();
@@ -470,7 +472,7 @@ namespace BO2.ViewModels
 
         private void ApplyRefreshSnapshot(GameConnectionRefreshResult snapshot)
         {
-            ApplyDisplayState(_displayProjector.Project(snapshot));
+            ApplyDisplayState(_displayRenderer.Render(_displayProjector.Project(snapshot)));
         }
 
         private void ApplyDisplayState(GameConnectionSessionDisplayState state)
