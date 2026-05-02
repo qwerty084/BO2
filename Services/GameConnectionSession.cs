@@ -76,8 +76,6 @@ namespace BO2.Services
             _processDetectionService.DetectedGameChanged += OnDetectedGameChanged;
         }
 
-        public event EventHandler<DetectedGameChangedEventArgs>? DetectedGameChanged;
-
         public event EventHandler<GameConnectionSnapshotChangedEventArgs>? SnapshotChanged;
 
         public GameConnectionSnapshot Snapshot
@@ -149,7 +147,7 @@ namespace BO2.Services
                 }
             }
 
-            ApplyDetectedGame(_processDetectionService.CurrentGame, notify: false);
+            ApplyDetectedGame(_processDetectionService.CurrentGame);
         }
 
         public GameConnectionSnapshot Read()
@@ -411,14 +409,14 @@ namespace BO2.Services
 
         private void OnDetectedGameChanged(object? sender, DetectedGameChangedEventArgs args)
         {
-            ApplyDetectedGame(args.DetectedGame, notify: true);
+            ApplyDetectedGame(args.DetectedGame);
         }
 
         private DetectedGame? RefreshCurrentGame()
         {
             if (UsesPollingProcessDetection)
             {
-                ApplyDetectedGame(DetectByPolling(), notify: false);
+                ApplyDetectedGame(DetectByPolling());
             }
 
             return CurrentGame;
@@ -531,9 +529,8 @@ namespace BO2.Services
                 ConnectionState.Detected);
         }
 
-        private void ApplyDetectedGame(DetectedGame? detectedGame, bool notify)
+        private void ApplyDetectedGame(DetectedGame? detectedGame)
         {
-            EventHandler<DetectedGameChangedEventArgs>? handler;
             GameConnectionSnapshotChangedEventArgs? snapshotChangedArgs;
             GameConnectionSessionMonitorStopRequest stopRequest;
             lock (_syncRoot)
@@ -548,7 +545,6 @@ namespace BO2.Services
                 GameConnectionSessionLifecycleGame? detectedLifecycleGame =
                     GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame);
                 _currentGame = detectedGame;
-                handler = DetectedGameChanged;
                 stopRequest = _lifecycle.ResetForDetectedGameChange(
                     currentLifecycleGame,
                     detectedLifecycleGame);
@@ -559,11 +555,6 @@ namespace BO2.Services
             if (stopRequest.ShouldRequestStop)
             {
                 _eventMonitor.RequestStop(stopRequest.MonitorProcessId);
-            }
-
-            if (notify)
-            {
-                handler?.Invoke(this, new DetectedGameChangedEventArgs(detectedGame));
             }
 
             RaiseSnapshotChanged(snapshotChangedArgs);

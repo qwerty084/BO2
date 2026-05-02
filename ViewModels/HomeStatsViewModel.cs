@@ -5,48 +5,7 @@ using System.Runtime.CompilerServices;
 
 namespace BO2.ViewModels
 {
-    public interface IHomeStatsPresentationState : INotifyPropertyChanged
-    {
-        string PointsText { get; }
-
-        string KillsText { get; }
-
-        string DownsText { get; }
-
-        string RevivesText { get; }
-
-        string HeadshotsText { get; }
-
-        string PositionXText { get; }
-
-        string PositionYText { get; }
-
-        string PositionZText { get; }
-
-        string PlayerCandidateDetailsText { get; }
-
-        string AmmoCandidateDetailsText { get; }
-
-        string CounterCandidateDetailsText { get; }
-
-        string AddressCandidateDetailsText { get; }
-
-        string DetectedGameText { get; }
-
-        string EventCompatibilityText { get; }
-
-        string InjectionStatusText { get; }
-
-        string EventMonitorStatusText { get; }
-
-        string CurrentRoundText { get; }
-
-        string BoxEventsText { get; }
-
-        string RecentGameEventsText { get; }
-    }
-
-    internal sealed class HomeStatsViewModel : IHomeStatsPresentationState
+    public sealed class HomeStatsViewModel : INotifyPropertyChanged
     {
         private const string EmptyStatText = "--";
 

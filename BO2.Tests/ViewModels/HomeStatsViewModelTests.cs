@@ -43,12 +43,12 @@ namespace BO2.Tests.ViewModels
         [Fact]
         public void PresentationStateContract_ExposesReadOnlyStateWithoutConnectionCommands()
         {
-            PropertyInfo[] properties = typeof(IHomeStatsPresentationState)
+            PropertyInfo[] properties = typeof(HomeStatsViewModel)
                 .GetProperties(BindingFlags.Instance | BindingFlags.Public);
             MethodInfo[] publicMethods = typeof(HomeStatsViewModel)
                 .GetMethods(BindingFlags.Instance | BindingFlags.Public);
 
-            Assert.All(properties, property => Assert.Null(property.SetMethod));
+            Assert.All(properties, property => Assert.Null(property.GetSetMethod()));
             Assert.DoesNotContain(publicMethods, IsConnectionCommand);
         }
 

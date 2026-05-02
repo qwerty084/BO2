@@ -52,7 +52,6 @@ namespace BO2.ViewModels
             _connectionSession = connectionSession;
             _displayProjector = new GameConnectionSessionDisplayProjector();
             _displayRenderer = new GameConnectionSessionDisplayRenderer();
-            _connectionSession.DetectedGameChanged += OnDetectedGameChanged;
             _connectionSession.SnapshotChanged += OnSnapshotChanged;
 
             _connectionSession.Start();
@@ -65,7 +64,7 @@ namespace BO2.ViewModels
 
         public event EventHandler? RefreshRequested;
 
-        public IHomeStatsPresentationState HomeStats => _homeStats;
+        public HomeStatsViewModel HomeStats => _homeStats;
 
         public string StatusText
         {
@@ -248,7 +247,6 @@ namespace BO2.ViewModels
         public void Dispose()
         {
             _disposed = true;
-            _connectionSession.DetectedGameChanged -= OnDetectedGameChanged;
             _connectionSession.SnapshotChanged -= OnSnapshotChanged;
             _connectionSession.Dispose();
             _operationSemaphore.Dispose();
@@ -361,7 +359,7 @@ namespace BO2.ViewModels
 
             if (_dispatcherQueue.HasThreadAccess)
             {
-                ApplyRefreshSnapshot(args.Snapshot);
+                ApplySnapshotChanged(args);
                 return;
             }
 
@@ -369,36 +367,18 @@ namespace BO2.ViewModels
             {
                 if (!_disposed)
                 {
-                    ApplyRefreshSnapshot(args.Snapshot);
+                    ApplySnapshotChanged(args);
                 }
             });
         }
 
-        private void OnDetectedGameChanged(object? sender, DetectedGameChangedEventArgs args)
+        private void ApplySnapshotChanged(GameConnectionSnapshotChangedEventArgs args)
         {
-            if (_disposed)
+            ApplyRefreshSnapshot(args.Snapshot);
+            if (!Equals(args.PreviousSnapshot.CurrentGame, args.Snapshot.CurrentGame))
             {
-                return;
+                RefreshRequested?.Invoke(this, EventArgs.Empty);
             }
-
-            if (_dispatcherQueue.HasThreadAccess)
-            {
-                ApplyDetectedGameChanged();
-                return;
-            }
-
-            _dispatcherQueue.TryEnqueue(() =>
-            {
-                if (!_disposed)
-                {
-                    ApplyDetectedGameChanged();
-                }
-            });
-        }
-
-        private void ApplyDetectedGameChanged()
-        {
-            RefreshRequested?.Invoke(this, EventArgs.Empty);
         }
 
         private void ApplyReadError(string message, GameConnectionSnapshot snapshot)

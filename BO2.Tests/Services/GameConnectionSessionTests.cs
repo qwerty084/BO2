@@ -213,6 +213,40 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void ProcessDetectionChanged_WhenCurrentGameChanges_PublishesSnapshotTransition()
+        {
+            DetectedGame originalGame = CreateSupportedGame(processId: 1001);
+            DetectedGame detectedGame = CreateSupportedGame(processId: 2002);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            SessionContext context = CreateSessionContext(
+                eventMonitor,
+                detectedGame: originalGame,
+                memoryAccessor: memoryAccessor);
+            context.Session.Start();
+            List<GameConnectionSnapshotChangedEventArgs> changes = new();
+            context.Session.SnapshotChanged += (_, args) => changes.Add(args);
+            context.EventDetector.Result = detectedGame;
+
+            context.LifecycleEventSource.RaiseStarted(detectedGame.ProcessName, detectedGame.ProcessId);
+
+            GameConnectionSnapshotChangedEventArgs change = Assert.Single(changes);
+            Assert.Same(originalGame, change.PreviousSnapshot.CurrentGame);
+            Assert.Same(detectedGame, change.Snapshot.CurrentGame);
+            Assert.Same(detectedGame, change.Snapshot.ReadResult.DetectedGame);
+            Assert.Null(change.Snapshot.ReadResult.Stats);
+            Assert.Equal(ConnectionState.Detected, change.Snapshot.ReadResult.ConnectionState);
+            Assert.Equal(GameCompatibilityState.WaitingForMonitor, change.Snapshot.EventStatus.CompatibilityState);
+            Assert.Equal(DllInjectionState.NotAttempted, change.Snapshot.InjectionResult.State);
+            Assert.Equal(change.Snapshot, context.Session.Snapshot);
+            Assert.Equal(0, memoryAccessor.AttachCallCount);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+        }
+
+        [Fact]
         public void Connect_WhenInjectionIsInProgress_GetStatusSnapshotReturnsConnectingStatusWithoutPlayerStatsRead()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
