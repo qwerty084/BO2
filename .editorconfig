@@ -32,3 +32,6 @@ dotnet_diagnostic.SYSLIB1054.severity = silent
 
 [BO2.Tests/Fakes/*.cs]
 dotnet_diagnostic.IDE0130.severity = silent
+
+[BO2.Tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = silent
