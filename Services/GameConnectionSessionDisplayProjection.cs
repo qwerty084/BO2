@@ -5,16 +5,16 @@ namespace BO2.Services
 {
     internal sealed class GameConnectionSessionDisplayProjector
     {
-        public GameConnectionSessionDisplayProjection Project(GameConnectionRefreshResult snapshot)
+        public GameConnectionSessionDisplayProjection Project(GameConnectionSnapshot snapshot)
         {
             var projection = GameConnectionSessionDisplayProjection.CreateDefault();
-            bool readResultIsForCurrentGame = Equals(snapshot.ReadResult.DetectedGame, snapshot.CurrentGame);
             ApplyReadResult(
                 projection,
+                snapshot.CurrentGame,
                 snapshot.ReadResult,
                 snapshot.IsConnecting,
                 snapshot.IsDisconnecting,
-                readResultIsForCurrentGame && snapshot.IsMonitorConnectedForCurrentGame);
+                snapshot.IsMonitorConnectedForCurrentGame);
             ApplyEventMonitorStatus(
                 projection,
                 snapshot.CurrentGame,
@@ -40,17 +40,18 @@ namespace BO2.Services
 
         private static void ApplyReadResult(
             GameConnectionSessionDisplayProjection projection,
+            DetectedGame? currentGame,
             PlayerStatsReadResult result,
             bool isConnecting,
             bool isDisconnecting,
             bool isMonitorConnectedForDetectedGame)
         {
-            projection.DetectedGameText = result.DetectedGame is null
+            projection.DetectedGameText = currentGame is null
                 ? DisplayText.Resource("NoGameDetected")
-                : DisplayText.Plain(result.DetectedGame.DisplayName);
+                : DisplayText.Plain(currentGame.DisplayName);
             ApplyConnectionStatus(
                 projection,
-                result.DetectedGame,
+                currentGame,
                 result.StatusText,
                 isConnecting,
                 isDisconnecting,
@@ -73,7 +74,7 @@ namespace BO2.Services
             projection.PlayerCandidateDetailsText = FormatPlayerCandidateDetails(result.Stats.Candidates);
             projection.AmmoCandidateDetailsText = FormatAmmoCandidateDetails(result.Stats.Candidates);
             projection.CounterCandidateDetailsText = FormatCounterCandidateDetails(result.Stats.Candidates);
-            projection.AddressCandidateDetailsText = result.DetectedGame?.AddressMap is PlayerStatAddressMap addressMap
+            projection.AddressCandidateDetailsText = currentGame?.AddressMap is PlayerStatAddressMap addressMap
                 ? FormatAddressCandidateDetails(addressMap)
                 : EmptyStatText;
         }
@@ -383,7 +384,7 @@ namespace BO2.Services
 
         private static void UpdateConnectButtonState(
             GameConnectionSessionDisplayProjection projection,
-            GameConnectionRefreshResult snapshot)
+            GameConnectionSnapshot snapshot)
         {
             UpdateConnectButtonState(
                 projection,

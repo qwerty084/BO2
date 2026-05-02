@@ -166,7 +166,7 @@ namespace BO2.Tests.Services
             return new GameConnectionSessionDisplayProjector();
         }
 
-        private static GameConnectionRefreshResult CreateSnapshot(
+        private static GameConnectionSnapshot CreateSnapshot(
             DetectedGame? currentGame,
             PlayerStatsReadResult readResult,
             GameEventMonitorStatus? eventStatus = null,
@@ -177,7 +177,7 @@ namespace BO2.Tests.Services
             bool hasInjectionAttemptForCurrentGame = false,
             bool isMonitorConnectedForCurrentGame = false)
         {
-            return new GameConnectionRefreshResult(
+            return new GameConnectionSnapshot(
                 currentGame,
                 readResult,
                 eventStatus ?? GameEventMonitorStatus.WaitingForMonitor,

@@ -299,7 +299,7 @@ namespace BO2.ViewModels
             await _operationSemaphore.WaitAsync(cancellationToken);
             try
             {
-                GameConnectionRefreshResult snapshot = await Task.Run(
+                GameConnectionSnapshot snapshot = await Task.Run(
                     _connectionSession.Read,
                     cancellationToken);
                 await RunOnDispatcherAsync(
@@ -308,11 +308,11 @@ namespace BO2.ViewModels
             }
             catch (InvalidOperationException ex) when (!cancellationToken.IsCancellationRequested)
             {
-                await TryApplyReadErrorAsync(ex.Message, cancellationToken);
+                await TryApplyReadErrorAsync(ex.Message, sessionAlreadyHandled: true, cancellationToken);
             }
             catch (Win32Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
-                await TryApplyReadErrorAsync(ex.Message, cancellationToken);
+                await TryApplyReadErrorAsync(ex.Message, sessionAlreadyHandled: true, cancellationToken);
             }
             finally
             {
@@ -328,21 +328,23 @@ namespace BO2.ViewModels
                 bool connectPending = false;
                 try
                 {
-                    GameConnectionRefreshResult connectingSnapshot = await Task.Run(
+                    await Task.Run(
                         _connectionSession.BeginConnect,
                         cancellationToken);
-                    connectPending = connectingSnapshot.IsConnecting;
+                    GameConnectionSnapshot connectingSessionSnapshot = _connectionSession.Snapshot;
+                    connectPending = connectingSessionSnapshot.IsConnecting;
                     await RunOnDispatcherAsync(
-                        () => ApplyRefreshSnapshot(connectingSnapshot),
+                        () => ApplyRefreshSnapshot(connectingSessionSnapshot),
                         cancellationToken);
-                    if (!connectingSnapshot.IsConnecting)
+                    if (!connectingSessionSnapshot.IsConnecting)
                     {
                         return;
                     }
 
-                    GameConnectionRefreshResult connectedSnapshot = await Task.Run(
+                    await Task.Run(
                         _connectionSession.CompleteConnect,
                         cancellationToken);
+                    GameConnectionSnapshot connectedSnapshot = _connectionSession.Snapshot;
                     connectPending = false;
                     await RunOnDispatcherAsync(
                         () => ApplyRefreshSnapshot(connectedSnapshot),
@@ -360,11 +362,11 @@ namespace BO2.ViewModels
             }
             catch (InvalidOperationException ex) when (!cancellationToken.IsCancellationRequested)
             {
-                await TryApplyReadErrorAsync(ex.Message, cancellationToken);
+                await TryApplyReadErrorAsync(ex.Message, sessionAlreadyHandled: true, cancellationToken);
             }
             catch (Win32Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
-                await TryApplyReadErrorAsync(ex.Message, cancellationToken);
+                await TryApplyReadErrorAsync(ex.Message, sessionAlreadyHandled: true, cancellationToken);
             }
             finally
             {
@@ -377,9 +379,10 @@ namespace BO2.ViewModels
             await _operationSemaphore.WaitAsync(cancellationToken);
             try
             {
-                GameConnectionRefreshResult snapshot = await Task.Run(
+                await Task.Run(
                     _connectionSession.BeginDisconnect,
                     cancellationToken);
+                GameConnectionSnapshot snapshot = _connectionSession.Snapshot;
                 await RunOnDispatcherAsync(
                     () => ApplyRefreshSnapshot(snapshot),
                     cancellationToken);
@@ -392,7 +395,7 @@ namespace BO2.ViewModels
 
         public Task TryApplyRefreshErrorAsync(string message, CancellationToken cancellationToken)
         {
-            return TryApplyReadErrorAsync(message, cancellationToken);
+            return TryApplyReadErrorAsync(message, sessionAlreadyHandled: false, cancellationToken);
         }
 
         public void Dispose()
@@ -453,9 +456,14 @@ namespace BO2.ViewModels
             return RunOnDispatcherAsync(_dispatcherQueue, action, cancellationToken);
         }
 
-        private async Task TryApplyReadErrorAsync(string message, CancellationToken cancellationToken)
+        private async Task TryApplyReadErrorAsync(
+            string message,
+            bool sessionAlreadyHandled,
+            CancellationToken cancellationToken)
         {
-            GameConnectionRefreshResult snapshot = _connectionSession.HandleReadFailure();
+            GameConnectionSnapshot snapshot = sessionAlreadyHandled
+                ? _connectionSession.Snapshot
+                : _connectionSession.HandleReadFailure();
             try
             {
                 await RunOnDispatcherAsync(() => ApplyReadError(message, snapshot), cancellationToken);
@@ -470,7 +478,7 @@ namespace BO2.ViewModels
             }
         }
 
-        private void ApplyRefreshSnapshot(GameConnectionRefreshResult snapshot)
+        private void ApplyRefreshSnapshot(GameConnectionSnapshot snapshot)
         {
             ApplyDisplayState(_displayRenderer.Render(_displayProjector.Project(snapshot)));
         }
@@ -540,7 +548,7 @@ namespace BO2.ViewModels
             RefreshRequested?.Invoke(this, EventArgs.Empty);
         }
 
-        private void ApplyReadError(string message, GameConnectionRefreshResult snapshot)
+        private void ApplyReadError(string message, GameConnectionSnapshot snapshot)
         {
             ApplyRefreshSnapshot(snapshot);
             StatusText = message;

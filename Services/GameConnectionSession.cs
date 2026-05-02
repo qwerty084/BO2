@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Management;
 using System.Runtime.InteropServices;
 
@@ -151,7 +152,7 @@ namespace BO2.Services
             ApplyDetectedGame(_processDetectionService.CurrentGame, notify: false);
         }
 
-        public GameConnectionRefreshResult Read()
+        public GameConnectionSnapshot Read()
         {
             long diagnosticsStartedAt = RefreshDiagnostics.Start();
             try
@@ -165,13 +166,18 @@ namespace BO2.Services
 
                 return PublishSnapshot(ReadSnapshot(detectedGame, receivedAt));
             }
+            catch (Exception ex) when (IsRecoverableReadException(ex))
+            {
+                HandleReadFailure();
+                throw;
+            }
             finally
             {
                 RefreshDiagnostics.WriteElapsed("game connection refresh", diagnosticsStartedAt);
             }
         }
 
-        public GameConnectionRefreshResult GetStatusSnapshot()
+        public GameConnectionSnapshot GetStatusSnapshot()
         {
             RefreshCurrentGame();
             GameConnectionRefreshResult result;
@@ -183,7 +189,7 @@ namespace BO2.Services
             return PublishSnapshot(result);
         }
 
-        public GameConnectionRefreshResult HandleReadFailure()
+        public GameConnectionSnapshot HandleReadFailure()
         {
             RefreshCurrentGame();
             GameConnectionRefreshResult result;
@@ -228,7 +234,7 @@ namespace BO2.Services
                 result = CreateStatusSnapshotLocked(detectedGame);
             }
 
-            return PublishSnapshot(result);
+            return PublishRefreshResult(result);
         }
 
         public GameConnectionRefreshResult CompleteConnect()
@@ -236,7 +242,7 @@ namespace BO2.Services
             GameConnectionSessionLifecycleGame? connectTargetGame = GetConnectTargetGame();
             try
             {
-                return PublishSnapshot(CompleteConnect(connectTargetGame, Inject()));
+                return PublishRefreshResult(CompleteConnect(connectTargetGame, Inject()));
             }
             catch
             {
@@ -354,7 +360,7 @@ namespace BO2.Services
                 ? ReadSnapshot(detectedGame, receivedAt)
                 : result!.Value;
 
-            return PublishSnapshot(snapshot);
+            return PublishRefreshResult(snapshot);
         }
 
         public void ResetMonitorConnectionState(bool requestStop = true)
@@ -594,16 +600,23 @@ namespace BO2.Services
             RaiseSnapshotChanged(snapshotChangedArgs);
         }
 
-        private GameConnectionRefreshResult PublishSnapshot(GameConnectionRefreshResult result)
+        private GameConnectionRefreshResult PublishRefreshResult(GameConnectionRefreshResult result)
         {
+            PublishSnapshot(result);
+            return result;
+        }
+
+        private GameConnectionSnapshot PublishSnapshot(GameConnectionRefreshResult result)
+        {
+            GameConnectionSnapshot snapshot = GameConnectionSnapshot.FromRefreshResult(result);
             GameConnectionSnapshotChangedEventArgs? args;
             lock (_syncRoot)
             {
-                args = UpdateSnapshotLocked(GameConnectionSnapshot.FromRefreshResult(result));
+                args = UpdateSnapshotLocked(snapshot);
             }
 
             RaiseSnapshotChanged(args);
-            return result;
+            return snapshot;
         }
 
         private GameConnectionSnapshotChangedEventArgs? UpdateSnapshotLocked(GameConnectionSnapshot snapshot)
@@ -668,6 +681,11 @@ namespace BO2.Services
             }
 
             return true;
+        }
+
+        private static bool IsRecoverableReadException(Exception exception)
+        {
+            return exception is InvalidOperationException or Win32Exception;
         }
 
         private GameConnectionRefreshResult CreateStatusSnapshotLocked(DetectedGame? detectedGame)
