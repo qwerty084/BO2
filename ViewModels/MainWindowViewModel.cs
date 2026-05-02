@@ -325,39 +325,39 @@ namespace BO2.ViewModels
             await _operationSemaphore.WaitAsync(cancellationToken);
             try
             {
-                bool connectPending = false;
+                TaskCompletionSource<GameConnectionSnapshot> connectingSnapshotSource = new(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                void OnSnapshotChanged(object? sender, GameConnectionSnapshotChangedEventArgs args)
+                {
+                    if (args.Snapshot.IsConnecting)
+                    {
+                        connectingSnapshotSource.TrySetResult(args.Snapshot);
+                    }
+                }
+
+                _connectionSession.SnapshotChanged += OnSnapshotChanged;
                 try
                 {
-                    await Task.Run(
-                        _connectionSession.BeginConnect,
+                    Task<GameConnectionSnapshot> connectTask = Task.Run(
+                        _connectionSession.Connect,
                         cancellationToken);
-                    GameConnectionSnapshot connectingSessionSnapshot = _connectionSession.Snapshot;
-                    connectPending = connectingSessionSnapshot.IsConnecting;
-                    await RunOnDispatcherAsync(
-                        () => ApplyRefreshSnapshot(connectingSessionSnapshot),
-                        cancellationToken);
-                    if (!connectingSessionSnapshot.IsConnecting)
+                    await Task.WhenAny(connectTask, connectingSnapshotSource.Task);
+                    if (connectingSnapshotSource.Task.IsCompletedSuccessfully)
                     {
-                        return;
+                        GameConnectionSnapshot connectingSnapshot = await connectingSnapshotSource.Task;
+                        await RunOnDispatcherAsync(
+                            () => ApplyRefreshSnapshot(connectingSnapshot),
+                            cancellationToken);
                     }
 
-                    await Task.Run(
-                        _connectionSession.CompleteConnect,
-                        cancellationToken);
-                    GameConnectionSnapshot connectedSnapshot = _connectionSession.Snapshot;
-                    connectPending = false;
+                    GameConnectionSnapshot connectedSnapshot = await connectTask;
                     await RunOnDispatcherAsync(
                         () => ApplyRefreshSnapshot(connectedSnapshot),
                         cancellationToken);
                 }
-                catch
+                finally
                 {
-                    if (connectPending)
-                    {
-                        _connectionSession.CancelConnect();
-                    }
-
-                    throw;
+                    _connectionSession.SnapshotChanged -= OnSnapshotChanged;
                 }
             }
             catch (InvalidOperationException ex) when (!cancellationToken.IsCancellationRequested)

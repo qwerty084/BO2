@@ -211,15 +211,15 @@ namespace BO2.Services
             }
         }
 
-        public GameConnectionRefreshResult Connect()
+        public GameConnectionSnapshot Connect()
         {
-            GameConnectionRefreshResult connectingSnapshot = BeginConnect();
-            if (!connectingSnapshot.IsConnecting)
+            GameConnectionRefreshResult connectingResult = BeginConnect();
+            if (!connectingResult.IsConnecting)
             {
-                return connectingSnapshot;
+                return GameConnectionSnapshot.FromRefreshResult(connectingResult);
             }
 
-            return CompleteConnect();
+            return GameConnectionSnapshot.FromRefreshResult(CompleteConnect());
         }
 
         public GameConnectionRefreshResult BeginConnect()

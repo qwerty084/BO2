@@ -353,31 +353,35 @@ namespace BO2.Tests.Services
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
             int? injectedProcessId = null;
+            bool injectionObservedConnectingSnapshot = false;
+            List<GameConnectionSnapshot> publishedSnapshots = new();
             FakeGameEventMonitor eventMonitor = new()
             {
                 Status = CreateCompatibleStatus()
             };
-            bool connectingSnapshotPublished = false;
             DllInjector dllInjector = CreateDllInjector(
                 fileExists: _ => true,
                 injectLibrary: (processId, _) =>
                 {
-                    Assert.True(connectingSnapshotPublished);
+                    injectionObservedConnectingSnapshot = publishedSnapshots.Exists(snapshot => snapshot.IsConnecting);
                     injectedProcessId = processId;
                 });
             GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, dllInjector: dllInjector);
+            session.SnapshotChanged += (_, args) => publishedSnapshots.Add(args.Snapshot);
 
-            GameConnectionRefreshResult connectingSnapshot = session.BeginConnect();
-            connectingSnapshotPublished = true;
-            GameConnectionRefreshResult connectedSnapshot = session.CompleteConnect();
+            GameConnectionSnapshot connectedSnapshot = session.Connect();
 
+            Assert.NotEmpty(publishedSnapshots);
+            GameConnectionSnapshot connectingSnapshot = publishedSnapshots[0];
             Assert.True(connectingSnapshot.IsConnecting);
             Assert.False(connectingSnapshot.CanAttemptConnect);
+            Assert.True(injectionObservedConnectingSnapshot);
             Assert.Equal(1001, injectedProcessId);
             Assert.False(connectedSnapshot.IsConnecting);
             Assert.Same(detectedGame, connectedSnapshot.CurrentGame);
             Assert.Equal(DllInjectionState.Loaded, connectedSnapshot.InjectionResult.State);
             Assert.True(connectedSnapshot.IsMonitorConnectedForCurrentGame);
+            Assert.Equal(connectedSnapshot, publishedSnapshots[^1]);
             Assert.True(session.GetStatusSnapshot().IsMonitorConnectedForCurrentGame);
             Assert.Equal(1, eventMonitor.ReadStatusCallCount);
             Assert.Equal(1001, eventMonitor.LastTargetProcessId);
@@ -391,14 +395,18 @@ namespace BO2.Tests.Services
             {
                 Status = CreateCompatibleStatus()
             };
-            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame);
+            bool injectionAttempted = false;
+            DllInjector dllInjector = CreateDllInjector(
+                injectLibrary: (_, _) => injectionAttempted = true);
+            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, dllInjector: dllInjector);
 
-            GameConnectionRefreshResult snapshot = session.BeginConnect();
+            GameConnectionSnapshot snapshot = session.Connect();
 
             Assert.False(snapshot.IsConnecting);
             Assert.Equal(DllInjectionState.NotAttempted, snapshot.InjectionResult.State);
             Assert.False(snapshot.CanAttemptConnect);
             Assert.False(snapshot.IsMonitorConnectedForCurrentGame);
+            Assert.False(injectionAttempted);
             Assert.Equal(0, eventMonitor.ReadStatusCallCount);
         }
 
@@ -409,15 +417,19 @@ namespace BO2.Tests.Services
             {
                 Status = CreateCompatibleStatus()
             };
-            GameConnectionSession session = CreateStartedSession(eventMonitor);
+            bool injectionAttempted = false;
+            DllInjector dllInjector = CreateDllInjector(
+                injectLibrary: (_, _) => injectionAttempted = true);
+            GameConnectionSession session = CreateStartedSession(eventMonitor, dllInjector: dllInjector);
 
-            GameConnectionRefreshResult snapshot = session.BeginConnect();
+            GameConnectionSnapshot snapshot = session.Connect();
 
             Assert.False(snapshot.IsConnecting);
             Assert.Null(snapshot.CurrentGame);
             Assert.Equal(DllInjectionState.NotAttempted, snapshot.InjectionResult.State);
             Assert.False(snapshot.CanAttemptConnect);
             Assert.False(snapshot.IsMonitorConnectedForCurrentGame);
+            Assert.False(injectionAttempted);
             Assert.Equal(0, eventMonitor.ReadStatusCallCount);
         }
 
@@ -443,10 +455,8 @@ namespace BO2.Tests.Services
             context = CreateSessionContext(eventMonitor, detectedGame: originalGame, dllInjector: dllInjector);
             context.Session.Start();
 
-            GameConnectionRefreshResult connectingSnapshot = context.Session.BeginConnect();
-            GameConnectionRefreshResult connectedSnapshot = context.Session.CompleteConnect();
+            GameConnectionSnapshot connectedSnapshot = context.Session.Connect();
 
-            Assert.True(connectingSnapshot.IsConnecting);
             Assert.Equal(1001, injectedProcessId);
             Assert.Same(changedGame, connectedSnapshot.CurrentGame);
             Assert.Equal(DllInjectionState.NotAttempted, connectedSnapshot.InjectionResult.State);
@@ -470,14 +480,17 @@ namespace BO2.Tests.Services
             DllInjector dllInjector = CreateDllInjector(
                 fileExists: _ => throw new NotSupportedException("payload unavailable"));
             GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, dllInjector: dllInjector);
+            List<GameConnectionSnapshot> publishedSnapshots = new();
+            session.SnapshotChanged += (_, args) => publishedSnapshots.Add(args.Snapshot);
 
-            GameConnectionRefreshResult connectingSnapshot = session.BeginConnect();
             NotSupportedException exception = Assert.Throws<NotSupportedException>(
-                () => session.CompleteConnect());
+                () => session.Connect());
 
             Assert.Equal("payload unavailable", exception.Message);
-            Assert.True(connectingSnapshot.IsConnecting);
-            GameConnectionSnapshot statusSnapshot = session.GetStatusSnapshot();
+            Assert.Equal(2, publishedSnapshots.Count);
+            Assert.True(publishedSnapshots[0].IsConnecting);
+            GameConnectionSnapshot statusSnapshot = session.Snapshot;
+            Assert.Equal(statusSnapshot, publishedSnapshots[^1]);
             Assert.False(statusSnapshot.IsConnecting);
             Assert.True(statusSnapshot.CanAttemptConnect);
             Assert.False(statusSnapshot.IsMonitorConnectedForCurrentGame);
@@ -500,15 +513,18 @@ namespace BO2.Tests.Services
                 eventMonitor,
                 detectedGame,
                 memoryAccessor: memoryAccessor);
+            List<GameConnectionSnapshot> publishedSnapshots = new();
+            session.SnapshotChanged += (_, args) => publishedSnapshots.Add(args.Snapshot);
 
-            GameConnectionRefreshResult connectingSnapshot = session.BeginConnect();
             eventMonitor.ResetCalls();
             InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
-                () => session.CompleteConnect());
+                () => session.Connect());
 
             Assert.Equal("read failed", exception.Message);
-            Assert.True(connectingSnapshot.IsConnecting);
-            GameConnectionSnapshot statusSnapshot = session.GetStatusSnapshot();
+            Assert.Equal(2, publishedSnapshots.Count);
+            Assert.True(publishedSnapshots[0].IsConnecting);
+            GameConnectionSnapshot statusSnapshot = session.Snapshot;
+            Assert.Equal(statusSnapshot, publishedSnapshots[^1]);
             Assert.False(statusSnapshot.IsConnecting);
             Assert.True(statusSnapshot.CanAttemptConnect);
             Assert.False(statusSnapshot.IsMonitorConnectedForCurrentGame);
@@ -865,12 +881,12 @@ namespace BO2.Tests.Services
                 (_, _) => { });
         }
 
-        private static GameConnectionRefreshResult CompleteConnectWithLoadedMonitor(GameConnectionSession session)
+        private static GameConnectionSnapshot CompleteConnectWithLoadedMonitor(GameConnectionSession session)
         {
-            GameConnectionRefreshResult connectingSnapshot = session.BeginConnect();
-            GameConnectionRefreshResult connectedSnapshot = session.CompleteConnect();
-            Assert.True(connectingSnapshot.IsConnecting);
+            GameConnectionSnapshot connectedSnapshot = session.Connect();
             Assert.Equal(DllInjectionState.Loaded, connectedSnapshot.InjectionResult.State);
+            Assert.False(connectedSnapshot.IsConnecting);
+            Assert.True(connectedSnapshot.IsMonitorConnectedForCurrentGame);
             return connectedSnapshot;
         }
 
