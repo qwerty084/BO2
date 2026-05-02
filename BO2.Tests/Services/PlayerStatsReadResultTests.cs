@@ -1,5 +1,5 @@
-using BO2.Services;
 using System;
+using BO2.Services;
 using Xunit;
 
 namespace BO2.Tests.Services
