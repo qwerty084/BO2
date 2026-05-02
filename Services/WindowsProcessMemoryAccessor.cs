@@ -28,6 +28,9 @@ namespace BO2.Services
             }
 
             Close();
+
+            // Player Stats Read requires a read-only handle to the running game process; no managed API exposes this access.
+            // codeql[cs/call-to-unmanaged-code]
             _processHandle = OpenProcess(ProcessAccess.QueryLimitedInformation | ProcessAccess.VirtualMemoryRead, false, processId);
 
             if (_processHandle.IsInvalid)
@@ -46,6 +49,8 @@ namespace BO2.Services
             byte[] buffer = new byte[Int32Size];
             nuint size = Int32Size;
 
+            // Player Stats Read intentionally copies a fixed-size primitive from a known game address.
+            // codeql[cs/call-to-unmanaged-code]
             if (!ReadProcessMemory(processHandle, new IntPtr(unchecked((long)address)), buffer, size, out nuint bytesRead))
             {
                 throw new Win32Exception(Marshal.GetLastWin32Error(), AppStrings.Format("ReadMemoryFailedFormat", valueName));
@@ -65,6 +70,8 @@ namespace BO2.Services
             byte[] buffer = new byte[SingleSize];
             nuint size = SingleSize;
 
+            // Player Stats Read intentionally copies a fixed-size primitive from a known game address.
+            // codeql[cs/call-to-unmanaged-code]
             if (!ReadProcessMemory(processHandle, new IntPtr(unchecked((long)address)), buffer, size, out nuint bytesRead))
             {
                 throw new Win32Exception(Marshal.GetLastWin32Error(), AppStrings.Format("ReadMemoryFailedFormat", valueName));
@@ -100,10 +107,16 @@ namespace BO2.Services
             return _processHandle;
         }
 
+        // Required for read-only cross-process Player Stats memory access; access flags are limited to query + read.
+        // codeql[cs/unmanaged-code]
         [DllImport("kernel32.dll", SetLastError = true)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         private static extern SafeProcessHandle OpenProcess(ProcessAccess desiredAccess, bool inheritHandle, int processId);
 
+        // Required for read-only cross-process Player Stats memory access; callers require exact byte counts.
+        // codeql[cs/unmanaged-code]
         [DllImport("kernel32.dll", SetLastError = true)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         private static extern bool ReadProcessMemory(
             SafeProcessHandle process,
             nint baseAddress,
@@ -129,11 +142,16 @@ namespace BO2.Services
 
             protected override bool ReleaseHandle()
             {
+                // SafeHandle release must call the matching native close routine for the process handle.
+                // codeql[cs/call-to-unmanaged-code]
                 return CloseHandle(handle);
             }
         }
 
+        // Required by SafeProcessHandle to release the native process handle acquired from OpenProcess.
+        // codeql[cs/unmanaged-code]
         [DllImport("kernel32.dll", SetLastError = true)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         private static extern bool CloseHandle(IntPtr handle);
     }
 }

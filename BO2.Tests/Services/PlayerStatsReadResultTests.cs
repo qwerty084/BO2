@@ -1,3 +1,4 @@
+using System;
 using BO2.Services;
 using Xunit;
 
@@ -5,117 +6,44 @@ namespace BO2.Tests.Services
 {
     public sealed class PlayerStatsReadResultTests
     {
-        // ── GameNotRunning static property ─────────────────────────────────────────
-
         [Fact]
-        public void GameNotRunning_HasDisconnectedConnectionState()
+        public void WhenConstructed_HasDetectedGameAndStats()
         {
-            PlayerStatsReadResult result = PlayerStatsReadResult.GameNotRunning;
+            DetectedGame game = MakeSteamZombiesGame();
+            PlayerStats stats = MakeStats(points: 1500, kills: 42, downs: 3, revives: 7, headshots: 10);
 
-            Assert.Equal(ConnectionState.Disconnected, result.ConnectionState);
-        }
+            var result = new PlayerStatsReadResult(game, stats);
 
-        [Fact]
-        public void GameNotRunning_HasNullStats()
-        {
-            PlayerStatsReadResult result = PlayerStatsReadResult.GameNotRunning;
-
-            Assert.Null(result.Stats);
-        }
-
-        [Fact]
-        public void GameNotRunning_HasNullDetectedGame()
-        {
-            PlayerStatsReadResult result = PlayerStatsReadResult.GameNotRunning;
-
-            Assert.Null(result.DetectedGame);
-        }
-
-        [Fact]
-        public void GameNotRunning_StatusTextIsNonEmpty()
-        {
-            PlayerStatsReadResult result = PlayerStatsReadResult.GameNotRunning;
-
-            Assert.False(string.IsNullOrWhiteSpace(result.StatusText));
-        }
-
-        // ── Connected result ────────────────────────────────────────────────────────
-
-        [Fact]
-        public void WhenConstructedAsConnected_HasConnectedState()
-        {
-            var game = MakeSteamZombiesGame();
-            var stats = MakeStats();
-            var result = new PlayerStatsReadResult(game, stats, "Connected: Steam Zombies", ConnectionState.Connected);
-
-            Assert.Equal(ConnectionState.Connected, result.ConnectionState);
-        }
-
-        [Fact]
-        public void WhenConstructedAsConnected_HasNonNullStats()
-        {
-            var game = MakeSteamZombiesGame();
-            var stats = MakeStats();
-            var result = new PlayerStatsReadResult(game, stats, "Connected: Steam Zombies", ConnectionState.Connected);
-
-            Assert.NotNull(result.Stats);
-        }
-
-        [Fact]
-        public void WhenConstructedAsConnected_StatValuesMatchInput()
-        {
-            var game = MakeSteamZombiesGame();
-            var stats = MakeStats(points: 1500, kills: 42, downs: 3, revives: 7, headshots: 10);
-            var result = new PlayerStatsReadResult(game, stats, "Connected: Steam Zombies", ConnectionState.Connected);
-
-            Assert.Equal(1500, result.Stats!.Points);
+            Assert.Same(game, result.DetectedGame);
+            Assert.Same(stats, result.Stats);
+            Assert.Equal(1500, result.Stats.Points);
             Assert.Equal(42, result.Stats.Kills);
             Assert.Equal(3, result.Stats.Downs);
             Assert.Equal(7, result.Stats.Revives);
             Assert.Equal(10, result.Stats.Headshots);
         }
 
-        // ── Unsupported result ──────────────────────────────────────────────────────
-
         [Fact]
-        public void WhenConstructedAsUnsupported_HasUnsupportedState()
+        public void WhenDetectedGameIsNull_ThrowsArgumentNullException()
         {
-            var game = MakeUnsupportedGame();
-            var result = new PlayerStatsReadResult(game, null, "Unsupported: Redacted Zombies", ConnectionState.Unsupported);
+            PlayerStats stats = MakeStats();
 
-            Assert.Equal(ConnectionState.Unsupported, result.ConnectionState);
+            ArgumentNullException exception = Assert.Throws<ArgumentNullException>(
+                () => new PlayerStatsReadResult(null!, stats));
+
+            Assert.Equal("DetectedGame", exception.ParamName);
         }
 
         [Fact]
-        public void WhenConstructedAsUnsupported_HasNullStats()
+        public void WhenStatsIsNull_ThrowsArgumentNullException()
         {
-            var game = MakeUnsupportedGame();
-            var result = new PlayerStatsReadResult(game, null, "Unsupported: Redacted Zombies", ConnectionState.Unsupported);
+            DetectedGame game = MakeSteamZombiesGame();
 
-            Assert.Null(result.Stats);
+            ArgumentNullException exception = Assert.Throws<ArgumentNullException>(
+                () => new PlayerStatsReadResult(game, null!));
+
+            Assert.Equal("Stats", exception.ParamName);
         }
-
-        [Fact]
-        public void WhenConstructedAsUnsupported_DetectedGameIsPresent()
-        {
-            var game = MakeUnsupportedGame();
-            var result = new PlayerStatsReadResult(game, null, "Unsupported: Redacted Zombies", ConnectionState.Unsupported);
-
-            Assert.NotNull(result.DetectedGame);
-            Assert.Equal(GameVariant.RedactedZombies, result.DetectedGame.Variant);
-        }
-
-        // ── Disconnected result ─────────────────────────────────────────────────────
-
-        [Fact]
-        public void WhenConstructedAsDisconnected_HasDisconnectedState()
-        {
-            var result = new PlayerStatsReadResult(null, null, "some error", ConnectionState.Disconnected);
-
-            Assert.Equal(ConnectionState.Disconnected, result.ConnectionState);
-        }
-
-        // ── DetectedGame.IsStatsSupported ───────────────────────────────────────────
 
         [Fact]
         public void DetectedGame_WhenAddressMapPresent_IsStatsSupportedIsTrue()

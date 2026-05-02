@@ -382,6 +382,8 @@ namespace BO2
                 nint hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
                 int cornerPreference = DwmWindowCornerPreferenceDoNotRound;
 
+                // WinUI has no managed API for disabling rounded corners on this top-level HWND.
+                // codeql[cs/call-to-unmanaged-code]
                 _ = DwmSetWindowAttribute(
                     hWnd,
                     DwmWindowCornerPreferenceAttribute,
@@ -401,7 +403,10 @@ namespace BO2
         private const uint DwmWindowCornerPreferenceAttribute = 33;
         private const int DwmWindowCornerPreferenceDoNotRound = 1;
 
+        // Required to set Windows 11 DWM corner preference for the app-owned HWND.
+        // codeql[cs/unmanaged-code]
         [DllImport("dwmapi.dll")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         private static extern int DwmSetWindowAttribute(
             nint hWnd,
             uint dwAttribute,

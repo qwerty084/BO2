@@ -10,7 +10,7 @@ namespace BO2.Tests.Services
         public void Project_WhenNoGame_ReturnsDisconnectedDisplayProjection()
         {
             GameConnectionSessionDisplayProjection projection = CreateProjector().Project(
-                CreateSnapshot(null, PlayerStatsReadResult.GameNotRunning));
+                CreateSnapshot(null, null));
 
             AssertResource("NoGameDetected", projection.DetectedGameText);
             AssertResource("GameNotRunning", projection.StatusText);
@@ -31,9 +31,7 @@ namespace BO2.Tests.Services
             PlayerStats stats = CreateStats();
             var readResult = new PlayerStatsReadResult(
                 detectedGame,
-                stats,
-                "ConnectedStatus",
-                ConnectionState.Connected);
+                stats);
 
             GameConnectionSessionDisplayProjection projection = CreateProjector().Project(
                 CreateSnapshot(
@@ -84,9 +82,7 @@ namespace BO2.Tests.Services
                 ]);
             var readResult = new PlayerStatsReadResult(
                 detectedGame,
-                CreateStats(),
-                "ConnectedStatus",
-                ConnectionState.Connected);
+                CreateStats());
 
             GameConnectionSessionDisplayProjection projection = CreateProjector().Project(
                 CreateSnapshot(
@@ -97,7 +93,8 @@ namespace BO2.Tests.Services
                     hasInjectionAttemptForCurrentGame: true,
                     isMonitorConnectedForCurrentGame: true));
 
-            AssertPlain("ConnectedStatus", projection.StatusText);
+            DisplayText.FormatText status = AssertFormat("ConnectedStatusFormat", projection.StatusText);
+            AssertPlain("Steam Zombies", status.Arguments[0]);
             AssertResource("DllInjectionMonitorReady", projection.InjectionStatusText);
             DisplayText.FormatText monitorStatus = AssertFormat("EventMonitorCaptureDropsFormat", projection.EventMonitorStatusText);
             AssertResource("EventMonitorCompatible", monitorStatus.Arguments[0]);
@@ -130,9 +127,7 @@ namespace BO2.Tests.Services
             DetectedGame detectedGame = CreateSupportedGame(1001);
             var readResult = new PlayerStatsReadResult(
                 detectedGame,
-                null,
-                "ConnectedStatus",
-                ConnectionState.Connected);
+                CreateStats());
 
             GameConnectionSessionDisplayProjection projection = CreateProjector().Project(
                 CreateSnapshot(
@@ -168,7 +163,7 @@ namespace BO2.Tests.Services
 
         private static GameConnectionSnapshot CreateSnapshot(
             DetectedGame? currentGame,
-            PlayerStatsReadResult readResult,
+            PlayerStatsReadResult? readResult,
             GameEventMonitorStatus? eventStatus = null,
             DllInjectionResult? injectionResult = null,
             bool isConnecting = false,
