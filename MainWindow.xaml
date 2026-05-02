@@ -242,7 +242,7 @@
                     <views:HomeStatsView
                         x:Name="HomeContent"
                         HorizontalAlignment="Stretch"
-                        DataContext="{x:Bind ViewModel}" />
+                        DataContext="{x:Bind ViewModel.HomeStats, Mode=OneWay}" />
 
                     <StackPanel
                         x:Name="SettingsContent"

@@ -45,6 +45,7 @@
     <Compile Include="..\Services\GameProcessDetectionService.cs" Link="Services\GameProcessDetectionService.cs" />
     <Compile Include="..\Services\GameVariant.cs"               Link="Services\GameVariant.cs" />
     <Compile Include="..\Services\GameCompatibilityState.cs"    Link="Services\GameCompatibilityState.cs" />
+    <Compile Include="..\Services\DisplayText.cs"               Link="Services\DisplayText.cs" />
     <Compile Include="..\Services\GameEvent.cs"                 Link="Services\GameEvent.cs" />
     <Compile Include="..\Services\GameEventFormatter.cs"        Link="Services\GameEventFormatter.cs" />
     <Compile Include="..\Services\GameEventMonitor.cs"          Link="Services\GameEventMonitor.cs" />
@@ -71,7 +72,10 @@
     <Compile Include="..\Services\PlayerStatsReadResult.cs"     Link="Services\PlayerStatsReadResult.cs" />
     <Compile Include="..\Services\GameConnectionSessionLifecycle.cs" Link="Services\GameConnectionSessionLifecycle.cs" />
     <Compile Include="..\Services\GameConnectionSession.cs"     Link="Services\GameConnectionSession.cs" />
+    <Compile Include="..\Services\GameConnectionSessionDisplayProjection.cs" Link="Services\GameConnectionSessionDisplayProjection.cs" />
+    <Compile Include="..\Services\GameConnectionSessionDisplayRenderer.cs" Link="Services\GameConnectionSessionDisplayRenderer.cs" />
     <Compile Include="..\Services\StatFormatter.cs"             Link="Services\StatFormatter.cs" />
+    <Compile Include="..\ViewModels\HomeStatsViewModel.cs"      Link="ViewModels\HomeStatsViewModel.cs" />
   </ItemGroup>
 
 </Project>
