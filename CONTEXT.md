@@ -12,6 +12,10 @@ _Avoid_: Process, game process
 The app-owned runtime relationship between the current **Detected Game** and an optional **Event Monitor**.
 _Avoid_: connection manager, stats refresh service
 
+**Game Connection Snapshot**:
+A point-in-time read-only view of a **Game Connection Session** for app pages and widgets.
+_Avoid_: refresh result, UI state
+
 **Event Monitor**:
 The native `BO2Monitor` payload loaded into Steam Zombies to publish read-only game events through a shared snapshot.
 _Avoid_: injector, hook
@@ -24,6 +28,7 @@ _Avoid_: polling update, refresh
 
 - A **Game Connection Session** has zero or one current **Detected Game**.
 - A **Game Connection Session** owns zero or one **Event Monitor** for the current **Detected Game**.
+- A **Game Connection Session** exposes one current **Game Connection Snapshot** at a time.
 - A **Player Stats Read** belongs to exactly one **Detected Game** when Steam Zombies is supported.
 - An **Event Monitor** can provide event data only after the **Game Connection Session** connects to Steam Zombies.
 
