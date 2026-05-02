@@ -366,6 +366,100 @@ namespace BO2.Tests.Services
             Assert.False(snapshot.IsMonitorConnectedForCurrentGame);
         }
 
+        [Fact]
+        public void ApplyMonitorReadinessTimeout_WhenBeforeTimeout_PreservesMonitorOwnershipWithoutStopRequest()
+        {
+            GameConnectionSessionLifecycleGame detectedGame = CreateSupportedGame(processId: 1001);
+            DateTimeOffset attemptedAt = new(2026, 5, 2, 1, 0, 0, TimeSpan.Zero);
+            GameConnectionSessionLifecycle lifecycle = CreateLifecycleWithLoadedMonitor(detectedGame, attemptedAt);
+
+            GameConnectionSessionMonitorStopRequest stopRequest = lifecycle.ApplyMonitorReadinessTimeout(
+                detectedGame,
+                GameEventMonitorStatus.WaitingForMonitor,
+                attemptedAt.AddSeconds(14),
+                TimeSpan.FromSeconds(15),
+                "Timed out");
+            GameConnectionSessionLifecycleSnapshot snapshot = lifecycle.CreateSnapshot(detectedGame);
+
+            Assert.False(stopRequest.ShouldRequestStop);
+            Assert.Null(stopRequest.MonitorProcessId);
+            Assert.Equal(DllInjectionState.Loaded, snapshot.InjectionResult.State);
+            Assert.False(snapshot.CanAttemptConnect);
+            Assert.True(snapshot.HasInjectionAttemptForCurrentGame);
+            Assert.True(snapshot.IsMonitorConnectedForCurrentGame);
+        }
+
+        [Fact]
+        public void ApplyMonitorReadinessTimeout_WhenAtTimeout_MarksFailedAndReturnsStopRequest()
+        {
+            GameConnectionSessionLifecycleGame detectedGame = CreateSupportedGame(processId: 1001);
+            DateTimeOffset attemptedAt = new(2026, 5, 2, 1, 0, 0, TimeSpan.Zero);
+            GameConnectionSessionLifecycle lifecycle = CreateLifecycleWithLoadedMonitor(detectedGame, attemptedAt);
+
+            GameConnectionSessionMonitorStopRequest stopRequest = lifecycle.ApplyMonitorReadinessTimeout(
+                detectedGame,
+                GameEventMonitorStatus.WaitingForMonitor,
+                attemptedAt.AddSeconds(15),
+                TimeSpan.FromSeconds(15),
+                "Timed out");
+            GameConnectionSessionLifecycleSnapshot snapshot = lifecycle.CreateSnapshot(detectedGame);
+
+            Assert.True(stopRequest.ShouldRequestStop);
+            Assert.Equal(1001, stopRequest.MonitorProcessId);
+            Assert.Equal(DllInjectionState.Failed, snapshot.InjectionResult.State);
+            Assert.Equal("Timed out", snapshot.InjectionResult.Message);
+            Assert.True(snapshot.CanAttemptConnect);
+            Assert.True(snapshot.HasInjectionAttemptForCurrentGame);
+            Assert.False(snapshot.IsMonitorConnectedForCurrentGame);
+        }
+
+        [Fact]
+        public void ApplyMonitorReadinessTimeout_WhenAfterTimeout_MarksFailedAndReturnsStopRequest()
+        {
+            GameConnectionSessionLifecycleGame detectedGame = CreateSupportedGame(processId: 1001);
+            DateTimeOffset attemptedAt = new(2026, 5, 2, 1, 0, 0, TimeSpan.Zero);
+            GameConnectionSessionLifecycle lifecycle = CreateLifecycleWithLoadedMonitor(detectedGame, attemptedAt);
+
+            GameConnectionSessionMonitorStopRequest stopRequest = lifecycle.ApplyMonitorReadinessTimeout(
+                detectedGame,
+                GameEventMonitorStatus.WaitingForMonitor,
+                attemptedAt.AddSeconds(16),
+                TimeSpan.FromSeconds(15),
+                "Timed out");
+            GameConnectionSessionLifecycleSnapshot snapshot = lifecycle.CreateSnapshot(detectedGame);
+
+            Assert.True(stopRequest.ShouldRequestStop);
+            Assert.Equal(1001, stopRequest.MonitorProcessId);
+            Assert.Equal(DllInjectionState.Failed, snapshot.InjectionResult.State);
+            Assert.Equal("Timed out", snapshot.InjectionResult.Message);
+            Assert.True(snapshot.CanAttemptConnect);
+            Assert.True(snapshot.HasInjectionAttemptForCurrentGame);
+            Assert.False(snapshot.IsMonitorConnectedForCurrentGame);
+        }
+
+        [Fact]
+        public void ApplyMonitorReadinessTimeout_WhenMonitorIsAlreadyReady_PreservesMonitorOwnership()
+        {
+            GameConnectionSessionLifecycleGame detectedGame = CreateSupportedGame(processId: 1001);
+            DateTimeOffset attemptedAt = new(2026, 5, 2, 1, 0, 0, TimeSpan.Zero);
+            GameConnectionSessionLifecycle lifecycle = CreateLifecycleWithLoadedMonitor(detectedGame, attemptedAt);
+
+            GameConnectionSessionMonitorStopRequest stopRequest = lifecycle.ApplyMonitorReadinessTimeout(
+                detectedGame,
+                CreateCompatibleStatus(),
+                attemptedAt.AddSeconds(16),
+                TimeSpan.FromSeconds(15),
+                "Timed out");
+            GameConnectionSessionLifecycleSnapshot snapshot = lifecycle.CreateSnapshot(detectedGame);
+
+            Assert.False(stopRequest.ShouldRequestStop);
+            Assert.Null(stopRequest.MonitorProcessId);
+            Assert.Equal(DllInjectionState.Loaded, snapshot.InjectionResult.State);
+            Assert.False(snapshot.CanAttemptConnect);
+            Assert.True(snapshot.HasInjectionAttemptForCurrentGame);
+            Assert.True(snapshot.IsMonitorConnectedForCurrentGame);
+        }
+
         private static GameConnectionSessionLifecycleGame CreateSupportedGame(int processId)
         {
             return new GameConnectionSessionLifecycleGame(
@@ -375,15 +469,26 @@ namespace BO2.Tests.Services
         }
 
         private static GameConnectionSessionLifecycle CreateLifecycleWithLoadedMonitor(
-            GameConnectionSessionLifecycleGame detectedGame)
+            GameConnectionSessionLifecycleGame detectedGame,
+            DateTimeOffset? attemptedAt = null)
         {
             GameConnectionSessionLifecycle lifecycle = new();
             lifecycle.BeginConnect(detectedGame);
             lifecycle.CompleteConnect(
                 detectedGame,
                 new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
-                new DateTimeOffset(2026, 5, 2, 0, 0, 0, TimeSpan.Zero));
+                attemptedAt ?? new DateTimeOffset(2026, 5, 2, 0, 0, 0, TimeSpan.Zero));
             return lifecycle;
+        }
+
+        private static GameEventMonitorStatus CreateCompatibleStatus()
+        {
+            return new GameEventMonitorStatus(
+                GameCompatibilityState.Compatible,
+                DroppedEventCount: 0,
+                DroppedNotifyCount: 0,
+                PublishedNotifyCount: 0,
+                Array.Empty<GameEvent>());
         }
     }
 }
