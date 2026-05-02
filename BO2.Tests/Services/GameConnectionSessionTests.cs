@@ -141,6 +141,7 @@ namespace BO2.Tests.Services
             Assert.Equal(GameCompatibilityState.WaitingForMonitor, snapshot.EventStatus.CompatibilityState);
             Assert.Equal(0, memoryAccessor.AttachCallCount);
             Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(0, eventMonitor.RequestStopCallCount);
         }
 
         [Fact]
@@ -457,9 +458,14 @@ namespace BO2.Tests.Services
             {
                 Status = CreateCompatibleStatus()
             };
-            SessionContext context = CreateSessionContext(eventMonitor, detectedGame: connectedGame);
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            SessionContext context = CreateSessionContext(
+                eventMonitor,
+                detectedGame: connectedGame,
+                memoryAccessor: memoryAccessor);
             context.Session.Start();
             CompleteConnectWithLoadedMonitor(context.Session);
+            int attachCallCount = memoryAccessor.AttachCallCount;
             eventMonitor.ResetCalls();
             context.EventDetector.Result = detectedGame;
             context.LifecycleEventSource.RaiseStarted(detectedGame.ProcessName, detectedGame.ProcessId);
@@ -467,10 +473,14 @@ namespace BO2.Tests.Services
             GameConnectionRefreshResult snapshot = context.Session.Read();
 
             Assert.Same(detectedGame, snapshot.CurrentGame);
+            Assert.Same(detectedGame, snapshot.ReadResult.DetectedGame);
+            Assert.NotNull(snapshot.ReadResult.Stats);
+            Assert.Equal(ConnectionState.Connected, snapshot.ReadResult.ConnectionState);
             Assert.Equal(DllInjectionState.NotAttempted, snapshot.InjectionResult.State);
             Assert.Equal(GameCompatibilityState.WaitingForMonitor, snapshot.EventStatus.CompatibilityState);
             Assert.False(snapshot.HasInjectionAttemptForCurrentGame);
             Assert.False(snapshot.IsMonitorConnectedForCurrentGame);
+            Assert.Equal(attachCallCount + 1, memoryAccessor.AttachCallCount);
             Assert.Equal(0, eventMonitor.ReadStatusCallCount);
             Assert.Equal(1, eventMonitor.RequestStopCallCount);
             Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);

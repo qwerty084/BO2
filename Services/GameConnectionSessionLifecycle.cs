@@ -100,6 +100,18 @@ namespace BO2.Services
             return GameConnectionSessionMonitorStopRequest.None;
         }
 
+        public GameConnectionSessionMonitorStopRequest ResetForDetectedGameChange(
+            GameConnectionSessionLifecycleGame? currentGame,
+            GameConnectionSessionLifecycleGame? detectedGame)
+        {
+            if (currentGame == detectedGame)
+            {
+                return GameConnectionSessionMonitorStopRequest.None;
+            }
+
+            return ResetMonitorConnectionState();
+        }
+
         public GameConnectionSessionDisconnectAction BeginDisconnect(DateTimeOffset receivedAt)
         {
             if (_isDisconnecting)
@@ -133,7 +145,7 @@ namespace BO2.Services
             _lastInjectionResult = DllInjectionResult.NotAttempted;
             return new GameConnectionSessionMonitorStopRequest(
                 monitorProcessId,
-                requestStop && !stopAlreadyRequested);
+                requestStop && !stopAlreadyRequested && monitorProcessId is not null);
         }
 
         public void ClearTransientOperationState()

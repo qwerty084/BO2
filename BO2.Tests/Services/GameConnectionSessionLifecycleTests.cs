@@ -158,6 +158,79 @@ namespace BO2.Tests.Services
             Assert.False(snapshot.IsMonitorConnectedForCurrentGame);
         }
 
+        [Fact]
+        public void ResetForDetectedGameChange_WhenGameIsUnchanged_PreservesMonitorOwnership()
+        {
+            GameConnectionSessionLifecycle lifecycle = new();
+            GameConnectionSessionLifecycleGame detectedGame = CreateSupportedGame(processId: 1001);
+            lifecycle.BeginConnect(detectedGame);
+            lifecycle.CompleteConnect(
+                detectedGame,
+                new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
+                new DateTimeOffset(2026, 5, 2, 0, 0, 0, TimeSpan.Zero));
+
+            GameConnectionSessionMonitorStopRequest stopRequest = lifecycle.ResetForDetectedGameChange(
+                detectedGame,
+                detectedGame);
+            GameConnectionSessionLifecycleSnapshot snapshot = lifecycle.CreateSnapshot(detectedGame);
+
+            Assert.False(stopRequest.ShouldRequestStop);
+            Assert.Null(stopRequest.MonitorProcessId);
+            Assert.Equal(DllInjectionState.Loaded, snapshot.InjectionResult.State);
+            Assert.False(snapshot.CanAttemptConnect);
+            Assert.True(snapshot.HasInjectionAttemptForCurrentGame);
+            Assert.True(snapshot.IsMonitorConnectedForCurrentGame);
+        }
+
+        [Fact]
+        public void ResetForDetectedGameChange_WhenGameChangesWithoutOwnedMonitor_ClearsTransientStateWithoutStopRequest()
+        {
+            GameConnectionSessionLifecycle lifecycle = new();
+            GameConnectionSessionLifecycleGame originalGame = CreateSupportedGame(processId: 1001);
+            GameConnectionSessionLifecycleGame detectedGame = CreateSupportedGame(processId: 2002);
+            lifecycle.BeginConnect(originalGame);
+
+            GameConnectionSessionMonitorStopRequest stopRequest = lifecycle.ResetForDetectedGameChange(
+                originalGame,
+                detectedGame);
+            GameConnectionSessionLifecycleSnapshot snapshot = lifecycle.CreateSnapshot(detectedGame);
+
+            Assert.False(stopRequest.ShouldRequestStop);
+            Assert.Null(stopRequest.MonitorProcessId);
+            Assert.False(snapshot.IsConnecting);
+            Assert.True(snapshot.CanAttemptConnect);
+            Assert.False(snapshot.HasInjectionAttemptForCurrentGame);
+            Assert.False(snapshot.IsMonitorConnectedForCurrentGame);
+        }
+
+        [Fact]
+        public void ResetForDetectedGameChange_WhenGameChangesWithOwnedMonitor_ReturnsStopRequestAndClearsOwnership()
+        {
+            GameConnectionSessionLifecycle lifecycle = new();
+            GameConnectionSessionLifecycleGame connectedGame = CreateSupportedGame(processId: 1001);
+            GameConnectionSessionLifecycleGame detectedGame = CreateSupportedGame(processId: 2002);
+            lifecycle.BeginConnect(connectedGame);
+            lifecycle.CompleteConnect(
+                connectedGame,
+                new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
+                new DateTimeOffset(2026, 5, 2, 0, 0, 0, TimeSpan.Zero));
+
+            GameConnectionSessionMonitorStopRequest stopRequest = lifecycle.ResetForDetectedGameChange(
+                connectedGame,
+                detectedGame);
+            GameConnectionSessionLifecycleSnapshot connectedSnapshot = lifecycle.CreateSnapshot(connectedGame);
+            GameConnectionSessionLifecycleSnapshot detectedSnapshot = lifecycle.CreateSnapshot(detectedGame);
+
+            Assert.True(stopRequest.ShouldRequestStop);
+            Assert.Equal(1001, stopRequest.MonitorProcessId);
+            Assert.Equal(DllInjectionState.NotAttempted, connectedSnapshot.InjectionResult.State);
+            Assert.False(connectedSnapshot.HasInjectionAttemptForCurrentGame);
+            Assert.False(connectedSnapshot.IsMonitorConnectedForCurrentGame);
+            Assert.True(detectedSnapshot.CanAttemptConnect);
+            Assert.False(detectedSnapshot.HasInjectionAttemptForCurrentGame);
+            Assert.False(detectedSnapshot.IsMonitorConnectedForCurrentGame);
+        }
+
         private static GameConnectionSessionLifecycleGame CreateSupportedGame(int processId)
         {
             return new GameConnectionSessionLifecycleGame(

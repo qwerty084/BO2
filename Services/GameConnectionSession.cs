@@ -522,9 +522,15 @@ namespace BO2.Services
                     return;
                 }
 
+                GameConnectionSessionLifecycleGame? currentLifecycleGame =
+                    GameConnectionSessionLifecycleGame.FromDetectedGame(_currentGame);
+                GameConnectionSessionLifecycleGame? detectedLifecycleGame =
+                    GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame);
                 _currentGame = detectedGame;
                 handler = DetectedGameChanged;
-                stopRequest = _lifecycle.ResetMonitorConnectionState();
+                stopRequest = _lifecycle.ResetForDetectedGameChange(
+                    currentLifecycleGame,
+                    detectedLifecycleGame);
             }
 
             if (stopRequest.ShouldRequestStop)
