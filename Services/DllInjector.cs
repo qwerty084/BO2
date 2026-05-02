@@ -542,6 +542,7 @@ namespace BO2.Services
         private static extern bool FreeLibrary(IntPtr moduleHandle);
 
         [DllImport("kernel32.dll", SetLastError = true)]
+        // codeql[cs/unmanaged-code] DLL injection must resolve exports from the native payload; no managed API provides this.
         private static extern IntPtr GetProcAddress(
             IntPtr moduleHandle,
             [MarshalAs(UnmanagedType.LPStr)] string procName);
