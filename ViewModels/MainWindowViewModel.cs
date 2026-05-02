@@ -3,7 +3,6 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using System;
 using System.ComponentModel;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,8 +15,8 @@ namespace BO2.ViewModels
 
         private readonly DispatcherQueue _dispatcherQueue;
         private readonly GameConnectionSession _connectionSession;
+        private readonly GameConnectionSessionDisplayProjector _displayProjector;
         private readonly SemaphoreSlim _operationSemaphore = new(1, 1);
-        private DetectedGame? _detectedGame;
         private bool _disposed;
         private string _pointsText = EmptyStatText;
         private string _killsText = EmptyStatText;
@@ -52,7 +51,6 @@ namespace BO2.ViewModels
         private Visibility _footerPendingStatusVisibility = Visibility.Collapsed;
         private Visibility _footerDisconnectedStatusVisibility = Visibility.Visible;
         private Visibility _footerErrorStatusVisibility = Visibility.Collapsed;
-        private readonly StatFormatter _formatter;
         private GameEventMonitorStatus _latestEventStatus = GameEventMonitorStatus.WaitingForMonitor;
 
         public MainWindowViewModel(DispatcherQueue dispatcherQueue)
@@ -67,7 +65,7 @@ namespace BO2.ViewModels
 
             _dispatcherQueue = dispatcherQueue;
             _connectionSession = connectionSession;
-            _formatter = new StatFormatter(AppStrings.Get("UnavailableValue"));
+            _displayProjector = new GameConnectionSessionDisplayProjector(AppStrings.Get("UnavailableValue"));
             _connectionSession.DetectedGameChanged += OnDetectedGameChanged;
 
             _connectionSession.Start();
@@ -403,11 +401,6 @@ namespace BO2.ViewModels
             _operationSemaphore.Dispose();
         }
 
-        private static string FormatLine(string labelResourceId, string value)
-        {
-            return AppStrings.Format("LabeledValueFormat", AppStrings.Get(labelResourceId), value);
-        }
-
         private static async Task RunOnDispatcherAsync(DispatcherQueue dispatcherQueue, Action action, CancellationToken cancellationToken)
         {
             if (dispatcherQueue.HasThreadAccess)
@@ -477,338 +470,44 @@ namespace BO2.ViewModels
 
         private void ApplyRefreshSnapshot(GameConnectionRefreshResult snapshot)
         {
-            _detectedGame = snapshot.CurrentGame;
-            bool readResultIsForCurrentGame = Equals(snapshot.ReadResult.DetectedGame, snapshot.CurrentGame);
-            ApplyReadResult(
-                snapshot.ReadResult,
-                snapshot.IsConnecting,
-                snapshot.IsDisconnecting,
-                readResultIsForCurrentGame && snapshot.IsMonitorConnectedForCurrentGame);
-            ApplyEventMonitorStatus(
-                snapshot.CurrentGame,
-                snapshot.InjectionResult,
-                snapshot.EventStatus,
-                snapshot.IsConnecting,
-                snapshot.IsDisconnecting,
-                snapshot.HasInjectionAttemptForCurrentGame,
-                snapshot.IsMonitorConnectedForCurrentGame);
-            UpdateConnectButtonState(snapshot);
+            ApplyDisplayState(_displayProjector.Project(snapshot));
         }
 
-        private void ApplyReadResult(
-            PlayerStatsReadResult result,
-            bool isConnecting,
-            bool isDisconnecting,
-            bool isMonitorConnectedForDetectedGame)
+        private void ApplyDisplayState(GameConnectionSessionDisplayState state)
         {
-            DetectedGameText = result.DetectedGame?.DisplayName ?? AppStrings.Get("NoGameDetected");
-            ApplyConnectionStatus(
-                result.DetectedGame,
-                result.StatusText,
-                isConnecting,
-                isDisconnecting,
-                isMonitorConnectedForDetectedGame);
-
-            if (result.Stats is null)
-            {
-                ClearStats();
-                return;
-            }
-
-            PointsText = _formatter.FormatStat(result.Stats.Points);
-            KillsText = _formatter.FormatStat(result.Stats.Kills);
-            DownsText = _formatter.FormatStat(result.Stats.Downs);
-            RevivesText = _formatter.FormatStat(result.Stats.Revives);
-            HeadshotsText = _formatter.FormatStat(result.Stats.Headshots);
-            PositionXText = _formatter.FormatCandidate(result.Stats.Candidates.PositionX);
-            PositionYText = _formatter.FormatCandidate(result.Stats.Candidates.PositionY);
-            PositionZText = _formatter.FormatCandidate(result.Stats.Candidates.PositionZ);
-            PlayerCandidateDetailsText = FormatPlayerCandidateDetails(result.Stats.Candidates);
-            AmmoCandidateDetailsText = FormatAmmoCandidateDetails(result.Stats.Candidates);
-            CounterCandidateDetailsText = FormatCounterCandidateDetails(result.Stats.Candidates);
-            AddressCandidateDetailsText = result.DetectedGame?.AddressMap is PlayerStatAddressMap addressMap
-                ? FormatAddressCandidateDetails(addressMap)
-                : EmptyStatText;
-        }
-
-        private void ApplyConnectionStatus(
-            DetectedGame? detectedGame,
-            string? connectedStatusText,
-            bool isConnecting,
-            bool isDisconnecting,
-            bool isMonitorConnectedForDetectedGame)
-        {
-            if (detectedGame is null)
-            {
-                StatusText = AppStrings.Get("GameNotRunning");
-                SetConnectionState(detectedGame, ConnectionState.Disconnected, isConnecting, isDisconnecting);
-                return;
-            }
-
-            if (!detectedGame.IsStatsSupported)
-            {
-                StatusText = FormatUnsupportedStatus(detectedGame);
-                SetConnectionState(detectedGame, ConnectionState.Unsupported, isConnecting, isDisconnecting);
-                return;
-            }
-
-            if (isDisconnecting)
-            {
-                StatusText = AppStrings.Get("ConnectionStatusDisconnecting");
-                SetConnectionState(detectedGame, ConnectionState.Disconnecting, isConnecting, isDisconnecting);
-                return;
-            }
-
-            if (isConnecting)
-            {
-                StatusText = AppStrings.Get("ConnectionStatusConnecting");
-                SetConnectionState(detectedGame, ConnectionState.Detected, isConnecting, isDisconnecting);
-                return;
-            }
-
-            if (isMonitorConnectedForDetectedGame)
-            {
-                StatusText = connectedStatusText ?? AppStrings.Format("ConnectedStatusFormat", detectedGame.DisplayName);
-                SetConnectionState(detectedGame, ConnectionState.Connected, isConnecting, isDisconnecting);
-                return;
-            }
-
-            StatusText = AppStrings.Format("GameDetectedConnectPromptFormat", detectedGame.DisplayName);
-            SetConnectionState(detectedGame, ConnectionState.Detected, isConnecting, isDisconnecting);
-        }
-
-        private static string FormatUnsupportedStatus(DetectedGame detectedGame)
-        {
-            return string.IsNullOrWhiteSpace(detectedGame.UnsupportedReason)
-                ? AppStrings.Format("UnsupportedStatusFormat", detectedGame.DisplayName)
-                : AppStrings.Format("UnsupportedStatusWithReasonFormat", detectedGame.DisplayName, detectedGame.UnsupportedReason);
-        }
-
-        private string FormatPlayerCandidateDetails(PlayerCandidateStats candidates)
-        {
-            return string.Join(Environment.NewLine,
-            [
-                FormatLine("VelocityXLabel", _formatter.FormatCandidate(candidates.VelocityX)),
-                FormatLine("VelocityYLabel", _formatter.FormatCandidate(candidates.VelocityY)),
-                FormatLine("VelocityZLabel", _formatter.FormatCandidate(candidates.VelocityZ)),
-                FormatLine("GravityFieldLabel", _formatter.FormatCandidate(candidates.Gravity)),
-                FormatLine("SpeedFieldLabel", _formatter.FormatCandidate(candidates.Speed)),
-                FormatLine("LastJumpHeightLabel", _formatter.FormatCandidate(candidates.LastJumpHeight)),
-                FormatLine("AdsAmountLabel", _formatter.FormatCandidate(candidates.AdsAmount)),
-                FormatLine("ViewAngleXLabel", _formatter.FormatCandidate(candidates.ViewAngleX)),
-                FormatLine("ViewAngleYLabel", _formatter.FormatCandidate(candidates.ViewAngleY)),
-                FormatLine("HeightIntLabel", _formatter.FormatCandidate(candidates.HeightInt)),
-                FormatLine("HeightFloatLabel", _formatter.FormatCandidate(candidates.HeightFloat)),
-                FormatLine("LegacyHealthLabel", _formatter.FormatCandidate(candidates.LegacyHealth)),
-                FormatLine("PlayerInfoHealthLabel", _formatter.FormatCandidate(candidates.PlayerInfoHealth)),
-                FormatLine("GEntityPlayerHealthLabel", _formatter.FormatCandidate(candidates.GEntityPlayerHealth))
-            ]);
-        }
-
-        private string FormatAmmoCandidateDetails(PlayerCandidateStats candidates)
-        {
-            return string.Join(Environment.NewLine,
-            [
-                FormatLine("AmmoSlot0Label", _formatter.FormatCandidate(candidates.AmmoSlot0)),
-                FormatLine("AmmoSlot1Label", _formatter.FormatCandidate(candidates.AmmoSlot1)),
-                FormatLine("LethalAmmoLabel", _formatter.FormatCandidate(candidates.LethalAmmo)),
-                FormatLine("AmmoSlot2Label", _formatter.FormatCandidate(candidates.AmmoSlot2)),
-                FormatLine("TacticalAmmoLabel", _formatter.FormatCandidate(candidates.TacticalAmmo)),
-                FormatLine("AmmoSlot3Label", _formatter.FormatCandidate(candidates.AmmoSlot3)),
-                FormatLine("AmmoSlot4Label", _formatter.FormatCandidate(candidates.AmmoSlot4))
-            ]);
-        }
-
-        private string FormatCounterCandidateDetails(PlayerCandidateStats candidates)
-        {
-            return string.Join(Environment.NewLine,
-            [
-                FormatLine("RoundCandidateLabel", _formatter.FormatCandidate(candidates.Round)),
-                FormatLine("AlternateKillsLabel", _formatter.FormatCandidate(candidates.AlternateKills)),
-                FormatLine("AlternateHeadshotsLabel", _formatter.FormatCandidate(candidates.AlternateHeadshots)),
-                FormatLine("SecondaryKillsLabel", _formatter.FormatCandidate(candidates.SecondaryKills)),
-                FormatLine("SecondaryHeadshotsLabel", _formatter.FormatCandidate(candidates.SecondaryHeadshots))
-            ]);
-        }
-
-        private static string FormatAddressCandidateDetails(PlayerStatAddressMap addressMap)
-        {
-            DerivedPlayerStateAddresses derivedPlayerState = addressMap.DerivedPlayerState;
-            PlayerCandidateAddresses candidates = addressMap.Candidates;
-            return string.Join(Environment.NewLine,
-            [
-                FormatLine("LocalPlayerBaseLabel", StatFormatter.FormatAddress(derivedPlayerState.LocalPlayerBaseAddress)),
-                FormatLine("GEntityArrayLabel", StatFormatter.FormatAddress(candidates.GEntityArrayAddress)),
-                FormatLine("Zombie0GEntityLabel", StatFormatter.FormatAddress(candidates.Zombie0GEntityAddress)),
-                FormatLine("GEntitySizeLabel", StatFormatter.FormatAddress(candidates.GEntitySize))
-            ]);
-        }
-
-        private static string FormatEventCompatibility(GameCompatibilityState compatibilityState)
-        {
-            return compatibilityState switch
-            {
-                GameCompatibilityState.WaitingForMonitor => AppStrings.Get("EventMonitorWaitingForMonitor"),
-                GameCompatibilityState.Compatible => AppStrings.Get("EventMonitorCompatible"),
-                GameCompatibilityState.UnsupportedVersion => AppStrings.Get("EventMonitorUnsupportedVersion"),
-                GameCompatibilityState.CaptureDisabled => AppStrings.Get("EventMonitorCaptureDisabled"),
-                GameCompatibilityState.PollingFallback => AppStrings.Get("EventMonitorPollingFallback"),
-                _ => AppStrings.Get("EventMonitorUnknown")
-            };
-        }
-
-        private static string FormatRoundSession(GameEventMonitorStatus eventStatus)
-        {
-            GameEvent? sessionEvent = eventStatus.RecentEvents
-                .LastOrDefault(gameEvent => gameEvent.EventType is GameEventType.StartOfRound or GameEventType.EndOfRound or GameEventType.EndGame);
-            if (sessionEvent is null)
-            {
-                return EmptyStatText;
-            }
-
-            if (sessionEvent.EventType == GameEventType.EndGame)
-            {
-                return AppStrings.Get("RoundSessionEnded");
-            }
-
-            if (sessionEvent.LevelTime <= 0)
-            {
-                return EmptyStatText;
-            }
-
-            return AppStrings.Format("CurrentRoundFormat", sessionEvent.LevelTime, sessionEvent.EventName);
-        }
-
-        private void ApplyDisconnectingState(
-            DetectedGame? detectedGame,
-            bool isMonitorConnectedForDetectedGame)
-        {
-            StatusText = AppStrings.Get("ConnectionStatusDisconnecting");
-            InjectionStatusText = AppStrings.Get("DllInjectionDisconnecting");
-            EventMonitorStatusText = AppStrings.Get("EventMonitorDisconnecting");
-            LatestEventStatus = GameEventMonitorStatus.WaitingForMonitor;
-            ConnectionLastUpdateText = EmptyStatText;
-            CurrentRoundText = EmptyStatText;
-            BoxEventsText = AppStrings.Get("RecentEventsEmpty");
-            RecentGameEventsText = AppStrings.Get("RecentEventsEmpty");
-            SetConnectionState(
-                detectedGame,
-                ConnectionState.Disconnecting,
-                isConnecting: false,
-                isDisconnecting: true);
-            UpdateConnectButtonState(
-                detectedGame,
-                canAttemptConnect: false,
-                isConnecting: false,
-                isDisconnecting: true,
-                isMonitorConnectedForDetectedGame);
-        }
-
-        private static string FormatInjectionStatus(
-            DllInjectionResult injectionResult,
-            GameEventMonitorStatus eventStatus)
-        {
-            if (injectionResult.State is not (DllInjectionState.Loaded or DllInjectionState.AlreadyInjected))
-            {
-                return injectionResult.Message;
-            }
-
-            return eventStatus.CompatibilityState switch
-            {
-                GameCompatibilityState.Compatible => AppStrings.Get("DllInjectionMonitorReady"),
-                GameCompatibilityState.PollingFallback => AppStrings.Get("DllInjectionPollingFallback"),
-                GameCompatibilityState.UnsupportedVersion => AppStrings.Get("DllInjectionUnsupportedVersion"),
-                GameCompatibilityState.CaptureDisabled => AppStrings.Get("DllInjectionCaptureDisabled"),
-                GameCompatibilityState.WaitingForMonitor => AppStrings.Get("DllInjectionWaitingForReadiness"),
-                _ => injectionResult.Message
-            };
-        }
-
-        private void ApplyEventMonitorStatus(
-            DetectedGame? detectedGame,
-            DllInjectionResult injectionResult,
-            GameEventMonitorStatus eventStatus,
-            bool isConnecting,
-            bool isDisconnecting,
-            bool hasInjectionAttemptForDetectedGame,
-            bool isMonitorConnectedForDetectedGame)
-        {
-            LatestEventStatus = eventStatus;
-
-            if (isDisconnecting)
-            {
-                ApplyDisconnectingState(detectedGame, isMonitorConnectedForDetectedGame);
-                return;
-            }
-
-            if (detectedGame is null)
-            {
-                InjectionStatusText = AppStrings.Get("DllInjectionNotAttempted");
-                EventCompatibilityText = AppStrings.Get("NoGameDetected");
-                EventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForMonitor");
-                ConnectionLastUpdateText = EmptyStatText;
-                CurrentRoundText = EmptyStatText;
-                BoxEventsText = AppStrings.Get("RecentEventsEmpty");
-                RecentGameEventsText = AppStrings.Get("RecentEventsEmpty");
-                return;
-            }
-
-            if (detectedGame.Variant != GameVariant.SteamZombies || detectedGame.AddressMap is null)
-            {
-                InjectionStatusText = AppStrings.Format(
-                    "DllInjectionUnsupportedGameFormat",
-                    detectedGame.DisplayName);
-                EventCompatibilityText = AppStrings.Format(
-                    "EventMonitorUnsupportedGameFormat",
-                    detectedGame.DisplayName);
-                EventMonitorStatusText = AppStrings.Get("EventMonitorCaptureDisabled");
-                ConnectionLastUpdateText = EmptyStatText;
-                CurrentRoundText = EmptyStatText;
-                BoxEventsText = AppStrings.Get("RecentEventsEmpty");
-                RecentGameEventsText = AppStrings.Get("RecentEventsEmpty");
-                return;
-            }
-
-            EventCompatibilityText = AppStrings.Get("GameProcessDetectorDisplayNameSteamZombies");
-            if (!isMonitorConnectedForDetectedGame)
-            {
-                InjectionStatusText = isConnecting
-                    ? AppStrings.Get("DllInjectionConnecting")
-                    : hasInjectionAttemptForDetectedGame
-                        ? injectionResult.Message
-                        : AppStrings.Get("DllInjectionWaitingForConnect");
-                EventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForConnect");
-                ConnectionLastUpdateText = EmptyStatText;
-                CurrentRoundText = EmptyStatText;
-                BoxEventsText = AppStrings.Get("RecentEventsEmpty");
-                RecentGameEventsText = AppStrings.Get("RecentEventsEmpty");
-                return;
-            }
-
-            InjectionStatusText = FormatInjectionStatus(injectionResult, eventStatus);
-            ConnectionLastUpdateText = AppStrings.Get("ConnectionLastUpdateJustNow");
-            string monitorStatusText = FormatEventCompatibility(eventStatus.CompatibilityState);
-            if (eventStatus.DroppedEventCount > 0 || eventStatus.DroppedNotifyCount > 0)
-            {
-                monitorStatusText = AppStrings.Format(
-                    "EventMonitorCaptureDropsFormat",
-                    monitorStatusText,
-                    eventStatus.DroppedEventCount,
-                    eventStatus.DroppedNotifyCount,
-                    eventStatus.PublishedNotifyCount);
-            }
-            else if (eventStatus.PublishedNotifyCount > 0)
-            {
-                monitorStatusText = AppStrings.Format(
-                    "EventMonitorPublishedEventsFormat",
-                    monitorStatusText,
-                    eventStatus.PublishedNotifyCount);
-            }
-
-            EventMonitorStatusText = monitorStatusText;
-            CurrentRoundText = FormatRoundSession(eventStatus);
-            BoxEventsText = GameEventFormatter.FormatRecentBoxEvents(eventStatus);
-            RecentGameEventsText = GameEventFormatter.FormatRecentGameEvents(eventStatus);
+            PointsText = state.PointsText;
+            KillsText = state.KillsText;
+            DownsText = state.DownsText;
+            RevivesText = state.RevivesText;
+            HeadshotsText = state.HeadshotsText;
+            PositionXText = state.PositionXText;
+            PositionYText = state.PositionYText;
+            PositionZText = state.PositionZText;
+            PlayerCandidateDetailsText = state.PlayerCandidateDetailsText;
+            AmmoCandidateDetailsText = state.AmmoCandidateDetailsText;
+            CounterCandidateDetailsText = state.CounterCandidateDetailsText;
+            AddressCandidateDetailsText = state.AddressCandidateDetailsText;
+            DetectedGameText = state.DetectedGameText;
+            EventCompatibilityText = state.EventCompatibilityText;
+            InjectionStatusText = state.InjectionStatusText;
+            EventMonitorStatusText = state.EventMonitorStatusText;
+            CurrentRoundText = state.CurrentRoundText;
+            BoxEventsText = state.BoxEventsText;
+            RecentGameEventsText = state.RecentGameEventsText;
+            StatusText = state.StatusText;
+            GameStatusText = state.GameStatusText;
+            EventConnectionStatusText = state.EventConnectionStatusText;
+            ConnectButtonText = state.ConnectButtonText;
+            ConnectionCardStatusText = state.ConnectionCardStatusText;
+            ConnectionLastUpdateText = state.ConnectionLastUpdateText;
+            IsConnectButtonEnabled = state.IsConnectButtonEnabled;
+            ConnectButtonVisibility = ToVisibility(state.IsConnectButtonVisible);
+            DisconnectButtonVisibility = ToVisibility(state.IsDisconnectButtonVisible);
+            FooterSuccessStatusVisibility = ToVisibility(state.IsFooterSuccessStatusVisible);
+            FooterPendingStatusVisibility = ToVisibility(state.IsFooterPendingStatusVisible);
+            FooterDisconnectedStatusVisibility = ToVisibility(state.IsFooterDisconnectedStatusVisible);
+            FooterErrorStatusVisibility = ToVisibility(state.IsFooterErrorStatusVisible);
+            LatestEventStatus = state.LatestEventStatus;
         }
 
         private void OnDetectedGameChanged(object? sender, DetectedGameChangedEventArgs args)
@@ -839,169 +538,15 @@ namespace BO2.ViewModels
             RefreshRequested?.Invoke(this, EventArgs.Empty);
         }
 
-        private void UpdateConnectButtonState(GameConnectionRefreshResult snapshot)
-        {
-            UpdateConnectButtonState(
-                snapshot.CurrentGame,
-                snapshot.CanAttemptConnect,
-                snapshot.IsConnecting,
-                snapshot.IsDisconnecting,
-                snapshot.IsMonitorConnectedForCurrentGame);
-        }
-
-        private void UpdateConnectButtonState(
-            DetectedGame? detectedGame,
-            bool canAttemptConnect,
-            bool isConnecting,
-            bool isDisconnecting,
-            bool isMonitorConnectedForDetectedGame)
-        {
-            ConnectButtonText = GetConnectButtonText(
-                detectedGame,
-                isConnecting,
-                isDisconnecting,
-                isMonitorConnectedForDetectedGame);
-            IsConnectButtonEnabled = canAttemptConnect;
-        }
-
-        private static string GetConnectButtonText(
-            DetectedGame? detectedGame,
-            bool isConnecting,
-            bool isDisconnecting,
-            bool isMonitorConnectedForDetectedGame)
-        {
-            if (detectedGame is null)
-            {
-                return AppStrings.Get("ConnectButtonWaitingForGameText");
-            }
-
-            if (isConnecting)
-            {
-                return AppStrings.Get("ConnectButtonConnectingText");
-            }
-
-            if (isDisconnecting)
-            {
-                return AppStrings.Get("ConnectionCardStatusDisconnecting");
-            }
-
-            if (isMonitorConnectedForDetectedGame)
-            {
-                return AppStrings.Get("ConnectButtonConnectedText");
-            }
-
-            if (detectedGame.Variant != GameVariant.SteamZombies || !detectedGame.IsStatsSupported)
-            {
-                return AppStrings.Get("ConnectButtonUnsupportedText");
-            }
-
-            return AppStrings.Get("ConnectButtonText");
-        }
-
         private void ApplyReadError(string message, GameConnectionRefreshResult snapshot)
         {
             ApplyRefreshSnapshot(snapshot);
             StatusText = message;
         }
 
-        private void SetConnectionState(
-            DetectedGame? detectedGame,
-            ConnectionState connectionState,
-            bool isConnecting,
-            bool isDisconnecting)
+        private static Visibility ToVisibility(bool isVisible)
         {
-            UpdateGameFooterState(detectedGame);
-            UpdateEventFooterState(detectedGame, connectionState, isConnecting, isDisconnecting);
-            UpdateFooterIndicator(connectionState);
-            UpdateConnectionCardState(connectionState, isConnecting);
-        }
-
-        private void UpdateGameFooterState(DetectedGame? detectedGame)
-        {
-            if (detectedGame is null)
-            {
-                GameStatusText = AppStrings.Get("FooterGameNotRunning");
-                return;
-            }
-
-            GameStatusText = AppStrings.Format("FooterGameDetectedFormat", detectedGame.DisplayName);
-        }
-
-        private void UpdateEventFooterState(
-            DetectedGame? detectedGame,
-            ConnectionState connectionState,
-            bool isConnecting,
-            bool isDisconnecting)
-        {
-            if (connectionState == ConnectionState.Connected)
-            {
-                EventConnectionStatusText = AppStrings.Get("FooterEventsConnected");
-                return;
-            }
-
-            if (connectionState == ConnectionState.Disconnecting || isDisconnecting)
-            {
-                EventConnectionStatusText = AppStrings.Get("FooterEventsDisconnecting");
-                return;
-            }
-
-            if (isConnecting)
-            {
-                EventConnectionStatusText = AppStrings.Get("FooterEventsConnecting");
-                return;
-            }
-
-            if (detectedGame is not null && !detectedGame.IsStatsSupported)
-            {
-                EventConnectionStatusText = AppStrings.Get("FooterEventsUnsupported");
-                return;
-            }
-
-            EventConnectionStatusText = AppStrings.Get("FooterEventsNotConnected");
-        }
-
-        private void UpdateFooterIndicator(ConnectionState connectionState)
-        {
-            FooterSuccessStatusVisibility = connectionState == ConnectionState.Connected ? Visibility.Visible : Visibility.Collapsed;
-            FooterPendingStatusVisibility = connectionState is ConnectionState.Detected or ConnectionState.Disconnecting or ConnectionState.Unsupported
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-            FooterDisconnectedStatusVisibility = connectionState == ConnectionState.Disconnected ? Visibility.Visible : Visibility.Collapsed;
-            FooterErrorStatusVisibility = Visibility.Collapsed;
-        }
-
-        private void UpdateConnectionCardState(ConnectionState connectionState, bool isConnecting)
-        {
-            ConnectionCardStatusText = connectionState switch
-            {
-                ConnectionState.Connected => AppStrings.Get("ConnectionCardStatusConnected"),
-                ConnectionState.Disconnecting => AppStrings.Get("ConnectionCardStatusDisconnecting"),
-                ConnectionState.Unsupported => AppStrings.Get("ConnectionCardStatusUnsupported"),
-                ConnectionState.Detected when isConnecting => AppStrings.Get("ConnectionCardStatusConnecting"),
-                ConnectionState.Detected => AppStrings.Get("ConnectionCardStatusMonitoring"),
-                _ => AppStrings.Get("ConnectionCardStatusDisconnected")
-            };
-
-            ConnectButtonVisibility = connectionState is ConnectionState.Connected or ConnectionState.Disconnecting
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-            DisconnectButtonVisibility = connectionState == ConnectionState.Connected ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private void ClearStats()
-        {
-            PointsText = EmptyStatText;
-            KillsText = EmptyStatText;
-            DownsText = EmptyStatText;
-            RevivesText = EmptyStatText;
-            HeadshotsText = EmptyStatText;
-            PositionXText = EmptyStatText;
-            PositionYText = EmptyStatText;
-            PositionZText = EmptyStatText;
-            PlayerCandidateDetailsText = EmptyStatText;
-            AmmoCandidateDetailsText = EmptyStatText;
-            CounterCandidateDetailsText = EmptyStatText;
-            AddressCandidateDetailsText = EmptyStatText;
+            return isVisible ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
