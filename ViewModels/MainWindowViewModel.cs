@@ -278,7 +278,11 @@ namespace BO2.ViewModels
                     action();
                     completionSource.TrySetResult();
                 }
-                catch (Exception ex)
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    completionSource.TrySetCanceled(cancellationToken);
+                }
+                catch (Exception ex) when (IsNonFatalDispatcherException(ex))
                 {
                     completionSource.TrySetException(ex);
                 }
@@ -292,6 +296,14 @@ namespace BO2.ViewModels
             }
 
             await completionSource.Task;
+        }
+
+        private static bool IsNonFatalDispatcherException(Exception exception)
+        {
+            return exception is not OutOfMemoryException
+                && exception is not StackOverflowException
+                && exception is not AccessViolationException
+                && exception is not AppDomainUnloadedException;
         }
 
         private Task RunOnDispatcherAsync(Action action, CancellationToken cancellationToken)

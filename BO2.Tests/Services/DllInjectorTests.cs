@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using BO2.Services;
 using Xunit;
 
@@ -237,6 +238,43 @@ namespace BO2.Tests.Services
             }
         }
 
+        [Fact]
+        public void ResolvePeExportRva_WhenNamedExportExists_ReturnsFunctionRva()
+        {
+            string path = Path.GetFullPath(Path.Join(Path.GetTempPath(), Guid.NewGuid() + ".dll"));
+            try
+            {
+                File.WriteAllBytes(path, CreatePe32WithExport("StartMonitor", 0x1100));
+
+                uint rva = DllInjector.ResolvePeExportRva(path, "StartMonitor");
+
+                Assert.Equal(0x1100u, rva);
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public void ResolvePeExportRva_WhenNamedExportMissing_ThrowsInvalidOperationException()
+        {
+            string path = Path.GetFullPath(Path.Join(Path.GetTempPath(), Guid.NewGuid() + ".dll"));
+            try
+            {
+                File.WriteAllBytes(path, CreatePe32WithExport("OtherExport", 0x1100));
+
+                InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
+                    () => DllInjector.ResolvePeExportRva(path, "StartMonitor"));
+
+                Assert.Contains("StartMonitor", ex.Message, StringComparison.Ordinal);
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
         private static DetectedGame CreateSupportedGame()
         {
             return new DetectedGame(
@@ -259,6 +297,46 @@ namespace BO2.Tests.Services
             bytes[0x42] = 0;
             bytes[0x43] = 0;
             BitConverter.GetBytes(machine).CopyTo(bytes, 0x44);
+            return bytes;
+        }
+
+        private static byte[] CreatePe32WithExport(string exportName, uint functionRva)
+        {
+            byte[] bytes = new byte[0x400];
+            bytes[0] = 0x4D;
+            bytes[1] = 0x5A;
+            BitConverter.GetBytes(0x80).CopyTo(bytes, 0x3C);
+
+            bytes[0x80] = 0x50;
+            bytes[0x81] = 0x45;
+            bytes[0x82] = 0;
+            bytes[0x83] = 0;
+
+            BitConverter.GetBytes((ushort)0x014c).CopyTo(bytes, 0x84);
+            BitConverter.GetBytes((ushort)1).CopyTo(bytes, 0x86);
+            BitConverter.GetBytes((ushort)0xE0).CopyTo(bytes, 0x94);
+            BitConverter.GetBytes((ushort)0x010b).CopyTo(bytes, 0x98);
+            BitConverter.GetBytes(0x1000u).CopyTo(bytes, 0xF8);
+            BitConverter.GetBytes(0x80u).CopyTo(bytes, 0xFC);
+
+            BitConverter.GetBytes(0x200u).CopyTo(bytes, 0x180);
+            BitConverter.GetBytes(0x1000u).CopyTo(bytes, 0x184);
+            BitConverter.GetBytes(0x200u).CopyTo(bytes, 0x188);
+            BitConverter.GetBytes(0x200u).CopyTo(bytes, 0x18C);
+
+            BitConverter.GetBytes(1u).CopyTo(bytes, 0x210);
+            BitConverter.GetBytes(1u).CopyTo(bytes, 0x214);
+            BitConverter.GetBytes(1u).CopyTo(bytes, 0x218);
+            BitConverter.GetBytes(0x1040u).CopyTo(bytes, 0x21C);
+            BitConverter.GetBytes(0x1044u).CopyTo(bytes, 0x220);
+            BitConverter.GetBytes(0x1048u).CopyTo(bytes, 0x224);
+
+            BitConverter.GetBytes(functionRva).CopyTo(bytes, 0x240);
+            BitConverter.GetBytes(0x1050u).CopyTo(bytes, 0x244);
+            BitConverter.GetBytes((ushort)0).CopyTo(bytes, 0x248);
+            Encoding.ASCII.GetBytes(exportName).CopyTo(bytes, 0x250);
+            bytes[0x250 + exportName.Length] = 0;
+
             return bytes;
         }
     }
