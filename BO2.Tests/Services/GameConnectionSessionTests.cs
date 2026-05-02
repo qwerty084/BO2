@@ -311,7 +311,7 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void Connect_WhenCurrentGameChangesDuringInjection_DoesNotRecordStaleMonitorOwnership()
+        public void Connect_WhenCurrentGameChangesDuringInjection_StopsInjectedMonitorWithoutRecordingOwnership()
         {
             DetectedGame originalGame = CreateSupportedGame(processId: 1001);
             DetectedGame changedGame = CreateSupportedGame(processId: 2002);
@@ -344,6 +344,8 @@ namespace BO2.Tests.Services
             Assert.False(context.Session.GetStatusSnapshot().IsMonitorConnectedForCurrentGame);
             Assert.False(context.Session.IsMonitorConnectedFor(originalGame));
             Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(1, eventMonitor.RequestStopCallCount);
+            Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);
         }
 
         [Fact]

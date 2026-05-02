@@ -211,7 +211,7 @@ namespace BO2.Services
             GameConnectionSessionLifecycleGame? connectTargetGame = GetConnectTargetGame();
             try
             {
-                return CompleteConnect(Inject());
+                return CompleteConnect(connectTargetGame, Inject());
             }
             catch
             {
@@ -265,18 +265,27 @@ namespace BO2.Services
             return _dllInjector.Inject(detectedGame!);
         }
 
-        private GameConnectionRefreshResult CompleteConnect(DllInjectionResult injectionResult)
+        private GameConnectionRefreshResult CompleteConnect(
+            GameConnectionSessionLifecycleGame? connectTargetGame,
+            DllInjectionResult injectionResult)
         {
             ArgumentNullException.ThrowIfNull(injectionResult);
 
             DateTimeOffset receivedAt = _timeProvider.GetUtcNow();
             DetectedGame? detectedGame = RefreshCurrentGame();
+            GameConnectionSessionConnectCompletion completion;
             lock (_syncRoot)
             {
-                _lifecycle.CompleteConnect(
+                completion = _lifecycle.CompleteConnect(
                     GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame),
+                    connectTargetGame,
                     injectionResult,
                     receivedAt);
+            }
+
+            if (completion.StopRequest.ShouldRequestStop)
+            {
+                _eventMonitor.RequestStop(completion.StopRequest.MonitorProcessId);
             }
 
             return ReadSnapshot(detectedGame, receivedAt);

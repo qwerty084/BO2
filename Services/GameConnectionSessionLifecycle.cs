@@ -48,18 +48,20 @@ namespace BO2.Services
                 && detectedGame == connectTargetGame;
         }
 
-        public bool CompleteConnect(
+        public GameConnectionSessionConnectCompletion CompleteConnect(
             GameConnectionSessionLifecycleGame? detectedGame,
+            GameConnectionSessionLifecycleGame? connectTargetGame,
             DllInjectionResult injectionResult,
             DateTimeOffset receivedAt)
         {
             ArgumentNullException.ThrowIfNull(injectionResult);
 
+            GameConnectionSessionLifecycleGame? attemptedTargetGame = connectTargetGame ?? _connectTargetGame;
             bool isTargetMatch = CanCompleteConnectFor(detectedGame);
             if (isTargetMatch
-                && _connectTargetGame is GameConnectionSessionLifecycleGame connectTargetGame)
+                && _connectTargetGame is GameConnectionSessionLifecycleGame matchedTargetGame)
             {
-                _lastInjectionProcessId = connectTargetGame.ProcessId;
+                _lastInjectionProcessId = matchedTargetGame.ProcessId;
                 _lastInjectionResult = injectionResult;
                 _lastInjectionAttemptedAt = IsMonitorLoadedInjectionState(injectionResult.State)
                     ? receivedAt
@@ -68,7 +70,23 @@ namespace BO2.Services
 
             _connectTargetGame = null;
             _isConnecting = false;
-            return isTargetMatch;
+            return new GameConnectionSessionConnectCompletion(
+                isTargetMatch,
+                isTargetMatch
+                    ? GameConnectionSessionMonitorStopRequest.None
+                    : CreateMismatchedConnectStopRequest(attemptedTargetGame, injectionResult));
+        }
+
+        private static GameConnectionSessionMonitorStopRequest CreateMismatchedConnectStopRequest(
+            GameConnectionSessionLifecycleGame? connectTargetGame,
+            DllInjectionResult injectionResult)
+        {
+            return connectTargetGame is GameConnectionSessionLifecycleGame targetGame
+                && IsMonitorLoadedInjectionState(injectionResult.State)
+                    ? new GameConnectionSessionMonitorStopRequest(
+                        targetGame.ProcessId,
+                        ShouldRequestStop: true)
+                    : GameConnectionSessionMonitorStopRequest.None;
         }
 
         public void CancelConnect()
@@ -291,6 +309,10 @@ namespace BO2.Services
         bool CanAttemptConnect,
         bool HasInjectionAttemptForCurrentGame,
         bool IsMonitorConnectedForCurrentGame);
+
+    internal readonly record struct GameConnectionSessionConnectCompletion(
+        bool IsTargetMatch,
+        GameConnectionSessionMonitorStopRequest StopRequest);
 
     internal readonly record struct GameConnectionSessionMonitorStopRequest(
         int? MonitorProcessId,

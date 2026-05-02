@@ -67,8 +67,9 @@ namespace BO2.Tests.Services
             lifecycle.BeginConnect(detectedGame);
             bool completed = lifecycle.CompleteConnect(
                 detectedGame,
+                detectedGame,
                 new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
-                new DateTimeOffset(2026, 5, 2, 0, 0, 0, TimeSpan.Zero));
+                new DateTimeOffset(2026, 5, 2, 0, 0, 0, TimeSpan.Zero)).IsTargetMatch;
             GameConnectionSessionLifecycleSnapshot snapshot = lifecycle.CreateSnapshot(detectedGame);
 
             Assert.True(completed);
@@ -82,21 +83,24 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void CompleteConnect_WhenTargetDoesNotMatch_ClearsConnectWithoutRecordingInjectionResult()
+        public void CompleteConnect_WhenLoadedTargetDoesNotMatch_ReturnsStopRequestWithoutRecordingOwnership()
         {
             GameConnectionSessionLifecycle lifecycle = new();
             GameConnectionSessionLifecycleGame connectTarget = CreateSupportedGame(processId: 1001);
             GameConnectionSessionLifecycleGame currentGame = CreateSupportedGame(processId: 2002);
 
             lifecycle.BeginConnect(connectTarget);
-            bool completed = lifecycle.CompleteConnect(
+            GameConnectionSessionConnectCompletion completion = lifecycle.CompleteConnect(
                 currentGame,
+                connectTarget,
                 new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
                 new DateTimeOffset(2026, 5, 2, 0, 0, 0, TimeSpan.Zero));
             GameConnectionSessionLifecycleSnapshot targetSnapshot = lifecycle.CreateSnapshot(connectTarget);
             GameConnectionSessionLifecycleSnapshot currentSnapshot = lifecycle.CreateSnapshot(currentGame);
 
-            Assert.False(completed);
+            Assert.False(completion.IsTargetMatch);
+            Assert.True(completion.StopRequest.ShouldRequestStop);
+            Assert.Equal(1001, completion.StopRequest.MonitorProcessId);
             Assert.False(targetSnapshot.IsConnecting);
             Assert.Equal(DllInjectionState.NotAttempted, targetSnapshot.InjectionResult.State);
             Assert.False(targetSnapshot.HasInjectionAttemptForCurrentGame);
@@ -116,6 +120,7 @@ namespace BO2.Tests.Services
             GameConnectionSessionLifecycleGame connectTarget = CreateSupportedGame(processId: 2002);
             lifecycle.BeginConnect(connectedGame);
             lifecycle.CompleteConnect(
+                connectedGame,
                 connectedGame,
                 new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
                 new DateTimeOffset(2026, 5, 2, 0, 0, 0, TimeSpan.Zero));
@@ -144,6 +149,7 @@ namespace BO2.Tests.Services
             lifecycle.BeginConnect(detectedGame);
             lifecycle.CompleteConnect(
                 detectedGame,
+                detectedGame,
                 new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
                 new DateTimeOffset(2026, 5, 2, 0, 0, 0, TimeSpan.Zero));
 
@@ -165,6 +171,7 @@ namespace BO2.Tests.Services
             GameConnectionSessionLifecycleGame detectedGame = CreateSupportedGame(processId: 1001);
             lifecycle.BeginConnect(detectedGame);
             lifecycle.CompleteConnect(
+                detectedGame,
                 detectedGame,
                 new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
                 new DateTimeOffset(2026, 5, 2, 0, 0, 0, TimeSpan.Zero));
@@ -211,6 +218,7 @@ namespace BO2.Tests.Services
             GameConnectionSessionLifecycleGame detectedGame = CreateSupportedGame(processId: 2002);
             lifecycle.BeginConnect(connectedGame);
             lifecycle.CompleteConnect(
+                connectedGame,
                 connectedGame,
                 new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
                 new DateTimeOffset(2026, 5, 2, 0, 0, 0, TimeSpan.Zero));
@@ -475,6 +483,7 @@ namespace BO2.Tests.Services
             GameConnectionSessionLifecycle lifecycle = new();
             lifecycle.BeginConnect(detectedGame);
             lifecycle.CompleteConnect(
+                detectedGame,
                 detectedGame,
                 new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
                 attemptedAt ?? new DateTimeOffset(2026, 5, 2, 0, 0, 0, TimeSpan.Zero));
