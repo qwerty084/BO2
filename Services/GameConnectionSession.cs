@@ -350,24 +350,6 @@ namespace BO2.Services
             return PublishRefreshResult(snapshot);
         }
 
-        public void ResetMonitorConnectionState(bool requestStop = true)
-        {
-            GameConnectionSessionMonitorStopRequest stopRequest;
-            GameConnectionRefreshResult snapshot;
-            lock (_syncRoot)
-            {
-                stopRequest = _lifecycle.ResetMonitorConnectionState(requestStop);
-                snapshot = CreateStatusSnapshotLocked(_currentGame);
-            }
-
-            if (stopRequest.ShouldRequestStop)
-            {
-                _eventMonitor.RequestStop(stopRequest.MonitorProcessId);
-            }
-
-            PublishSnapshot(snapshot);
-        }
-
         public void Dispose()
         {
             _processDetectionService.DetectedGameChanged -= OnDetectedGameChanged;
