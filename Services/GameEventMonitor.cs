@@ -155,7 +155,7 @@ namespace BO2.Services
                     0,
                     0,
                     0,
-                    Array.Empty<GameEvent>());
+                    []);
             }
 
             uint magic = BinaryPrimitives.ReadUInt32LittleEndian(snapshot[0..4]);
@@ -167,7 +167,7 @@ namespace BO2.Services
                     0,
                     0,
                     0,
-                    Array.Empty<GameEvent>());
+                    []);
             }
 
             GameCompatibilityState compatibilityState = ReadCompatibilityState(snapshot[8..12]);

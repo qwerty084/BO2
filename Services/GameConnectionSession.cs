@@ -227,11 +227,11 @@ namespace BO2.Services
 
         private GameConnectionRefreshResult BeginConnect()
         {
-            DetectedGame? detectedGame = RefreshCurrentGame();
+            _ = RefreshCurrentGame();
             GameConnectionRefreshResult result;
             lock (_syncRoot)
             {
-                detectedGame = _currentGame;
+                DetectedGame? detectedGame = _currentGame;
                 _lifecycle.BeginConnect(
                     GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
                 result = CreateStatusSnapshotLocked(detectedGame);
@@ -720,18 +720,12 @@ namespace BO2.Services
         bool HasInjectionAttemptForCurrentGame,
         bool IsMonitorConnectedForCurrentGame);
 
-    internal sealed class GameConnectionSnapshotChangedEventArgs : EventArgs
+    internal sealed class GameConnectionSnapshotChangedEventArgs(
+        GameConnectionSnapshot previousSnapshot,
+        GameConnectionSnapshot snapshot) : EventArgs
     {
-        public GameConnectionSnapshotChangedEventArgs(
-            GameConnectionSnapshot previousSnapshot,
-            GameConnectionSnapshot snapshot)
-        {
-            PreviousSnapshot = previousSnapshot;
-            Snapshot = snapshot;
-        }
+        public GameConnectionSnapshot PreviousSnapshot { get; } = previousSnapshot;
 
-        public GameConnectionSnapshot PreviousSnapshot { get; }
-
-        public GameConnectionSnapshot Snapshot { get; }
+        public GameConnectionSnapshot Snapshot { get; } = snapshot;
     }
 }

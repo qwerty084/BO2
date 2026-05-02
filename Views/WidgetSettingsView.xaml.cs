@@ -64,13 +64,8 @@ namespace BO2.Views
         }
     }
 
-    public sealed class BoxTrackerEnabledChangedEventArgs : EventArgs
+    public sealed class BoxTrackerEnabledChangedEventArgs(bool isEnabled) : EventArgs
     {
-        public BoxTrackerEnabledChangedEventArgs(bool isEnabled)
-        {
-            IsEnabled = isEnabled;
-        }
-
-        public bool IsEnabled { get; }
+        public bool IsEnabled { get; } = isEnabled;
     }
 }

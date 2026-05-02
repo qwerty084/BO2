@@ -2,16 +2,10 @@ using System;
 
 namespace BO2.Services
 {
-    internal sealed class ProcessLifecycleEventArgs : EventArgs
+    internal sealed class ProcessLifecycleEventArgs(string processName, int processId) : EventArgs
     {
-        public ProcessLifecycleEventArgs(string processName, int processId)
-        {
-            ProcessName = processName;
-            ProcessId = processId;
-        }
+        public string ProcessName { get; } = processName;
 
-        public string ProcessName { get; }
-
-        public int ProcessId { get; }
+        public int ProcessId { get; } = processId;
     }
 }

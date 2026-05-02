@@ -286,10 +286,7 @@ namespace BO2.ViewModels
 
             if (!queued)
             {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    throw new OperationCanceledException(cancellationToken);
-                }
+                cancellationToken.ThrowIfCancellationRequested();
 
                 throw new InvalidOperationException(AppStrings.Get("DispatcherQueueFailed"));
             }

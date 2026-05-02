@@ -54,7 +54,7 @@ namespace BO2.Tests.Services
                 detectedGame,
                 memoryAccessor: memoryAccessor);
             GameConnectionSnapshot initialSnapshot = session.Snapshot;
-            List<GameConnectionSnapshotChangedEventArgs> changes = new();
+            List<GameConnectionSnapshotChangedEventArgs> changes = [];
             session.SnapshotChanged += (_, args) => changes.Add(args);
 
             GameConnectionSnapshot readSnapshot = session.Read();
@@ -227,7 +227,7 @@ namespace BO2.Tests.Services
                 detectedGame: originalGame,
                 memoryAccessor: memoryAccessor);
             context.Session.Start();
-            List<GameConnectionSnapshotChangedEventArgs> changes = new();
+            List<GameConnectionSnapshotChangedEventArgs> changes = [];
             context.Session.SnapshotChanged += (_, args) => changes.Add(args);
             context.EventDetector.Result = detectedGame;
 
@@ -328,7 +328,7 @@ namespace BO2.Tests.Services
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
             int? injectedProcessId = null;
             bool injectionObservedConnectingSnapshot = false;
-            List<GameConnectionSnapshot> publishedSnapshots = new();
+            List<GameConnectionSnapshot> publishedSnapshots = [];
             FakeGameEventMonitor eventMonitor = new()
             {
                 Status = CreateCompatibleStatus()
@@ -454,7 +454,7 @@ namespace BO2.Tests.Services
             DllInjector dllInjector = CreateDllInjector(
                 fileExists: _ => throw new NotSupportedException("payload unavailable"));
             GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, dllInjector: dllInjector);
-            List<GameConnectionSnapshot> publishedSnapshots = new();
+            List<GameConnectionSnapshot> publishedSnapshots = [];
             session.SnapshotChanged += (_, args) => publishedSnapshots.Add(args.Snapshot);
 
             NotSupportedException exception = Assert.Throws<NotSupportedException>(
@@ -487,7 +487,7 @@ namespace BO2.Tests.Services
                 eventMonitor,
                 detectedGame,
                 memoryAccessor: memoryAccessor);
-            List<GameConnectionSnapshot> publishedSnapshots = new();
+            List<GameConnectionSnapshot> publishedSnapshots = [];
             session.SnapshotChanged += (_, args) => publishedSnapshots.Add(args.Snapshot);
 
             eventMonitor.ResetCalls();
@@ -640,7 +640,7 @@ namespace BO2.Tests.Services
             CompleteConnectWithLoadedMonitor(session);
             eventMonitor.ResetCalls();
 
-            List<GameConnectionSnapshotChangedEventArgs> changes = new();
+            List<GameConnectionSnapshotChangedEventArgs> changes = [];
             session.SnapshotChanged += (_, args) => changes.Add(args);
 
             GameConnectionSnapshot snapshot = session.Disconnect();
@@ -932,7 +932,7 @@ namespace BO2.Tests.Services
                 0,
                 0,
                 1,
-                Array.Empty<GameEvent>());
+                []);
         }
 
         private sealed class SessionContext(

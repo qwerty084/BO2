@@ -246,8 +246,8 @@ namespace BO2.Widgets
                 nint oldFont = SelectObject(hdc, font);
                 try
                 {
-                    SetBkMode(hdc, TransparentBkMode);
-                    SetTextColor(hdc, ToColorRef(_textColor));
+                    _ = SetBkMode(hdc, TransparentBkMode);
+                    _ = SetTextColor(hdc, ToColorRef(_textColor));
                     DrawText(hdc, _text, clientRect);
                 }
                 finally
@@ -295,14 +295,14 @@ namespace BO2.Widgets
             int extendedStyle = GetWindowLong(_windowHandle, GwlExStyle);
             if (_transparentBackground)
             {
-                SetWindowLong(_windowHandle, GwlExStyle, extendedStyle | WsExLayered);
+                _ = SetWindowLong(_windowHandle, GwlExStyle, extendedStyle | WsExLayered);
                 SetLayeredWindowAttributes(_windowHandle, TransparentColorKey, 255, LwaColorKey);
                 return;
             }
 
             if ((extendedStyle & WsExLayered) != 0)
             {
-                SetWindowLong(_windowHandle, GwlExStyle, extendedStyle & ~WsExLayered);
+                _ = SetWindowLong(_windowHandle, GwlExStyle, extendedStyle & ~WsExLayered);
             }
         }
 
@@ -331,10 +331,7 @@ namespace BO2.Widgets
 
         private void ThrowIfClosed()
         {
-            if (_closed || _windowHandle == nint.Zero)
-            {
-                throw new ObjectDisposedException(nameof(BoxTrackerWidgetWindow));
-            }
+            ObjectDisposedException.ThrowIf(_closed || _windowHandle == nint.Zero, this);
         }
 
         private static int ToColorRef(Color color)

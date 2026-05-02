@@ -502,12 +502,8 @@ namespace BO2.Services
             }
         }
 
-        internal sealed class WrongProcessArchitectureException : InvalidOperationException
+        internal sealed class WrongProcessArchitectureException(string message) : InvalidOperationException(message)
         {
-            public WrongProcessArchitectureException(string message)
-                : base(message)
-            {
-            }
         }
 
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -545,8 +541,10 @@ namespace BO2.Services
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool FreeLibrary(IntPtr moduleHandle);
 
-        [DllImport("kernel32.dll", CharSet = CharSet.Ansi, SetLastError = true)]
-        private static extern IntPtr GetProcAddress(IntPtr moduleHandle, string procName);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr GetProcAddress(
+            IntPtr moduleHandle,
+            [MarshalAs(UnmanagedType.LPStr)] string procName);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern IntPtr CreateRemoteThread(
