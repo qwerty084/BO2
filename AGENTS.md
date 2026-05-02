@@ -5,9 +5,13 @@
 - Build solution: `dotnet build .\BO2.slnx`.
 - Build 32-bit Windows app: `dotnet build .\BO2.csproj -p:Platform=x86`.
 - Run non-UI unit tests: `dotnet test BO2.Tests\BO2.Tests.csproj`.
+- Create the standard .NET editor configuration with `dotnet new editorconfig` when adopting or refreshing the formatter baseline.
+- Apply C# formatter fixes with `dotnet format .\BO2.slnx -v detailed --severity info`.
+- Check C# formatting without editing files with `dotnet format .\BO2.slnx -v detailed --verify-no-changes --severity info`.
+- Treat formatter commands as separate from build and test validation: use the fix command to apply supported formatting and code-style changes, then use the check-only command to verify no formatting changes remain. Build and tests remain the behavior validation path.
+- Formatter checks should run at `info` severity going forward so information-level C# style suggestions are included in repo policy.
 - When changing GitHub Actions workflows under `.github\workflows\`, test affected workflow locally with `act` before handoff. For Windows jobs, prefer host-backed run: `act workflow_dispatch -W .github\workflows\build.yml -j windows -P windows-latest=-self-hosted`; clean `.act-*` folders after.
 - Tests pure xUnit, no WinAppSDK runtime; target `net8.0-windows10.0.19041.0`, do NOT reference WinUI.
-- No repo-specific lint/format command/config checked in.
 
 ## Architecture
 
