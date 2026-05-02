@@ -48,14 +48,15 @@ namespace BO2.Services
                 && detectedGame == connectTargetGame;
         }
 
-        public void CompleteConnect(
+        public bool CompleteConnect(
             GameConnectionSessionLifecycleGame? detectedGame,
             DllInjectionResult injectionResult,
             DateTimeOffset receivedAt)
         {
             ArgumentNullException.ThrowIfNull(injectionResult);
 
-            if (CanCompleteConnectFor(detectedGame)
+            bool isTargetMatch = CanCompleteConnectFor(detectedGame);
+            if (isTargetMatch
                 && _connectTargetGame is GameConnectionSessionLifecycleGame connectTargetGame)
             {
                 _lastInjectionProcessId = connectTargetGame.ProcessId;
@@ -67,6 +68,7 @@ namespace BO2.Services
 
             _connectTargetGame = null;
             _isConnecting = false;
+            return isTargetMatch;
         }
 
         public void CancelConnect()

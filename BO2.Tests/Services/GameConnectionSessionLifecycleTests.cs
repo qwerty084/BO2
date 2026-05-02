@@ -65,12 +65,13 @@ namespace BO2.Tests.Services
             GameConnectionSessionLifecycleGame otherGame = CreateSupportedGame(processId: 2002);
 
             lifecycle.BeginConnect(detectedGame);
-            lifecycle.CompleteConnect(
+            bool completed = lifecycle.CompleteConnect(
                 detectedGame,
                 new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
                 new DateTimeOffset(2026, 5, 2, 0, 0, 0, TimeSpan.Zero));
             GameConnectionSessionLifecycleSnapshot snapshot = lifecycle.CreateSnapshot(detectedGame);
 
+            Assert.True(completed);
             Assert.False(snapshot.IsConnecting);
             Assert.False(snapshot.CanAttemptConnect);
             Assert.True(snapshot.HasInjectionAttemptForCurrentGame);
@@ -78,6 +79,61 @@ namespace BO2.Tests.Services
             Assert.Equal(DllInjectionState.Loaded, snapshot.InjectionResult.State);
             Assert.True(lifecycle.IsMonitorConnectedFor(detectedGame));
             Assert.False(lifecycle.IsMonitorConnectedFor(otherGame));
+        }
+
+        [Fact]
+        public void CompleteConnect_WhenTargetDoesNotMatch_ClearsConnectWithoutRecordingInjectionResult()
+        {
+            GameConnectionSessionLifecycle lifecycle = new();
+            GameConnectionSessionLifecycleGame connectTarget = CreateSupportedGame(processId: 1001);
+            GameConnectionSessionLifecycleGame currentGame = CreateSupportedGame(processId: 2002);
+
+            lifecycle.BeginConnect(connectTarget);
+            bool completed = lifecycle.CompleteConnect(
+                currentGame,
+                new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
+                new DateTimeOffset(2026, 5, 2, 0, 0, 0, TimeSpan.Zero));
+            GameConnectionSessionLifecycleSnapshot targetSnapshot = lifecycle.CreateSnapshot(connectTarget);
+            GameConnectionSessionLifecycleSnapshot currentSnapshot = lifecycle.CreateSnapshot(currentGame);
+
+            Assert.False(completed);
+            Assert.False(targetSnapshot.IsConnecting);
+            Assert.Equal(DllInjectionState.NotAttempted, targetSnapshot.InjectionResult.State);
+            Assert.False(targetSnapshot.HasInjectionAttemptForCurrentGame);
+            Assert.False(targetSnapshot.IsMonitorConnectedForCurrentGame);
+            Assert.True(targetSnapshot.CanAttemptConnect);
+            Assert.Equal(DllInjectionState.NotAttempted, currentSnapshot.InjectionResult.State);
+            Assert.False(currentSnapshot.HasInjectionAttemptForCurrentGame);
+            Assert.False(currentSnapshot.IsMonitorConnectedForCurrentGame);
+            Assert.True(currentSnapshot.CanAttemptConnect);
+        }
+
+        [Fact]
+        public void CancelConnect_WhenAnotherMonitorIsOwned_ClearsConnectAndPreservesMonitorOwnership()
+        {
+            GameConnectionSessionLifecycle lifecycle = new();
+            GameConnectionSessionLifecycleGame connectedGame = CreateSupportedGame(processId: 1001);
+            GameConnectionSessionLifecycleGame connectTarget = CreateSupportedGame(processId: 2002);
+            lifecycle.BeginConnect(connectedGame);
+            lifecycle.CompleteConnect(
+                connectedGame,
+                new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
+                new DateTimeOffset(2026, 5, 2, 0, 0, 0, TimeSpan.Zero));
+
+            bool started = lifecycle.BeginConnect(connectTarget);
+            lifecycle.CancelConnect();
+            GameConnectionSessionLifecycleSnapshot connectedSnapshot = lifecycle.CreateSnapshot(connectedGame);
+            GameConnectionSessionLifecycleSnapshot targetSnapshot = lifecycle.CreateSnapshot(connectTarget);
+
+            Assert.True(started);
+            Assert.False(connectedSnapshot.IsConnecting);
+            Assert.True(connectedSnapshot.IsMonitorConnectedForCurrentGame);
+            Assert.True(connectedSnapshot.HasInjectionAttemptForCurrentGame);
+            Assert.Equal(DllInjectionState.Loaded, connectedSnapshot.InjectionResult.State);
+            Assert.False(targetSnapshot.IsConnecting);
+            Assert.False(targetSnapshot.IsMonitorConnectedForCurrentGame);
+            Assert.False(targetSnapshot.HasInjectionAttemptForCurrentGame);
+            Assert.True(targetSnapshot.CanAttemptConnect);
         }
 
         [Fact]

@@ -199,6 +199,7 @@ namespace BO2.Services
             DetectedGame? detectedGame = RefreshCurrentGame();
             lock (_syncRoot)
             {
+                detectedGame = _currentGame;
                 _lifecycle.BeginConnect(
                     GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
                 return CreateStatusSnapshotLocked(detectedGame);
