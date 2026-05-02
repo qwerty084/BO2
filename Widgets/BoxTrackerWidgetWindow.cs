@@ -246,9 +246,11 @@ namespace BO2.Widgets
                 nint oldFont = SelectObject(hdc, font);
                 try
                 {
-                    // codeql[cs/call-to-unmanaged-code] Owner-drawn HWND text requires configuring the native paint DC.
+                    // Owner-drawn HWND text requires configuring the native paint DC.
+                    // codeql[cs/call-to-unmanaged-code]
                     _ = SetBkMode(hdc, TransparentBkMode);
-                    // codeql[cs/call-to-unmanaged-code] Owner-drawn HWND text requires configuring the native paint DC.
+                    // Owner-drawn HWND text requires configuring the native paint DC.
+                    // codeql[cs/call-to-unmanaged-code]
                     _ = SetTextColor(hdc, ToColorRef(_textColor));
                     DrawText(hdc, _text, clientRect);
                 }
@@ -297,7 +299,8 @@ namespace BO2.Widgets
             int extendedStyle = GetWindowLong(_windowHandle, GwlExStyle);
             if (_transparentBackground)
             {
-                // codeql[cs/call-to-unmanaged-code] Layered HWND transparency is a native window style with no managed equivalent here.
+                // Layered HWND transparency is a native window style with no managed equivalent here.
+                // codeql[cs/call-to-unmanaged-code]
                 _ = SetWindowLong(_windowHandle, GwlExStyle, extendedStyle | WsExLayered);
                 SetLayeredWindowAttributes(_windowHandle, TransparentColorKey, 255, LwaColorKey);
                 return;
@@ -305,7 +308,8 @@ namespace BO2.Widgets
 
             if ((extendedStyle & WsExLayered) != 0)
             {
-                // codeql[cs/call-to-unmanaged-code] Layered HWND transparency is a native window style with no managed equivalent here.
+                // Layered HWND transparency is a native window style with no managed equivalent here.
+                // codeql[cs/call-to-unmanaged-code]
                 _ = SetWindowLong(_windowHandle, GwlExStyle, extendedStyle & ~WsExLayered);
             }
         }
