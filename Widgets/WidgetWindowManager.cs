@@ -1,5 +1,5 @@
-using BO2.Services;
 using System;
+using BO2.Services;
 
 namespace BO2.Widgets
 {

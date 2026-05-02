@@ -1,8 +1,8 @@
-using BO2.Services;
-using Microsoft.UI;
 using System;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
+using BO2.Services;
+using Microsoft.UI;
 using Windows.UI;
 
 namespace BO2.Widgets
@@ -246,8 +246,12 @@ namespace BO2.Widgets
                 nint oldFont = SelectObject(hdc, font);
                 try
                 {
-                    SetBkMode(hdc, TransparentBkMode);
-                    SetTextColor(hdc, ToColorRef(_textColor));
+                    // Owner-drawn HWND text requires configuring the native paint DC.
+                    // codeql[cs/call-to-unmanaged-code]
+                    _ = SetBkMode(hdc, TransparentBkMode);
+                    // Owner-drawn HWND text requires configuring the native paint DC.
+                    // codeql[cs/call-to-unmanaged-code]
+                    _ = SetTextColor(hdc, ToColorRef(_textColor));
                     DrawText(hdc, _text, clientRect);
                 }
                 finally
@@ -295,14 +299,18 @@ namespace BO2.Widgets
             int extendedStyle = GetWindowLong(_windowHandle, GwlExStyle);
             if (_transparentBackground)
             {
-                SetWindowLong(_windowHandle, GwlExStyle, extendedStyle | WsExLayered);
+                // Layered HWND transparency is a native window style with no managed equivalent here.
+                // codeql[cs/call-to-unmanaged-code]
+                _ = SetWindowLong(_windowHandle, GwlExStyle, extendedStyle | WsExLayered);
                 SetLayeredWindowAttributes(_windowHandle, TransparentColorKey, 255, LwaColorKey);
                 return;
             }
 
             if ((extendedStyle & WsExLayered) != 0)
             {
-                SetWindowLong(_windowHandle, GwlExStyle, extendedStyle & ~WsExLayered);
+                // Layered HWND transparency is a native window style with no managed equivalent here.
+                // codeql[cs/call-to-unmanaged-code]
+                _ = SetWindowLong(_windowHandle, GwlExStyle, extendedStyle & ~WsExLayered);
             }
         }
 
@@ -331,10 +339,7 @@ namespace BO2.Widgets
 
         private void ThrowIfClosed()
         {
-            if (_closed || _windowHandle == nint.Zero)
-            {
-                throw new ObjectDisposedException(nameof(BoxTrackerWidgetWindow));
-            }
+            ObjectDisposedException.ThrowIf(_closed || _windowHandle == nint.Zero, this);
         }
 
         private static int ToColorRef(Color color)

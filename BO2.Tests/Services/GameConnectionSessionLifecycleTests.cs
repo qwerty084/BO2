@@ -497,7 +497,7 @@ namespace BO2.Tests.Services
                 DroppedEventCount: 0,
                 DroppedNotifyCount: 0,
                 PublishedNotifyCount: 0,
-                Array.Empty<GameEvent>());
+                []);
         }
     }
 }

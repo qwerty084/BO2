@@ -1,8 +1,8 @@
-using BO2.Services;
-using BO2.ViewModels;
 using System;
 using System.Globalization;
 using System.Reflection;
+using BO2.Services;
+using BO2.ViewModels;
 using Xunit;
 
 namespace BO2.Tests.ViewModels

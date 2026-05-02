@@ -8,7 +8,7 @@ namespace BO2.Services
 
         public int Version { get; set; } = CurrentVersion;
 
-        public Dictionary<string, WidgetSettings> Widgets { get; set; } = new();
+        public Dictionary<string, WidgetSettings> Widgets { get; set; } = [];
 
         public static WidgetSettingsDocument CreateDefault()
         {
@@ -19,7 +19,7 @@ namespace BO2.Services
 
         public WidgetSettings GetWidget(WidgetKind kind)
         {
-            Widgets ??= new Dictionary<string, WidgetSettings>();
+            Widgets ??= [];
             string key = GetKey(kind);
             if (!Widgets.TryGetValue(key, out WidgetSettings? settings) || settings is null)
             {
@@ -39,7 +39,7 @@ namespace BO2.Services
 
         public void Normalize()
         {
-            Widgets ??= new Dictionary<string, WidgetSettings>();
+            Widgets ??= [];
             if (Version != CurrentVersion)
             {
                 Version = CurrentVersion;

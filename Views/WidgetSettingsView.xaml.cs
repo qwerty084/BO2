@@ -1,7 +1,7 @@
+using System;
 using BO2.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using System;
 
 namespace BO2.Views
 {
@@ -64,13 +64,8 @@ namespace BO2.Views
         }
     }
 
-    public sealed class BoxTrackerEnabledChangedEventArgs : EventArgs
+    public sealed class BoxTrackerEnabledChangedEventArgs(bool isEnabled) : EventArgs
     {
-        public BoxTrackerEnabledChangedEventArgs(bool isEnabled)
-        {
-            IsEnabled = isEnabled;
-        }
-
-        public bool IsEnabled { get; }
+        public bool IsEnabled { get; } = isEnabled;
     }
 }

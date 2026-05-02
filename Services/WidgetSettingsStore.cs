@@ -7,14 +7,9 @@ namespace BO2.Services
 {
     public sealed record WidgetSettingsLoadRecovery(string Reason, string? BackupPath, string? ErrorMessage);
 
-    public sealed class WidgetSettingsStore
+    public sealed class WidgetSettingsStore(string settingsPath)
     {
-        private readonly string _settingsPath;
-
-        public WidgetSettingsStore(string settingsPath)
-        {
-            _settingsPath = settingsPath;
-        }
+        private readonly string _settingsPath = settingsPath;
 
         public WidgetSettingsLoadRecovery? LastLoadRecovery { get; private set; }
 

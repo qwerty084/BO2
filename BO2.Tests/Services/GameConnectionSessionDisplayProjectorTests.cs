@@ -260,7 +260,7 @@ namespace BO2.Tests.Services
 
         private static void AssertResource(string resourceId, object text)
         {
-            AssertResource(resourceId, Assert.IsAssignableFrom<DisplayText>(text));
+            AssertResource(resourceId, Assert.IsType<DisplayText>(text, exactMatch: false));
         }
 
         private static void AssertPlain(string value, DisplayText text)
@@ -271,7 +271,7 @@ namespace BO2.Tests.Services
 
         private static void AssertPlain(string value, object text)
         {
-            AssertPlain(value, Assert.IsAssignableFrom<DisplayText>(text));
+            AssertPlain(value, Assert.IsType<DisplayText>(text, exactMatch: false));
         }
 
         private static void AssertInteger(int value, DisplayText text)
@@ -288,7 +288,7 @@ namespace BO2.Tests.Services
 
         private static void AssertFloat2(float value, object text)
         {
-            AssertFloat2(value, Assert.IsAssignableFrom<DisplayText>(text));
+            AssertFloat2(value, Assert.IsType<DisplayText>(text, exactMatch: false));
         }
     }
 }

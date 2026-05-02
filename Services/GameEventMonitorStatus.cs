@@ -15,6 +15,6 @@ namespace BO2.Services
             0,
             0,
             0,
-            Array.Empty<GameEvent>());
+            []);
     }
 }

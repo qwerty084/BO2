@@ -2,13 +2,8 @@ using System;
 
 namespace BO2.Services
 {
-    internal sealed class DetectedGameChangedEventArgs : EventArgs
+    internal sealed class DetectedGameChangedEventArgs(DetectedGame? detectedGame) : EventArgs
     {
-        public DetectedGameChangedEventArgs(DetectedGame? detectedGame)
-        {
-            DetectedGame = detectedGame;
-        }
-
-        public DetectedGame? DetectedGame { get; }
+        public DetectedGame? DetectedGame { get; } = detectedGame;
     }
 }

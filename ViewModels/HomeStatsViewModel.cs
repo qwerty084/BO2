@@ -1,7 +1,7 @@
-using BO2.Services;
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using BO2.Services;
 
 namespace BO2.ViewModels
 {

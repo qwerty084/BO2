@@ -15,10 +15,7 @@ namespace BO2.Services
 
         public void Attach(int processId, string processName)
         {
-            if (processId <= 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(processId));
-            }
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(processId);
 
             if (string.IsNullOrWhiteSpace(processName))
             {

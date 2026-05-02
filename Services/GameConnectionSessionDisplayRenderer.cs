@@ -58,7 +58,7 @@ namespace BO2.Services
                 DisplayText.ResourceText resource => AppStrings.Get(resource.ResourceId),
                 DisplayText.FormatText format => AppStrings.Format(
                     format.ResourceId,
-                    format.Arguments.Select(RenderArgument).ToArray()),
+                    [.. format.Arguments.Select(RenderArgument)]),
                 DisplayText.LinesText lines => string.Join(
                     Environment.NewLine,
                     lines.Items.Select(Render)),

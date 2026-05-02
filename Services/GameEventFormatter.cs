@@ -35,32 +35,30 @@ namespace BO2.Services
             GameEventMonitorStatus eventStatus,
             DisplayText emptyText)
         {
-            GameEvent[] boxEvents = eventStatus.RecentEvents
+            GameEvent[] boxEvents = [.. eventStatus.RecentEvents
                 .Where(gameEvent => gameEvent.EventType == GameEventType.BoxEvent)
-                .TakeLast(6)
-                .ToArray();
+                .TakeLast(6)];
             if (boxEvents.Length == 0)
             {
                 return emptyText;
             }
 
-            return DisplayText.Lines(boxEvents.Select(FormatBoxEvent).ToArray());
+            return DisplayText.Lines([.. boxEvents.Select(FormatBoxEvent)]);
         }
 
         public static DisplayText FormatRecentGameEvents(
             GameEventMonitorStatus eventStatus,
             DisplayText emptyText)
         {
-            GameEvent[] visibleEvents = eventStatus.RecentEvents
+            GameEvent[] visibleEvents = [.. eventStatus.RecentEvents
                 .Where(IsVisibleRecentEvent)
-                .TakeLast(6)
-                .ToArray();
+                .TakeLast(6)];
             if (visibleEvents.Length == 0)
             {
                 return emptyText;
             }
 
-            return DisplayText.Lines(visibleEvents.Select(FormatRecentGameEvent).ToArray());
+            return DisplayText.Lines([.. visibleEvents.Select(FormatRecentGameEvent)]);
         }
 
         private static bool IsVisibleRecentEvent(GameEvent gameEvent)

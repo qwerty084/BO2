@@ -4,14 +4,9 @@ namespace BO2.Services
 {
     // Pure formatting helpers extracted from MainWindowViewModel so they can be unit-tested
     // without any WinUI or WinAppSDK dependencies.
-    internal sealed class StatFormatter
+    internal sealed class StatFormatter(string unavailableText)
     {
-        private readonly string _unavailableText;
-
-        public StatFormatter(string unavailableText)
-        {
-            _unavailableText = unavailableText;
-        }
+        private readonly string _unavailableText = unavailableText;
 
         public string FormatStat(int value) => value.ToString("N0", CultureInfo.CurrentCulture);
 

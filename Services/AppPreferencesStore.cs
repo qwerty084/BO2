@@ -4,14 +4,9 @@ using System.Text.Json;
 
 namespace BO2.Services
 {
-    public sealed class AppPreferencesStore
+    public sealed class AppPreferencesStore(string preferencesPath)
     {
-        private readonly string _preferencesPath;
-
-        public AppPreferencesStore(string preferencesPath)
-        {
-            _preferencesPath = preferencesPath;
-        }
+        private readonly string _preferencesPath = preferencesPath;
 
         public static AppPreferencesStore CreateDefault()
         {

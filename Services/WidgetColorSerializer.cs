@@ -32,7 +32,7 @@ namespace BO2.Services
             }
 
             string text = value.Trim();
-            if (text.StartsWith("#", StringComparison.Ordinal))
+            if (text.StartsWith('#'))
             {
                 text = text[1..];
             }
