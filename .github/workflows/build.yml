@@ -57,6 +57,10 @@ jobs:
             -warnaserror:NU1903 `
             -warnaserror:NU1904
 
+      - name: Verify formatting and style
+        shell: pwsh
+        run: dotnet format .\BO2.slnx --no-restore -v detailed --verify-no-changes --severity info
+
       - name: Test non-UI services
         shell: pwsh
         run: |

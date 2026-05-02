@@ -13,13 +13,14 @@ using Microsoft.UI.Xaml.Media.Animation;
 
 namespace BO2
 {
-    public sealed partial class MainWindow : Window
+    public sealed partial class MainWindow : Window, IDisposable
     {
         private readonly DispatcherTimer _refreshTimer;
         private readonly CancellationTokenSource _refreshCancellationTokenSource = new();
         private Task? _refreshTask;
         private bool _refreshPending;
         private int _cleanupRequested;
+        private int _disposeRequested;
         private readonly WidgetWindowManager _widgetWindowManager;
         private readonly AppPreferencesStore _preferencesStore = AppPreferencesStore.CreateDefault();
         private readonly AppPreferences _preferences;
@@ -140,7 +141,17 @@ namespace BO2
 
         private void OnClosed(object sender, WindowEventArgs args)
         {
+            Dispose();
+        }
+
+        public void Dispose()
+        {
             Closed -= OnClosed;
+            if (Interlocked.Exchange(ref _disposeRequested, 1) != 0)
+            {
+                return;
+            }
+
             if (_paneOpenChangedToken != 0)
             {
                 RootNavigationView.UnregisterPropertyChangedCallback(
@@ -156,6 +167,7 @@ namespace BO2
             _widgetWindowManager.SettingsChanged -= OnWidgetSettingsChanged;
             ViewModel.EventStatusUpdated -= OnEventStatusUpdated;
             _widgetWindowManager.Dispose();
+            GC.SuppressFinalize(this);
 
             Task? refreshTask = _refreshTask;
             if (refreshTask is null || refreshTask.IsCompleted)
