@@ -1,6 +1,6 @@
-using Microsoft.Windows.ApplicationModel.Resources;
 using System;
 using System.Globalization;
+using Microsoft.Windows.ApplicationModel.Resources;
 
 namespace BO2.Services
 {

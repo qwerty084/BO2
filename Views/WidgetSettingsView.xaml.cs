@@ -1,7 +1,7 @@
+using System;
 using BO2.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using System;
 
 namespace BO2.Views
 {
