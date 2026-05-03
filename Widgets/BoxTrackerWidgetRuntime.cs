@@ -17,9 +17,7 @@ namespace BO2.Widgets
             _nativeAdapter = nativeAdapter ?? throw new ArgumentNullException(nameof(nativeAdapter));
         }
 
-        public bool HasNativeWindow => _nativeWindow is not null;
-
-        public IBoxTrackerWidgetNativeWindow EnsureNativeWindow()
+        private IBoxTrackerWidgetNativeWindow EnsureNativeWindow()
         {
             if (_nativeWindow is null)
             {
@@ -82,7 +80,11 @@ namespace BO2.Widgets
 
             if (!settings.Enabled)
             {
-                _nativeWindow = null;
+                if (CloseNativeWindow(settings))
+                {
+                    PersistAndNotifySettingsChanged();
+                }
+
                 return;
             }
 

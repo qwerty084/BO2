@@ -15,7 +15,7 @@ namespace BO2.Tests.Widgets
 
             var runtime = new BoxTrackerWidgetRuntime(adapter);
 
-            Assert.False(runtime.HasNativeWindow);
+            Assert.NotNull(runtime);
             Assert.Equal(0, adapter.CreateWindowCallCount);
         }
 
@@ -28,8 +28,47 @@ namespace BO2.Tests.Widgets
 
             runtime.Restore(settings);
 
-            Assert.False(runtime.HasNativeWindow);
             Assert.Equal(0, adapter.CreateWindowCallCount);
+        }
+
+        [Fact]
+        public void Restore_WhenBoxTrackerDisabledAndWindowOpen_ClosesCapturesPersistsAndNotifies()
+        {
+            var adapter = new FakeBoxTrackerWidgetNativeAdapter();
+            var runtime = new BoxTrackerWidgetRuntime(adapter);
+            WidgetSettingsDocument document = WidgetSettingsDocument.CreateDefault();
+            WidgetSettings settings = document.GetWidget(WidgetKind.BoxTracker);
+            settings.Enabled = true;
+            var store = new WidgetSettingsStore(CreateSettingsPath());
+            runtime.Restore(settings);
+            FakeBoxTrackerWidgetNativeWindow window = Assert.IsType<FakeBoxTrackerWidgetNativeWindow>(
+                adapter.CreatedWindow);
+            settings.Enabled = false;
+            int persistCallCount = 0;
+            int notifyCallCount = 0;
+
+            runtime.Restore(
+                settings,
+                CreateStatus(),
+                () =>
+                {
+                    persistCallCount++;
+                    store.Save(document);
+                },
+                () => notifyCallCount++);
+
+            Assert.Equal(1, window.CapturePlacementCallCount);
+            Assert.Equal(1, window.CloseCallCount);
+            Assert.Equal(1, window.ClosedUnsubscriptionCount);
+            Assert.Equal(640, settings.X);
+            Assert.Equal(360, settings.Y);
+            Assert.Equal(1, persistCallCount);
+            Assert.Equal(1, notifyCallCount);
+
+            WidgetSettings persistedSettings = store.Load().GetWidget(WidgetKind.BoxTracker);
+            Assert.False(persistedSettings.Enabled);
+            Assert.Equal(640, persistedSettings.X);
+            Assert.Equal(360, persistedSettings.Y);
         }
 
         [Fact]
@@ -44,8 +83,8 @@ namespace BO2.Tests.Widgets
 
             FakeBoxTrackerWidgetNativeWindow window = Assert.IsType<FakeBoxTrackerWidgetNativeWindow>(
                 adapter.CreatedWindow);
-            Assert.True(runtime.HasNativeWindow);
             Assert.Equal(1, adapter.CreateWindowCallCount);
+            Assert.Equal(1, window.ClosedSubscriptionCount);
             Assert.Equal(1, window.ActivateCallCount);
             Assert.Same(settings, window.AppliedSettings);
         }
@@ -152,7 +191,6 @@ namespace BO2.Tests.Widgets
 
             FakeBoxTrackerWidgetNativeWindow window = Assert.IsType<FakeBoxTrackerWidgetNativeWindow>(
                 adapter.CreatedWindow);
-            Assert.True(runtime.HasNativeWindow);
             Assert.Equal(1, adapter.CreateWindowCallCount);
             Assert.Equal(1, window.UpdateTextCallCount);
             Assert.Equal(1, window.ActivateCallCount);
@@ -211,7 +249,6 @@ namespace BO2.Tests.Widgets
 
             runtime.ApplySettings(updatedSettings);
 
-            Assert.True(runtime.HasNativeWindow);
             Assert.Equal(1, adapter.CreateWindowCallCount);
             Assert.Equal(2, window.ApplySettingsCallCount);
             Assert.Same(updatedSettings, window.AppliedSettings);
@@ -250,9 +287,9 @@ namespace BO2.Tests.Widgets
                 },
                 () => notifyCallCount++);
 
-            Assert.False(runtime.HasNativeWindow);
             Assert.Equal(1, window.CapturePlacementCallCount);
             Assert.Equal(1, window.CloseCallCount);
+            Assert.Equal(1, window.ClosedUnsubscriptionCount);
             Assert.Equal(640, settings.X);
             Assert.Equal(360, settings.Y);
             Assert.Equal(1, persistCallCount);
@@ -311,7 +348,6 @@ namespace BO2.Tests.Widgets
                 adapter.CreatedWindow);
             Assert.True(changed);
             Assert.True(settings.Enabled);
-            Assert.True(runtime.HasNativeWindow);
             Assert.Equal(1, adapter.CreateWindowCallCount);
             Assert.Equal(1, window.UpdateTextCallCount);
             Assert.Equal(1, window.ActivateCallCount);
@@ -348,9 +384,9 @@ namespace BO2.Tests.Widgets
 
             Assert.True(changed);
             Assert.False(settings.Enabled);
-            Assert.False(runtime.HasNativeWindow);
             Assert.Equal(1, window.CapturePlacementCallCount);
             Assert.Equal(1, window.CloseCallCount);
+            Assert.Equal(1, window.ClosedUnsubscriptionCount);
             Assert.Equal(640, settings.X);
             Assert.Equal(360, settings.Y);
             Assert.Equal(1, persistCallCount);
@@ -385,15 +421,23 @@ namespace BO2.Tests.Widgets
 
             FakeBoxTrackerWidgetNativeWindow window = Assert.IsType<FakeBoxTrackerWidgetNativeWindow>(
                 adapter.CreatedWindow);
-            bool runtimeHadWindowDuringPlacementCapture = false;
-            window.CapturePlacementCallback = () => runtimeHadWindowDuringPlacementCapture = runtime.HasNativeWindow;
+            int updateTextCallCountBeforeClose = window.UpdateTextCallCount;
 
             window.SimulateManualClose();
+            runtime.UpdateEventStatus(CreateStatus(
+                new GameEvent(
+                    GameEventType.BoxEvent,
+                    "randomization_done",
+                    0,
+                    11,
+                    1160,
+                    new DateTimeOffset(2026, 4, 26, 12, 37, 56, TimeSpan.Zero),
+                    "galil_zm")));
 
-            Assert.True(runtimeHadWindowDuringPlacementCapture);
-            Assert.False(runtime.HasNativeWindow);
             Assert.False(settings.Enabled);
             Assert.Equal(1, window.CapturePlacementCallCount);
+            Assert.Equal(1, window.ClosedUnsubscriptionCount);
+            Assert.Equal(updateTextCallCountBeforeClose, window.UpdateTextCallCount);
             Assert.Equal(1, persistCallCount);
             Assert.Equal(1, notifyCallCount);
 
@@ -431,10 +475,10 @@ namespace BO2.Tests.Widgets
                 });
 
             Assert.True(closed);
-            Assert.False(runtime.HasNativeWindow);
             Assert.True(settings.Enabled);
             Assert.Equal(1, window.CapturePlacementCallCount);
             Assert.Equal(1, window.CloseCallCount);
+            Assert.Equal(1, window.ClosedUnsubscriptionCount);
             Assert.Equal(1, persistCallCount);
             Assert.Equal(0, notifyCallCount);
 
@@ -459,7 +503,6 @@ namespace BO2.Tests.Widgets
                 adapter.CreatedWindow);
             Assert.False(changed);
             Assert.True(settings.Enabled);
-            Assert.True(runtime.HasNativeWindow);
             Assert.Equal(1, adapter.CreateWindowCallCount);
             Assert.Equal(1, window.ActivateCallCount);
             Assert.Equal(1, persistCallCount);
@@ -477,24 +520,8 @@ namespace BO2.Tests.Widgets
 
             Assert.False(changed);
             Assert.False(settings.Enabled);
-            Assert.False(runtime.HasNativeWindow);
             Assert.Equal(0, adapter.CreateWindowCallCount);
             Assert.Equal(0, persistCallCount);
-        }
-
-        [Fact]
-        public void EnsureNativeWindow_CreatesWindowThroughAdapter()
-        {
-            var adapter = new FakeBoxTrackerWidgetNativeAdapter();
-            var runtime = new BoxTrackerWidgetRuntime(adapter);
-
-            IBoxTrackerWidgetNativeWindow window = runtime.EnsureNativeWindow();
-
-            Assert.True(runtime.HasNativeWindow);
-            Assert.Same(adapter.CreatedWindow, window);
-            Assert.Equal(1, adapter.CreateWindowCallCount);
-            FakeBoxTrackerWidgetNativeWindow fakeWindow = Assert.IsType<FakeBoxTrackerWidgetNativeWindow>(window);
-            Assert.Equal(1, fakeWindow.ClosedSubscriptionCount);
         }
 
         private static GameEventMonitorStatus CreateStatus(params GameEvent[] events)
@@ -586,8 +613,6 @@ namespace BO2.Tests.Widgets
 
             public WidgetSettings? AppliedSettingsSnapshot { get; private set; }
 
-            public Action? CapturePlacementCallback { get; set; }
-
             public void Activate()
             {
                 ActivateCallCount++;
@@ -615,7 +640,6 @@ namespace BO2.Tests.Widgets
             public void CapturePlacement(WidgetSettings settings)
             {
                 CapturePlacementCallCount++;
-                CapturePlacementCallback?.Invoke();
                 settings.X = 640;
                 settings.Y = 360;
             }
