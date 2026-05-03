@@ -20,14 +20,11 @@ namespace BO2.Tests.ViewModels
 
             viewModel.ApplySnapshot(new GameConnectionSnapshot(
                 detectedGame,
+                GameConnectionPhase.StatsOnlyDetected,
                 readResult,
-                GameEventMonitorStatus.WaitingForMonitor,
-                DllInjectionResult.NotAttempted,
-                IsConnecting: false,
-                IsDisconnecting: false,
-                CanAttemptConnect: true,
-                HasInjectionAttemptForCurrentGame: false,
-                IsMonitorConnectedForCurrentGame: false));
+                GameConnectionEventMonitorSummary.Waiting,
+                ConnectCommandAvailability: GameConnectionCommandAvailability.VisibleEnabled,
+                DisconnectCommandAvailability: GameConnectionCommandAvailability.Hidden));
 
             Assert.Equal("Steam Zombies", viewModel.DetectedGameText);
             Assert.Equal(1234.ToString("N0", CultureInfo.CurrentCulture), viewModel.PointsText);

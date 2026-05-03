@@ -111,17 +111,6 @@ namespace BO2.Services
             }
         }
 
-        private bool IsConnecting
-        {
-            get
-            {
-                lock (_syncRoot)
-                {
-                    return _lifecycle.IsConnecting;
-                }
-            }
-        }
-
         private bool IsDisconnecting
         {
             get
@@ -200,19 +189,10 @@ namespace BO2.Services
             return PublishSnapshot(result);
         }
 
-        internal bool IsMonitorConnectedFor(DetectedGame? detectedGame)
-        {
-            lock (_syncRoot)
-            {
-                return _lifecycle.IsMonitorConnectedFor(
-                    GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
-            }
-        }
-
         public GameConnectionSnapshot Connect()
         {
             GameConnectionRefreshResult connectingResult = BeginConnect();
-            if (!connectingResult.IsConnecting)
+            if (connectingResult.ConnectionPhase != GameConnectionPhase.Connecting)
             {
                 return CreateSnapshot(connectingResult);
             }
@@ -318,7 +298,12 @@ namespace BO2.Services
                 _eventMonitor.RequestStop(completion.StopRequest.MonitorProcessId);
             }
 
-            return ReadSnapshot(detectedGame, receivedAt);
+            return ReadSnapshot(
+                detectedGame,
+                receivedAt,
+                completion.StopRequest.ShouldRequestStop
+                    ? GameConnectionEventMonitorSummary.CleanupRequested
+                    : null);
         }
 
         private GameConnectionRefreshResult BeginDisconnect()
@@ -332,7 +317,9 @@ namespace BO2.Services
                 disconnectAction = _lifecycle.BeginDisconnect(receivedAt);
                 if (!disconnectAction.ShouldReadSnapshot)
                 {
-                    result = CreateDisconnectingSnapshotLocked(detectedGame);
+                    result = CreateDisconnectingSnapshotLocked(
+                        detectedGame,
+                        CreateEventMonitorSummaryOverride(disconnectAction.EventMonitorState));
                 }
             }
 
@@ -367,7 +354,9 @@ namespace BO2.Services
                 disconnectAction = _lifecycle.RefreshDisconnect();
                 if (!disconnectAction.ShouldReadSnapshot && !disconnectAction.ShouldCheckStopComplete)
                 {
-                    result = CreateDisconnectingSnapshotLocked(detectedGame);
+                    result = CreateDisconnectingSnapshotLocked(
+                        detectedGame,
+                        CreateEventMonitorSummaryOverride(disconnectAction.EventMonitorState));
                 }
             }
 
@@ -384,13 +373,18 @@ namespace BO2.Services
                         MonitorDisconnectTimeout);
                     if (!disconnectAction.ShouldReadSnapshot && !disconnectAction.ShouldCheckStopComplete)
                     {
-                        result = CreateDisconnectingSnapshotLocked(detectedGame);
+                        result = CreateDisconnectingSnapshotLocked(
+                            detectedGame,
+                            CreateEventMonitorSummaryOverride(disconnectAction.EventMonitorState));
                     }
                 }
             }
 
             return disconnectAction.ShouldReadSnapshot
-                ? ReadSnapshot(detectedGame, receivedAt)
+                ? ReadSnapshot(
+                    detectedGame,
+                    receivedAt,
+                    CreateEventMonitorSummaryOverride(disconnectAction.EventMonitorState))
                 : result!.Value;
         }
 
@@ -437,7 +431,8 @@ namespace BO2.Services
 
         private GameConnectionRefreshResult ReadSnapshot(
             DetectedGame? detectedGame,
-            DateTimeOffset receivedAt)
+            DateTimeOffset receivedAt,
+            GameConnectionEventMonitorSummary? eventMonitorSummaryOverride = null)
         {
             PlayerStatsReadResult? readResult = ReadPlayerStats(detectedGame);
             int? ownedMonitorProcessId;
@@ -470,7 +465,7 @@ namespace BO2.Services
                 }
 
                 stopRequest = ApplyMonitorReadinessTimeoutLocked(readResult?.DetectedGame, eventStatus, receivedAt);
-                result = CreateRefreshResultLocked(detectedGame, readResult, eventStatus);
+                result = CreateRefreshResultLocked(detectedGame, readResult, eventStatus, eventMonitorSummaryOverride);
             }
 
             if (stopRequest.ShouldRequestStop)
@@ -512,7 +507,11 @@ namespace BO2.Services
                     currentLifecycleGame,
                     detectedLifecycleGame);
                 snapshotChangedArgs = UpdateSnapshotLocked(
-                    CreateSnapshot(CreateStatusSnapshotLocked(detectedGame)));
+                    CreateSnapshot(CreateStatusSnapshotLocked(
+                        detectedGame,
+                        stopRequest.ShouldRequestStop
+                            ? GameConnectionEventMonitorSummary.CleanupRequested
+                            : null)));
             }
 
             if (stopRequest.ShouldRequestStop)
@@ -567,14 +566,20 @@ namespace BO2.Services
             GameConnectionSnapshot right)
         {
             return Equals(left.CurrentGame, right.CurrentGame)
+                && left.ConnectionPhase == right.ConnectionPhase
                 && Equals(left.ReadResult, right.ReadResult)
-                && Equals(left.InjectionResult, right.InjectionResult)
-                && left.IsConnecting == right.IsConnecting
-                && left.IsDisconnecting == right.IsDisconnecting
-                && left.CanAttemptConnect == right.CanAttemptConnect
-                && left.HasInjectionAttemptForCurrentGame == right.HasInjectionAttemptForCurrentGame
-                && left.IsMonitorConnectedForCurrentGame == right.IsMonitorConnectedForCurrentGame
-                && HasSameEventStatus(left.EventStatus, right.EventStatus);
+                && left.ConnectCommandAvailability == right.ConnectCommandAvailability
+                && left.DisconnectCommandAvailability == right.DisconnectCommandAvailability
+                && HasSameEventMonitorSummary(left.EventMonitorSummary, right.EventMonitorSummary);
+        }
+
+        private static bool HasSameEventMonitorSummary(
+            GameConnectionEventMonitorSummary left,
+            GameConnectionEventMonitorSummary right)
+        {
+            return left.State == right.State
+                && left.FailureMessage == right.FailureMessage
+                && HasSameEventStatus(left.Status, right.Status);
         }
 
         private static bool HasSameEventStatus(
@@ -611,77 +616,211 @@ namespace BO2.Services
             return exception is InvalidOperationException or Win32Exception;
         }
 
-        private GameConnectionRefreshResult CreateStatusSnapshotLocked(DetectedGame? detectedGame)
+        private static GameConnectionEventMonitorSummary? CreateEventMonitorSummaryOverride(
+            GameConnectionEventMonitorState? state)
         {
-            return CreateRefreshResultLocked(
-                detectedGame,
-                null,
-                GameEventMonitorStatus.WaitingForMonitor);
+            return state switch
+            {
+                GameConnectionEventMonitorState.Disconnecting => GameConnectionEventMonitorSummary.Disconnecting,
+                GameConnectionEventMonitorState.StopPending => GameConnectionEventMonitorSummary.StopPending,
+                GameConnectionEventMonitorState.StopCompleted => GameConnectionEventMonitorSummary.StopCompleted,
+                GameConnectionEventMonitorState.StopTimedOut => GameConnectionEventMonitorSummary.StopTimedOut,
+                GameConnectionEventMonitorState.CleanupRequested => GameConnectionEventMonitorSummary.CleanupRequested,
+                _ => null
+            };
         }
 
-        private GameConnectionRefreshResult CreateDisconnectingSnapshotLocked(DetectedGame? detectedGame)
+        private GameConnectionRefreshResult CreateStatusSnapshotLocked(
+            DetectedGame? detectedGame,
+            GameConnectionEventMonitorSummary? eventMonitorSummaryOverride = null)
         {
             return CreateRefreshResultLocked(
                 detectedGame,
                 null,
-                GameEventMonitorStatus.WaitingForMonitor);
+                GameEventMonitorStatus.WaitingForMonitor,
+                eventMonitorSummaryOverride);
+        }
+
+        private GameConnectionRefreshResult CreateDisconnectingSnapshotLocked(
+            DetectedGame? detectedGame,
+            GameConnectionEventMonitorSummary? eventMonitorSummaryOverride)
+        {
+            return CreateRefreshResultLocked(
+                detectedGame,
+                null,
+                GameEventMonitorStatus.WaitingForMonitor,
+                eventMonitorSummaryOverride ?? GameConnectionEventMonitorSummary.Disconnecting);
         }
 
         private GameConnectionRefreshResult CreateRefreshResultLocked(
             DetectedGame? detectedGame,
             PlayerStatsReadResult? readResult,
-            GameEventMonitorStatus eventStatus)
+            GameEventMonitorStatus eventStatus,
+            GameConnectionEventMonitorSummary? eventMonitorSummaryOverride = null)
         {
             GameConnectionSessionLifecycleSnapshot lifecycleSnapshot = _lifecycle.CreateSnapshot(
                 GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
+            GameConnectionPhase connectionPhase = DetermineConnectionPhase(detectedGame, readResult, lifecycleSnapshot);
+            GameConnectionSessionCommandAvailability commandAvailability = CreateCommandAvailability(
+                connectionPhase,
+                lifecycleSnapshot);
+            GameConnectionEventMonitorSummary eventMonitorSummary = CreateEventMonitorSummary(
+                lifecycleSnapshot,
+                eventStatus,
+                eventMonitorSummaryOverride);
             return new GameConnectionRefreshResult(
                 detectedGame,
+                connectionPhase,
                 readResult,
-                eventStatus,
-                lifecycleSnapshot.InjectionResult,
-                lifecycleSnapshot.IsConnecting,
-                lifecycleSnapshot.IsDisconnecting,
-                lifecycleSnapshot.CanAttemptConnect,
-                lifecycleSnapshot.HasInjectionAttemptForCurrentGame,
-                lifecycleSnapshot.IsMonitorConnectedForCurrentGame);
+                eventMonitorSummary,
+                commandAvailability.Connect,
+                commandAvailability.Disconnect);
+        }
+
+        private static GameConnectionSessionCommandAvailability CreateCommandAvailability(
+            GameConnectionPhase connectionPhase,
+            GameConnectionSessionLifecycleSnapshot lifecycleSnapshot)
+        {
+            GameConnectionCommandAvailability connect = connectionPhase switch
+            {
+                GameConnectionPhase.Connected or GameConnectionPhase.Disconnecting => GameConnectionCommandAvailability.Hidden,
+                _ when lifecycleSnapshot.CanAttemptConnect => GameConnectionCommandAvailability.VisibleEnabled,
+                _ => GameConnectionCommandAvailability.VisibleDisabled
+            };
+
+            GameConnectionCommandAvailability disconnect = connectionPhase == GameConnectionPhase.Connected
+                ? GameConnectionCommandAvailability.VisibleEnabled
+                : GameConnectionCommandAvailability.Hidden;
+
+            return new GameConnectionSessionCommandAvailability(connect, disconnect);
+        }
+
+        private static GameConnectionEventMonitorSummary CreateEventMonitorSummary(
+            GameConnectionSessionLifecycleSnapshot lifecycleSnapshot,
+            GameEventMonitorStatus eventStatus,
+            GameConnectionEventMonitorSummary? eventMonitorSummaryOverride)
+        {
+            if (eventMonitorSummaryOverride is not null)
+            {
+                return eventMonitorSummaryOverride;
+            }
+
+            if (lifecycleSnapshot.IsConnecting)
+            {
+                return GameConnectionEventMonitorSummary.Connecting;
+            }
+
+            if (lifecycleSnapshot.IsDisconnecting)
+            {
+                return GameConnectionEventMonitorSummary.Disconnecting;
+            }
+
+            if (lifecycleSnapshot.HasMonitorReadinessFailureForCurrentGame)
+            {
+                return GameConnectionEventMonitorSummary.ReadinessFailed(
+                    lifecycleSnapshot.InjectionResult.Message);
+            }
+
+            if (!lifecycleSnapshot.IsMonitorConnectedForCurrentGame)
+            {
+                if (lifecycleSnapshot.HasInjectionAttemptForCurrentGame
+                    && lifecycleSnapshot.InjectionResult.State != DllInjectionState.NotAttempted)
+                {
+                    return GameConnectionEventMonitorSummary.LoadingFailed(
+                        lifecycleSnapshot.InjectionResult.Message);
+                }
+
+                return GameConnectionEventMonitorSummary.Waiting;
+            }
+
+            return GameConnectionEventMonitorSummary.FromStatus(eventStatus);
+        }
+
+        private static GameConnectionPhase DetermineConnectionPhase(
+            DetectedGame? detectedGame,
+            PlayerStatsReadResult? readResult,
+            GameConnectionSessionLifecycleSnapshot lifecycleSnapshot)
+        {
+            if (detectedGame is null)
+            {
+                return GameConnectionPhase.NoGame;
+            }
+
+            if (!detectedGame.IsStatsSupported)
+            {
+                return GameConnectionPhase.UnsupportedGame;
+            }
+
+            if (lifecycleSnapshot.IsDisconnecting)
+            {
+                return GameConnectionPhase.Disconnecting;
+            }
+
+            if (lifecycleSnapshot.IsConnecting)
+            {
+                return GameConnectionPhase.Connecting;
+            }
+
+            if (lifecycleSnapshot.IsMonitorConnectedForCurrentGame)
+            {
+                return GameConnectionPhase.Connected;
+            }
+
+            return readResult is not null
+                && readResult.DetectedGame.ProcessId == detectedGame.ProcessId
+                && readResult.Stats is not null
+                    ? GameConnectionPhase.StatsOnlyDetected
+                    : GameConnectionPhase.Detected;
         }
 
         private static GameConnectionSnapshot CreateSnapshot(GameConnectionRefreshResult result)
         {
             return new GameConnectionSnapshot(
                 result.CurrentGame,
+                result.ConnectionPhase,
                 result.ReadResult,
-                result.EventStatus,
-                result.InjectionResult,
-                result.IsConnecting,
-                result.IsDisconnecting,
-                result.CanAttemptConnect,
-                result.HasInjectionAttemptForCurrentGame,
-                result.IsMonitorConnectedForCurrentGame);
+                result.EventMonitorSummary,
+                result.ConnectCommandAvailability,
+                result.DisconnectCommandAvailability);
         }
 
         private readonly record struct GameConnectionRefreshResult(
             DetectedGame? CurrentGame,
+            GameConnectionPhase ConnectionPhase,
             PlayerStatsReadResult? ReadResult,
-            GameEventMonitorStatus EventStatus,
-            DllInjectionResult InjectionResult,
-            bool IsConnecting,
-            bool IsDisconnecting,
-            bool CanAttemptConnect,
-            bool HasInjectionAttemptForCurrentGame,
-            bool IsMonitorConnectedForCurrentGame);
+            GameConnectionEventMonitorSummary EventMonitorSummary,
+            GameConnectionCommandAvailability ConnectCommandAvailability,
+            GameConnectionCommandAvailability DisconnectCommandAvailability);
     }
+
+    internal readonly record struct GameConnectionCommandAvailability(
+        bool IsEnabled,
+        bool IsVisible)
+    {
+        public static GameConnectionCommandAvailability Hidden { get; } = new(
+            IsEnabled: false,
+            IsVisible: false);
+
+        public static GameConnectionCommandAvailability VisibleDisabled { get; } = new(
+            IsEnabled: false,
+            IsVisible: true);
+
+        public static GameConnectionCommandAvailability VisibleEnabled { get; } = new(
+            IsEnabled: true,
+            IsVisible: true);
+    }
+
+    internal readonly record struct GameConnectionSessionCommandAvailability(
+        GameConnectionCommandAvailability Connect,
+        GameConnectionCommandAvailability Disconnect);
 
     internal readonly record struct GameConnectionSnapshot(
         DetectedGame? CurrentGame,
+        GameConnectionPhase ConnectionPhase,
         PlayerStatsReadResult? ReadResult,
-        GameEventMonitorStatus EventStatus,
-        DllInjectionResult InjectionResult,
-        bool IsConnecting,
-        bool IsDisconnecting,
-        bool CanAttemptConnect,
-        bool HasInjectionAttemptForCurrentGame,
-        bool IsMonitorConnectedForCurrentGame);
+        GameConnectionEventMonitorSummary EventMonitorSummary,
+        GameConnectionCommandAvailability ConnectCommandAvailability,
+        GameConnectionCommandAvailability DisconnectCommandAvailability);
 
     internal sealed class GameConnectionSnapshotChangedEventArgs(
         GameConnectionSnapshot previousSnapshot,

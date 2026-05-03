@@ -9,6 +9,7 @@ namespace BO2.Services
         private DllInjectionResult _lastInjectionResult = DllInjectionResult.NotAttempted;
         private int? _lastInjectionProcessId;
         private DateTimeOffset? _lastInjectionAttemptedAt;
+        private bool _hasMonitorReadinessFailure;
         private GameConnectionSessionLifecycleGame? _connectTargetGame;
         private int? _disconnectProcessId;
         private DateTimeOffset? _disconnectRequestedAt;
@@ -66,6 +67,7 @@ namespace BO2.Services
                 _lastInjectionAttemptedAt = IsMonitorLoadedInjectionState(injectionResult.State)
                     ? receivedAt
                     : null;
+                _hasMonitorReadinessFailure = false;
             }
 
             _connectTargetGame = null;
@@ -178,10 +180,16 @@ namespace BO2.Services
                 return GameConnectionSessionDisconnectRefreshAction.ReadSnapshot;
             }
 
-            if (isStopComplete || HasDisconnectTimedOut(receivedAt, disconnectTimeout))
+            if (isStopComplete)
             {
                 ResetMonitorConnectionState(requestStop: false);
-                return GameConnectionSessionDisconnectRefreshAction.ReadSnapshot;
+                return GameConnectionSessionDisconnectRefreshAction.StopCompleted;
+            }
+
+            if (HasDisconnectTimedOut(receivedAt, disconnectTimeout))
+            {
+                ResetMonitorConnectionState(requestStop: false);
+                return GameConnectionSessionDisconnectRefreshAction.StopTimedOut;
             }
 
             return GameConnectionSessionDisconnectRefreshAction.CreateDisconnectingSnapshot(monitorProcessId);
@@ -197,6 +205,7 @@ namespace BO2.Services
             _lastInjectionProcessId = null;
             _lastInjectionAttemptedAt = null;
             _lastInjectionResult = DllInjectionResult.NotAttempted;
+            _hasMonitorReadinessFailure = false;
             return new GameConnectionSessionMonitorStopRequest(
                 monitorProcessId,
                 requestStop && !stopAlreadyRequested && monitorProcessId is not null);
@@ -233,6 +242,7 @@ namespace BO2.Services
                 DllInjectionState.Failed,
                 timeoutMessage);
             _lastInjectionAttemptedAt = null;
+            _hasMonitorReadinessFailure = true;
             return new GameConnectionSessionMonitorStopRequest(monitorProcessId, ShouldRequestStop: true);
         }
 
@@ -245,7 +255,8 @@ namespace BO2.Services
                 _isDisconnecting,
                 CanAttemptConnect(detectedGame),
                 HasInjectionAttemptFor(detectedGame),
-                IsMonitorConnectedFor(detectedGame));
+                IsMonitorConnectedFor(detectedGame),
+                HasMonitorReadinessFailureFor(detectedGame));
         }
 
         public bool IsMonitorConnectedFor(GameConnectionSessionLifecycleGame? detectedGame)
@@ -270,6 +281,13 @@ namespace BO2.Services
             return detectedGame is GameConnectionSessionLifecycleGame game
                 && _lastInjectionProcessId == game.ProcessId
                 && _lastInjectionResult.State != DllInjectionState.NotAttempted;
+        }
+
+        private bool HasMonitorReadinessFailureFor(GameConnectionSessionLifecycleGame? detectedGame)
+        {
+            return detectedGame is GameConnectionSessionLifecycleGame game
+                && _lastInjectionProcessId == game.ProcessId
+                && _hasMonitorReadinessFailure;
         }
 
         private bool IsMonitorLoaded => IsMonitorLoadedInjectionState(_lastInjectionResult.State);
@@ -308,7 +326,8 @@ namespace BO2.Services
         bool IsDisconnecting,
         bool CanAttemptConnect,
         bool HasInjectionAttemptForCurrentGame,
-        bool IsMonitorConnectedForCurrentGame);
+        bool IsMonitorConnectedForCurrentGame,
+        bool HasMonitorReadinessFailureForCurrentGame);
 
     internal readonly record struct GameConnectionSessionConnectCompletion(
         bool IsTargetMatch,
@@ -326,43 +345,62 @@ namespace BO2.Services
     internal readonly record struct GameConnectionSessionDisconnectAction(
         bool ShouldReadSnapshot,
         bool ShouldRequestStop,
-        int? MonitorProcessId)
+        int? MonitorProcessId,
+        GameConnectionEventMonitorState? EventMonitorState)
     {
         public static GameConnectionSessionDisconnectAction ReadSnapshot { get; } = new(
             ShouldReadSnapshot: true,
             ShouldRequestStop: false,
-            MonitorProcessId: null);
+            MonitorProcessId: null,
+            EventMonitorState: null);
 
         public static GameConnectionSessionDisconnectAction CreateDisconnectingSnapshot { get; } = new(
             ShouldReadSnapshot: false,
             ShouldRequestStop: false,
-            MonitorProcessId: null);
+            MonitorProcessId: null,
+            EventMonitorState: GameConnectionEventMonitorState.Disconnecting);
 
         public static GameConnectionSessionDisconnectAction RequestStop(int monitorProcessId)
         {
             return new GameConnectionSessionDisconnectAction(
                 ShouldReadSnapshot: false,
                 ShouldRequestStop: true,
-                monitorProcessId);
+                monitorProcessId,
+                GameConnectionEventMonitorState.Disconnecting);
         }
     }
 
     internal readonly record struct GameConnectionSessionDisconnectRefreshAction(
         bool ShouldReadSnapshot,
         bool ShouldCheckStopComplete,
-        int? MonitorProcessId)
+        int? MonitorProcessId,
+        GameConnectionEventMonitorState? EventMonitorState)
     {
         public static GameConnectionSessionDisconnectRefreshAction ReadSnapshot { get; } = new(
             ShouldReadSnapshot: true,
             ShouldCheckStopComplete: false,
-            MonitorProcessId: null);
+            MonitorProcessId: null,
+            EventMonitorState: null);
+
+        public static GameConnectionSessionDisconnectRefreshAction StopCompleted { get; } = new(
+            ShouldReadSnapshot: true,
+            ShouldCheckStopComplete: false,
+            MonitorProcessId: null,
+            EventMonitorState: GameConnectionEventMonitorState.StopCompleted);
+
+        public static GameConnectionSessionDisconnectRefreshAction StopTimedOut { get; } = new(
+            ShouldReadSnapshot: true,
+            ShouldCheckStopComplete: false,
+            MonitorProcessId: null,
+            EventMonitorState: GameConnectionEventMonitorState.StopTimedOut);
 
         public static GameConnectionSessionDisconnectRefreshAction CreateDisconnectingSnapshot(int monitorProcessId)
         {
             return new GameConnectionSessionDisconnectRefreshAction(
                 ShouldReadSnapshot: false,
                 ShouldCheckStopComplete: false,
-                monitorProcessId);
+                monitorProcessId,
+                GameConnectionEventMonitorState.StopPending);
         }
 
         public static GameConnectionSessionDisconnectRefreshAction CheckStopComplete(int monitorProcessId)
@@ -370,7 +408,8 @@ namespace BO2.Services
             return new GameConnectionSessionDisconnectRefreshAction(
                 ShouldReadSnapshot: false,
                 ShouldCheckStopComplete: true,
-                monitorProcessId);
+                monitorProcessId,
+                null);
         }
     }
 }

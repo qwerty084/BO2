@@ -197,6 +197,7 @@
                             HorizontalAlignment="Stretch"
                             Click="OnDisconnectButtonClick"
                             Content="{x:Bind ViewModel.DisconnectButtonText, Mode=OneWay}"
+                            IsEnabled="{x:Bind ViewModel.IsDisconnectButtonEnabled, Mode=OneWay}"
                             Style="{StaticResource BO2DangerButtonStyle}"
                             Visibility="{x:Bind ViewModel.DisconnectButtonVisibility, Mode=OneWay}">
                             <Button.Resources>

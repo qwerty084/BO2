@@ -7,7 +7,7 @@ using Windows.UI;
 
 namespace BO2.Widgets
 {
-    internal sealed class BoxTrackerWidgetWindow
+    internal sealed class BoxTrackerWidgetWindow : IBoxTrackerWidgetNativeWindow
     {
         private const string WindowClassName = "BO2BoxTrackerWidgetWindow";
         private const string WindowTitle = "Box Tracker";
@@ -378,11 +378,16 @@ namespace BO2.Widgets
             }
 
             nint windowHandle = _windowHandle;
-            s_windows.TryRemove(windowHandle, out _);
-
-            _windowHandle = nint.Zero;
-            _closed = true;
-            Closed?.Invoke(this, EventArgs.Empty);
+            try
+            {
+                Closed?.Invoke(this, EventArgs.Empty);
+            }
+            finally
+            {
+                s_windows.TryRemove(windowHandle, out _);
+                _windowHandle = nint.Zero;
+                _closed = true;
+            }
         }
 
         private void Invalidate()

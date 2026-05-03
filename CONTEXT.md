@@ -24,6 +24,14 @@ _Avoid_: injector, hook
 A read-only sample of confirmed player stat and candidate addresses from the current **Detected Game**.
 _Avoid_: polling update, refresh
 
+**Box Tracker Widget**:
+A user-enabled overlay window that displays recent box events from the current **Event Monitor** outside the main app shell.
+_Avoid_: overlay, native widget window
+
+**Box Tracker Widget Runtime**:
+The app-owned widget module that reconciles **Box Tracker Widget** settings, current **Event Monitor** state, settings persistence, and the native widget adapter.
+_Avoid_: widget manager, overlay service
+
 ## Relationships
 
 - A **Game Connection Session** has zero or one current **Detected Game**.
@@ -31,6 +39,8 @@ _Avoid_: polling update, refresh
 - A **Game Connection Session** exposes one current **Game Connection Snapshot** at a time.
 - A **Player Stats Read** belongs to exactly one **Detected Game** when Steam Zombies is supported.
 - An **Event Monitor** can provide event data only after the **Game Connection Session** connects to Steam Zombies.
+- A **Box Tracker Widget** displays recent box events from the current **Event Monitor**.
+- A **Box Tracker Widget Runtime** owns the lifecycle of zero or one visible **Box Tracker Widget**.
 
 ## Example Dialogue
 
