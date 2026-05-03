@@ -7,7 +7,7 @@ using Windows.UI;
 
 namespace BO2.Widgets
 {
-    internal sealed class BoxTrackerWidgetWindow
+    internal sealed class BoxTrackerWidgetWindow : IBoxTrackerWidgetNativeWindow
     {
         private const string WindowClassName = "BO2BoxTrackerWidgetWindow";
         private const string WindowTitle = "Box Tracker";
