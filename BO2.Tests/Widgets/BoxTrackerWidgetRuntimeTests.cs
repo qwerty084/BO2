@@ -195,6 +195,89 @@ namespace BO2.Tests.Widgets
         }
 
         [Fact]
+        public void ManualClose_WhenWindowOpen_CapturesPlacementDisablesPersistsAndNotifies()
+        {
+            var adapter = new FakeBoxTrackerWidgetNativeAdapter();
+            var runtime = new BoxTrackerWidgetRuntime(adapter);
+            WidgetSettingsDocument document = WidgetSettingsDocument.CreateDefault();
+            WidgetSettings settings = document.GetWidget(WidgetKind.BoxTracker);
+            settings.Enabled = true;
+            var store = new WidgetSettingsStore(CreateSettingsPath());
+            int persistCallCount = 0;
+            int notifyCallCount = 0;
+
+            runtime.Restore(
+                settings,
+                CreateStatus(),
+                () =>
+                {
+                    persistCallCount++;
+                    store.Save(document);
+                },
+                () => notifyCallCount++);
+
+            FakeBoxTrackerWidgetNativeWindow window = Assert.IsType<FakeBoxTrackerWidgetNativeWindow>(
+                adapter.CreatedWindow);
+            bool runtimeHadWindowDuringPlacementCapture = false;
+            window.CapturePlacementCallback = () => runtimeHadWindowDuringPlacementCapture = runtime.HasNativeWindow;
+
+            window.SimulateManualClose();
+
+            Assert.True(runtimeHadWindowDuringPlacementCapture);
+            Assert.False(runtime.HasNativeWindow);
+            Assert.False(settings.Enabled);
+            Assert.Equal(1, window.CapturePlacementCallCount);
+            Assert.Equal(1, persistCallCount);
+            Assert.Equal(1, notifyCallCount);
+
+            WidgetSettings persistedSettings = store.Load().GetWidget(WidgetKind.BoxTracker);
+            Assert.False(persistedSettings.Enabled);
+            Assert.Equal(640, persistedSettings.X);
+            Assert.Equal(360, persistedSettings.Y);
+        }
+
+        [Fact]
+        public void Shutdown_WhenWindowOpen_CapturesPlacementPersistsClosesAndKeepsEnabled()
+        {
+            var adapter = new FakeBoxTrackerWidgetNativeAdapter();
+            var runtime = new BoxTrackerWidgetRuntime(adapter);
+            WidgetSettingsDocument document = WidgetSettingsDocument.CreateDefault();
+            WidgetSettings settings = document.GetWidget(WidgetKind.BoxTracker);
+            settings.Enabled = true;
+            var store = new WidgetSettingsStore(CreateSettingsPath());
+            int persistCallCount = 0;
+            int notifyCallCount = 0;
+            runtime.Restore(
+                settings,
+                CreateStatus(),
+                () => store.Save(document),
+                () => notifyCallCount++);
+            FakeBoxTrackerWidgetNativeWindow window = Assert.IsType<FakeBoxTrackerWidgetNativeWindow>(
+                adapter.CreatedWindow);
+
+            bool closed = runtime.Shutdown(
+                settings,
+                () =>
+                {
+                    persistCallCount++;
+                    store.Save(document);
+                });
+
+            Assert.True(closed);
+            Assert.False(runtime.HasNativeWindow);
+            Assert.True(settings.Enabled);
+            Assert.Equal(1, window.CapturePlacementCallCount);
+            Assert.Equal(1, window.CloseCallCount);
+            Assert.Equal(1, persistCallCount);
+            Assert.Equal(0, notifyCallCount);
+
+            WidgetSettings persistedSettings = store.Load().GetWidget(WidgetKind.BoxTracker);
+            Assert.True(persistedSettings.Enabled);
+            Assert.Equal(640, persistedSettings.X);
+            Assert.Equal(360, persistedSettings.Y);
+        }
+
+        [Fact]
         public void SetEnabled_WhenAlreadyEnabled_DoesNotCreateDuplicateWindowOrPersistAgain()
         {
             var adapter = new FakeBoxTrackerWidgetNativeAdapter();
@@ -243,6 +326,8 @@ namespace BO2.Tests.Widgets
             Assert.True(runtime.HasNativeWindow);
             Assert.Same(adapter.CreatedWindow, window);
             Assert.Equal(1, adapter.CreateWindowCallCount);
+            FakeBoxTrackerWidgetNativeWindow fakeWindow = Assert.IsType<FakeBoxTrackerWidgetNativeWindow>(window);
+            Assert.Equal(1, fakeWindow.ClosedSubscriptionCount);
         }
 
         private static GameEventMonitorStatus CreateStatus(params GameEvent[] events)
@@ -280,11 +365,30 @@ namespace BO2.Tests.Widgets
 
         private sealed class FakeBoxTrackerWidgetNativeWindow : IBoxTrackerWidgetNativeWindow
         {
-            public event EventHandler? Closed;
+            private EventHandler? _closed;
+
+            public event EventHandler? Closed
+            {
+                add
+                {
+                    ClosedSubscriptionCount++;
+                    _closed += value;
+                }
+
+                remove
+                {
+                    ClosedUnsubscriptionCount++;
+                    _closed -= value;
+                }
+            }
 
             public int ActivateCallCount { get; private set; }
 
             public int CapturePlacementCallCount { get; private set; }
+
+            public int ClosedSubscriptionCount { get; private set; }
+
+            public int ClosedUnsubscriptionCount { get; private set; }
 
             public int CloseCallCount { get; private set; }
 
@@ -294,6 +398,8 @@ namespace BO2.Tests.Widgets
 
             public WidgetSettings? AppliedSettings { get; private set; }
 
+            public Action? CapturePlacementCallback { get; set; }
+
             public void Activate()
             {
                 ActivateCallCount++;
@@ -302,7 +408,7 @@ namespace BO2.Tests.Widgets
             public void Close()
             {
                 CloseCallCount++;
-                Closed?.Invoke(this, EventArgs.Empty);
+                _closed?.Invoke(this, EventArgs.Empty);
             }
 
             public void UpdateText(string text)
@@ -319,8 +425,14 @@ namespace BO2.Tests.Widgets
             public void CapturePlacement(WidgetSettings settings)
             {
                 CapturePlacementCallCount++;
+                CapturePlacementCallback?.Invoke();
                 settings.X = 640;
                 settings.Y = 360;
+            }
+
+            public void SimulateManualClose()
+            {
+                _closed?.Invoke(this, EventArgs.Empty);
             }
         }
     }

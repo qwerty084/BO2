@@ -377,12 +377,13 @@ namespace BO2.Widgets
                 return;
             }
 
+            Closed?.Invoke(this, EventArgs.Empty);
+
             nint windowHandle = _windowHandle;
             s_windows.TryRemove(windowHandle, out _);
 
             _windowHandle = nint.Zero;
             _closed = true;
-            Closed?.Invoke(this, EventArgs.Empty);
         }
 
         private void Invalidate()

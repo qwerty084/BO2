@@ -8,9 +8,7 @@ namespace BO2.Widgets
         private readonly WidgetSettingsStore _settingsStore;
         private readonly WidgetSettingsDocument _settingsDocument;
         private readonly BoxTrackerWidgetRuntime _boxTrackerRuntime;
-        private BoxTrackerWidgetWindow? _boxTrackerWindow;
         private GameEventMonitorStatus _latestEventStatus = GameEventMonitorStatus.WaitingForMonitor;
-        private bool _isShuttingDown;
 
         public WidgetWindowManager()
             : this(WidgetSettingsStore.CreateDefault())
@@ -41,7 +39,11 @@ namespace BO2.Widgets
 
         public void RestoreEnabledWidgets()
         {
-            _boxTrackerRuntime.Restore(BoxTrackerSettings, _latestEventStatus);
+            _boxTrackerRuntime.Restore(
+                BoxTrackerSettings,
+                _latestEventStatus,
+                SaveSettings,
+                NotifySettingsChanged);
         }
 
         public void UpdateEventStatus(GameEventMonitorStatus eventStatus)
@@ -50,14 +52,17 @@ namespace BO2.Widgets
 
             _latestEventStatus = eventStatus;
             _boxTrackerRuntime.UpdateEventStatus(eventStatus);
-            _boxTrackerWindow?.UpdateText(GameEventFormatter.FormatBoxTrackerEvents(eventStatus));
         }
 
         public void SetBoxTrackerEnabled(bool enabled)
         {
-            if (_boxTrackerRuntime.SetEnabled(BoxTrackerSettings, enabled, SaveSettings))
+            if (_boxTrackerRuntime.SetEnabled(
+                BoxTrackerSettings,
+                enabled,
+                SaveSettings,
+                NotifySettingsChanged))
             {
-                SettingsChanged?.Invoke(this, EventArgs.Empty);
+                NotifySettingsChanged();
             }
         }
 
@@ -65,93 +70,28 @@ namespace BO2.Widgets
         {
             settings.Normalize();
             _settingsDocument.SetWidget(WidgetKind.BoxTracker, settings);
-            if (settings.Enabled)
-            {
-                OpenBoxTracker();
-                _boxTrackerWindow?.ApplySettings(settings);
-            }
-            else
-            {
-                CloseBoxTracker(disable: false);
-            }
+            _boxTrackerRuntime.ApplySettings(
+                BoxTrackerSettings,
+                SaveSettings,
+                NotifySettingsChanged);
 
             SaveSettings();
-            SettingsChanged?.Invoke(this, EventArgs.Empty);
+            NotifySettingsChanged();
         }
 
         public void Dispose()
         {
-            _isShuttingDown = true;
-            CaptureOpenWindowPlacement();
-            SaveSettings();
-            _boxTrackerWindow?.Close();
-            _boxTrackerWindow = null;
-        }
-
-        private void OpenBoxTracker()
-        {
-            if (_boxTrackerWindow is not null)
-            {
-                return;
-            }
-
-            WidgetSettings settings = BoxTrackerSettings;
-            _boxTrackerWindow = new BoxTrackerWidgetWindow();
-            _boxTrackerWindow.Closed += OnBoxTrackerClosed;
-            _boxTrackerWindow.UpdateText(GameEventFormatter.FormatBoxTrackerEvents(_latestEventStatus));
-            _boxTrackerWindow.Activate();
-            _boxTrackerWindow.ApplySettings(settings);
-        }
-
-        private void CloseBoxTracker(bool disable)
-        {
-            if (_boxTrackerWindow is null)
-            {
-                if (disable)
-                {
-                    BoxTrackerSettings.Enabled = false;
-                }
-
-                return;
-            }
-
-            BoxTrackerWidgetWindow window = _boxTrackerWindow;
-            window.CapturePlacement(BoxTrackerSettings);
-            _boxTrackerWindow = null;
-            window.Closed -= OnBoxTrackerClosed;
-            if (disable)
-            {
-                BoxTrackerSettings.Enabled = false;
-            }
-
-            window.Close();
-        }
-
-        private void OnBoxTrackerClosed(object? sender, EventArgs args)
-        {
-            if (sender is BoxTrackerWidgetWindow window)
-            {
-                window.CapturePlacement(BoxTrackerSettings);
-                window.Closed -= OnBoxTrackerClosed;
-            }
-
-            _boxTrackerWindow = null;
-            if (!_isShuttingDown)
-            {
-                BoxTrackerSettings.Enabled = false;
-                SaveSettings();
-                SettingsChanged?.Invoke(this, EventArgs.Empty);
-            }
-        }
-
-        private void CaptureOpenWindowPlacement()
-        {
-            _boxTrackerWindow?.CapturePlacement(BoxTrackerSettings);
+            _boxTrackerRuntime.Shutdown(BoxTrackerSettings, SaveSettings);
         }
 
         private void SaveSettings()
         {
             _settingsStore.Save(_settingsDocument);
+        }
+
+        private void NotifySettingsChanged()
+        {
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 }
