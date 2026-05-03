@@ -27,6 +27,7 @@ namespace BO2.Services
                 snapshot.HasInjectionAttemptForCurrentGame,
                 snapshot.IsMonitorConnectedForCurrentGame);
             UpdateConnectButtonState(projection, snapshot);
+            ApplyCommandAvailability(projection, snapshot);
             return projection;
         }
 
@@ -274,14 +275,6 @@ namespace BO2.Services
                 ConnectionState.Disconnecting,
                 isConnecting: false,
                 isDisconnecting: true);
-            UpdateConnectButtonState(
-                projection,
-                detectedGame,
-                GameConnectionPhase.Disconnecting,
-                canAttemptConnect: false,
-                isConnecting: false,
-                isDisconnecting: true,
-                isMonitorConnectedForDetectedGame);
         }
 
         private static DisplayText FormatInjectionStatus(
@@ -414,32 +407,22 @@ namespace BO2.Services
             GameConnectionSessionDisplayProjection projection,
             GameConnectionSnapshot snapshot)
         {
-            UpdateConnectButtonState(
-                projection,
+            projection.ConnectButtonText = GetConnectButtonText(
                 snapshot.CurrentGame,
                 snapshot.ConnectionPhase,
-                snapshot.CanAttemptConnect,
                 snapshot.IsConnecting,
                 snapshot.IsDisconnecting,
                 snapshot.IsMonitorConnectedForCurrentGame);
         }
 
-        private static void UpdateConnectButtonState(
+        private static void ApplyCommandAvailability(
             GameConnectionSessionDisplayProjection projection,
-            DetectedGame? detectedGame,
-            GameConnectionPhase connectionPhase,
-            bool canAttemptConnect,
-            bool isConnecting,
-            bool isDisconnecting,
-            bool isMonitorConnectedForDetectedGame)
+            GameConnectionSnapshot snapshot)
         {
-            projection.ConnectButtonText = GetConnectButtonText(
-                detectedGame,
-                connectionPhase,
-                isConnecting,
-                isDisconnecting,
-                isMonitorConnectedForDetectedGame);
-            projection.IsConnectButtonEnabled = canAttemptConnect;
+            projection.IsConnectButtonEnabled = snapshot.ConnectCommandAvailability.IsEnabled;
+            projection.IsConnectButtonVisible = snapshot.ConnectCommandAvailability.IsVisible;
+            projection.IsDisconnectButtonEnabled = snapshot.DisconnectCommandAvailability.IsEnabled;
+            projection.IsDisconnectButtonVisible = snapshot.DisconnectCommandAvailability.IsVisible;
         }
 
         private static DisplayText GetConnectButtonText(
@@ -559,9 +542,6 @@ namespace BO2.Services
                 ConnectionState.Detected => DisplayText.Resource("ConnectionCardStatusMonitoring"),
                 _ => DisplayText.Resource("ConnectionCardStatusDisconnected")
             };
-
-            projection.IsConnectButtonVisible = connectionState is not (ConnectionState.Connected or ConnectionState.Disconnecting);
-            projection.IsDisconnectButtonVisible = connectionState == ConnectionState.Connected;
         }
 
         private static void ClearStats(GameConnectionSessionDisplayProjection projection)
@@ -640,6 +620,8 @@ namespace BO2.Services
         public bool IsConnectButtonVisible { get; set; } = true;
 
         public bool IsDisconnectButtonVisible { get; set; }
+
+        public bool IsDisconnectButtonEnabled { get; set; }
 
         public bool IsFooterSuccessStatusVisible { get; set; }
 

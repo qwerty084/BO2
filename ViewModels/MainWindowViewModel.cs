@@ -30,6 +30,7 @@ namespace BO2.ViewModels
         private string _connectionCardStatusText = AppStrings.Get("ConnectionCardStatusDisconnected");
         private string _connectionLastUpdateText = EmptyStatText;
         private bool _isConnectButtonEnabled;
+        private bool _isDisconnectButtonEnabled;
         private Visibility _connectButtonVisibility = Visibility.Visible;
         private Visibility _disconnectButtonVisibility = Visibility.Collapsed;
         private Visibility _footerSuccessStatusVisibility = Visibility.Collapsed;
@@ -124,6 +125,12 @@ namespace BO2.ViewModels
         {
             get => _connectButtonVisibility;
             private set => SetProperty(ref _connectButtonVisibility, value);
+        }
+
+        public bool IsDisconnectButtonEnabled
+        {
+            get => _isDisconnectButtonEnabled;
+            private set => SetProperty(ref _isDisconnectButtonEnabled, value);
         }
 
         public Visibility DisconnectButtonVisibility
@@ -351,6 +358,7 @@ namespace BO2.ViewModels
             ConnectionLastUpdateText = state.ConnectionLastUpdateText;
             IsConnectButtonEnabled = state.IsConnectButtonEnabled;
             ConnectButtonVisibility = ToVisibility(state.IsConnectButtonVisible);
+            IsDisconnectButtonEnabled = state.IsDisconnectButtonEnabled;
             DisconnectButtonVisibility = ToVisibility(state.IsDisconnectButtonVisible);
             FooterSuccessStatusVisibility = ToVisibility(state.IsFooterSuccessStatusVisible);
             FooterPendingStatusVisibility = ToVisibility(state.IsFooterPendingStatusVisible);

@@ -168,6 +168,7 @@ namespace BO2.Tests.Services
             AssertResource("ConnectButtonConnectedText", projection.ConnectButtonText);
             Assert.False(projection.IsConnectButtonVisible);
             Assert.True(projection.IsDisconnectButtonVisible);
+            Assert.True(projection.IsDisconnectButtonEnabled);
             Assert.True(projection.IsFooterSuccessStatusVisible);
             Assert.Same(eventStatus, projection.LatestEventStatus);
         }
@@ -203,8 +204,28 @@ namespace BO2.Tests.Services
             Assert.False(projection.IsConnectButtonEnabled);
             Assert.False(projection.IsConnectButtonVisible);
             Assert.False(projection.IsDisconnectButtonVisible);
+            Assert.False(projection.IsDisconnectButtonEnabled);
             Assert.True(projection.IsFooterPendingStatusVisible);
             Assert.Same(GameEventMonitorStatus.WaitingForMonitor, projection.LatestEventStatus);
+        }
+
+        [Fact]
+        public void Project_UsesSnapshotCommandAvailabilityForButtonEnabledAndVisibleState()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+
+            GameConnectionSessionDisplayProjection projection = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    CreateReadResult(detectedGame),
+                    isMonitorConnectedForCurrentGame: true,
+                    connectCommandAvailability: GameConnectionCommandAvailability.VisibleEnabled,
+                    disconnectCommandAvailability: GameConnectionCommandAvailability.Hidden));
+
+            Assert.True(projection.IsConnectButtonEnabled);
+            Assert.True(projection.IsConnectButtonVisible);
+            Assert.False(projection.IsDisconnectButtonEnabled);
+            Assert.False(projection.IsDisconnectButtonVisible);
         }
 
         private static GameConnectionSessionDisplayProjector CreateProjector()
@@ -222,24 +243,54 @@ namespace BO2.Tests.Services
             bool canAttemptConnect = false,
             bool hasInjectionAttemptForCurrentGame = false,
             bool isMonitorConnectedForCurrentGame = false,
-            GameConnectionPhase? connectionPhase = null)
+            GameConnectionPhase? connectionPhase = null,
+            GameConnectionCommandAvailability? connectCommandAvailability = null,
+            GameConnectionCommandAvailability? disconnectCommandAvailability = null)
         {
+            GameConnectionPhase phase = connectionPhase ?? DetermineConnectionPhase(
+                currentGame,
+                readResult,
+                isConnecting,
+                isDisconnecting,
+                isMonitorConnectedForCurrentGame);
             return new GameConnectionSnapshot(
                 currentGame,
-                connectionPhase ?? DetermineConnectionPhase(
-                    currentGame,
-                    readResult,
-                    isConnecting,
-                    isDisconnecting,
-                    isMonitorConnectedForCurrentGame),
+                phase,
                 readResult,
                 eventStatus ?? GameEventMonitorStatus.WaitingForMonitor,
                 injectionResult ?? DllInjectionResult.NotAttempted,
                 isConnecting,
                 isDisconnecting,
                 canAttemptConnect,
+                connectCommandAvailability ?? CreateConnectCommandAvailability(phase, canAttemptConnect),
+                disconnectCommandAvailability ?? CreateDisconnectCommandAvailability(phase),
                 hasInjectionAttemptForCurrentGame,
                 isMonitorConnectedForCurrentGame);
+        }
+
+        private static GameConnectionCommandAvailability CreateConnectCommandAvailability(
+            GameConnectionPhase connectionPhase,
+            bool canAttemptConnect)
+        {
+            return connectionPhase switch
+            {
+                GameConnectionPhase.Connected or GameConnectionPhase.Disconnecting => GameConnectionCommandAvailability.Hidden,
+                _ when canAttemptConnect => GameConnectionCommandAvailability.VisibleEnabled,
+                _ => GameConnectionCommandAvailability.VisibleDisabled
+            };
+        }
+
+        private static GameConnectionCommandAvailability CreateDisconnectCommandAvailability(
+            GameConnectionPhase connectionPhase)
+        {
+            return connectionPhase == GameConnectionPhase.Connected
+                ? GameConnectionCommandAvailability.VisibleEnabled
+                : GameConnectionCommandAvailability.Hidden;
+        }
+
+        private static PlayerStatsReadResult CreateReadResult(DetectedGame detectedGame)
+        {
+            return new PlayerStatsReadResult(detectedGame, CreateStats());
         }
 
         private static GameConnectionPhase DetermineConnectionPhase(

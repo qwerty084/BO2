@@ -573,6 +573,8 @@ namespace BO2.Services
                 && left.IsConnecting == right.IsConnecting
                 && left.IsDisconnecting == right.IsDisconnecting
                 && left.CanAttemptConnect == right.CanAttemptConnect
+                && left.ConnectCommandAvailability == right.ConnectCommandAvailability
+                && left.DisconnectCommandAvailability == right.DisconnectCommandAvailability
                 && left.HasInjectionAttemptForCurrentGame == right.HasInjectionAttemptForCurrentGame
                 && left.IsMonitorConnectedForCurrentGame == right.IsMonitorConnectedForCurrentGame
                 && HasSameEventStatus(left.EventStatus, right.EventStatus);
@@ -635,17 +637,41 @@ namespace BO2.Services
         {
             GameConnectionSessionLifecycleSnapshot lifecycleSnapshot = _lifecycle.CreateSnapshot(
                 GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
+            GameConnectionPhase connectionPhase = DetermineConnectionPhase(detectedGame, readResult, lifecycleSnapshot);
+            GameConnectionSessionCommandAvailability commandAvailability = CreateCommandAvailability(
+                connectionPhase,
+                lifecycleSnapshot);
             return new GameConnectionRefreshResult(
                 detectedGame,
-                DetermineConnectionPhase(detectedGame, readResult, lifecycleSnapshot),
+                connectionPhase,
                 readResult,
                 eventStatus,
                 lifecycleSnapshot.InjectionResult,
                 lifecycleSnapshot.IsConnecting,
                 lifecycleSnapshot.IsDisconnecting,
                 lifecycleSnapshot.CanAttemptConnect,
+                commandAvailability.Connect,
+                commandAvailability.Disconnect,
                 lifecycleSnapshot.HasInjectionAttemptForCurrentGame,
                 lifecycleSnapshot.IsMonitorConnectedForCurrentGame);
+        }
+
+        private static GameConnectionSessionCommandAvailability CreateCommandAvailability(
+            GameConnectionPhase connectionPhase,
+            GameConnectionSessionLifecycleSnapshot lifecycleSnapshot)
+        {
+            GameConnectionCommandAvailability connect = connectionPhase switch
+            {
+                GameConnectionPhase.Connected or GameConnectionPhase.Disconnecting => GameConnectionCommandAvailability.Hidden,
+                _ when lifecycleSnapshot.CanAttemptConnect => GameConnectionCommandAvailability.VisibleEnabled,
+                _ => GameConnectionCommandAvailability.VisibleDisabled
+            };
+
+            GameConnectionCommandAvailability disconnect = connectionPhase == GameConnectionPhase.Connected
+                ? GameConnectionCommandAvailability.VisibleEnabled
+                : GameConnectionCommandAvailability.Hidden;
+
+            return new GameConnectionSessionCommandAvailability(connect, disconnect);
         }
 
         private static GameConnectionPhase DetermineConnectionPhase(
@@ -695,6 +721,8 @@ namespace BO2.Services
                 result.IsConnecting,
                 result.IsDisconnecting,
                 result.CanAttemptConnect,
+                result.ConnectCommandAvailability,
+                result.DisconnectCommandAvailability,
                 result.HasInjectionAttemptForCurrentGame,
                 result.IsMonitorConnectedForCurrentGame);
         }
@@ -708,9 +736,32 @@ namespace BO2.Services
             bool IsConnecting,
             bool IsDisconnecting,
             bool CanAttemptConnect,
+            GameConnectionCommandAvailability ConnectCommandAvailability,
+            GameConnectionCommandAvailability DisconnectCommandAvailability,
             bool HasInjectionAttemptForCurrentGame,
             bool IsMonitorConnectedForCurrentGame);
     }
+
+    internal readonly record struct GameConnectionCommandAvailability(
+        bool IsEnabled,
+        bool IsVisible)
+    {
+        public static GameConnectionCommandAvailability Hidden { get; } = new(
+            IsEnabled: false,
+            IsVisible: false);
+
+        public static GameConnectionCommandAvailability VisibleDisabled { get; } = new(
+            IsEnabled: false,
+            IsVisible: true);
+
+        public static GameConnectionCommandAvailability VisibleEnabled { get; } = new(
+            IsEnabled: true,
+            IsVisible: true);
+    }
+
+    internal readonly record struct GameConnectionSessionCommandAvailability(
+        GameConnectionCommandAvailability Connect,
+        GameConnectionCommandAvailability Disconnect);
 
     internal readonly record struct GameConnectionSnapshot(
         DetectedGame? CurrentGame,
@@ -721,6 +772,8 @@ namespace BO2.Services
         bool IsConnecting,
         bool IsDisconnecting,
         bool CanAttemptConnect,
+        GameConnectionCommandAvailability ConnectCommandAvailability,
+        GameConnectionCommandAvailability DisconnectCommandAvailability,
         bool HasInjectionAttemptForCurrentGame,
         bool IsMonitorConnectedForCurrentGame);
 

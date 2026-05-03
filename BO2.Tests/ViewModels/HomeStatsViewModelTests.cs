@@ -27,6 +27,8 @@ namespace BO2.Tests.ViewModels
                 IsConnecting: false,
                 IsDisconnecting: false,
                 CanAttemptConnect: true,
+                ConnectCommandAvailability: GameConnectionCommandAvailability.VisibleEnabled,
+                DisconnectCommandAvailability: GameConnectionCommandAvailability.Hidden,
                 HasInjectionAttemptForCurrentGame: false,
                 IsMonitorConnectedForCurrentGame: false));
 

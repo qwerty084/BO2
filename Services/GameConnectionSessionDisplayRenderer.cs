@@ -40,6 +40,7 @@ namespace BO2.Services
                 IsConnectButtonEnabled = projection.IsConnectButtonEnabled,
                 IsConnectButtonVisible = projection.IsConnectButtonVisible,
                 IsDisconnectButtonVisible = projection.IsDisconnectButtonVisible,
+                IsDisconnectButtonEnabled = projection.IsDisconnectButtonEnabled,
                 IsFooterSuccessStatusVisible = projection.IsFooterSuccessStatusVisible,
                 IsFooterPendingStatusVisible = projection.IsFooterPendingStatusVisible,
                 IsFooterDisconnectedStatusVisible = projection.IsFooterDisconnectedStatusVisible,
@@ -137,6 +138,8 @@ namespace BO2.Services
         public bool IsConnectButtonVisible { get; set; } = true;
 
         public bool IsDisconnectButtonVisible { get; set; }
+
+        public bool IsDisconnectButtonEnabled { get; set; }
 
         public bool IsFooterSuccessStatusVisible { get; set; }
 

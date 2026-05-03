@@ -19,6 +19,7 @@ namespace BO2.Tests.Services
             Assert.Equal("RecentEventsEmpty", state.BoxEventsText);
             Assert.Equal("GameNotRunning", state.StatusText);
             Assert.True(state.IsConnectButtonVisible);
+            Assert.False(state.IsDisconnectButtonEnabled);
             Assert.True(state.IsFooterDisconnectedStatusVisible);
         }
 
