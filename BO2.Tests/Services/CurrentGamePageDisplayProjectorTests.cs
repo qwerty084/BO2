@@ -160,6 +160,10 @@ namespace BO2.Tests.Services
             [
                 "Candidate",
                 "Address",
+                "Button",
+                "Command",
+                "Connect",
+                "Disconnect",
                 "Debug",
                 "Diagnostic",
                 "Position"

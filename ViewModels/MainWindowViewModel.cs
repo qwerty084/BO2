@@ -15,8 +15,7 @@ namespace BO2.ViewModels
 
         private readonly DispatcherQueue _dispatcherQueue;
         private readonly GameConnectionSession _connectionSession;
-        private readonly GameConnectionSessionDisplayProjector _displayProjector;
-        private readonly GameConnectionSessionDisplayRenderer _displayRenderer;
+        private readonly ShellConnectionDisplayProjector _shellDisplayProjector;
         private readonly HomeStatsViewModel _homeStats = new();
         private readonly SemaphoreSlim _operationSemaphore = new(1, 1);
         private bool _disposed;
@@ -51,8 +50,7 @@ namespace BO2.ViewModels
 
             _dispatcherQueue = dispatcherQueue;
             _connectionSession = connectionSession;
-            _displayProjector = new GameConnectionSessionDisplayProjector();
-            _displayRenderer = new GameConnectionSessionDisplayRenderer();
+            _shellDisplayProjector = new ShellConnectionDisplayProjector();
             _connectionSession.SnapshotChanged += OnSnapshotChanged;
 
             _connectionSession.Start();
@@ -343,27 +341,28 @@ namespace BO2.ViewModels
         private void ApplyRefreshSnapshot(GameConnectionSnapshot snapshot)
         {
             _homeStats.ApplySnapshot(snapshot);
-            ApplyShellDisplayState(_displayRenderer.Render(_displayProjector.Project(snapshot)));
+            ApplyShellDisplayState(_shellDisplayProjector.Project(snapshot));
         }
 
-        private void ApplyShellDisplayState(GameConnectionSessionDisplayState state)
+        private void ApplyShellDisplayState(ShellConnectionDisplayState state)
         {
             DetectedGameText = state.DetectedGameText;
             EventMonitorStatusText = state.EventMonitorStatusText;
-            StatusText = state.StatusText;
-            GameStatusText = state.GameStatusText;
-            EventConnectionStatusText = state.EventConnectionStatusText;
+            StatusText = state.MainStatusText;
+            GameStatusText = state.FooterGameStatusText;
+            EventConnectionStatusText = state.FooterEventStatusText;
             ConnectButtonText = state.ConnectButtonText;
+            DisconnectButtonText = state.DisconnectButtonText;
             ConnectionCardStatusText = state.ConnectionCardStatusText;
             ConnectionLastUpdateText = state.ConnectionLastUpdateText;
-            IsConnectButtonEnabled = state.IsConnectButtonEnabled;
-            ConnectButtonVisibility = ToVisibility(state.IsConnectButtonVisible);
-            IsDisconnectButtonEnabled = state.IsDisconnectButtonEnabled;
-            DisconnectButtonVisibility = ToVisibility(state.IsDisconnectButtonVisible);
-            FooterSuccessStatusVisibility = ToVisibility(state.IsFooterSuccessStatusVisible);
-            FooterPendingStatusVisibility = ToVisibility(state.IsFooterPendingStatusVisible);
-            FooterDisconnectedStatusVisibility = ToVisibility(state.IsFooterDisconnectedStatusVisible);
-            FooterErrorStatusVisibility = ToVisibility(state.IsFooterErrorStatusVisible);
+            IsConnectButtonEnabled = state.IsConnectCommandEnabled;
+            ConnectButtonVisibility = ToVisibility(state.IsConnectCommandVisible);
+            IsDisconnectButtonEnabled = state.IsDisconnectCommandEnabled;
+            DisconnectButtonVisibility = ToVisibility(state.IsDisconnectCommandVisible);
+            FooterSuccessStatusVisibility = ToVisibility(state.IsFooterSuccessIndicatorVisible);
+            FooterPendingStatusVisibility = ToVisibility(state.IsFooterPendingIndicatorVisible);
+            FooterDisconnectedStatusVisibility = ToVisibility(state.IsFooterDisconnectedIndicatorVisible);
+            FooterErrorStatusVisibility = ToVisibility(state.IsFooterErrorIndicatorVisible);
             LatestEventStatus = state.LatestEventStatus;
         }
 
