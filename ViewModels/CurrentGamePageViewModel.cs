@@ -10,6 +10,7 @@ namespace BO2.ViewModels
         private const string EmptyStatText = "--";
 
         private readonly CurrentGamePageDisplayProjector _currentGamePageDisplayProjector = new();
+        private string _pageStatusText = AppStrings.Get("CurrentGamePageStatusNotConnected");
         private string _pointsText = EmptyStatText;
         private string _killsText = EmptyStatText;
         private string _downsText = EmptyStatText;
@@ -24,6 +25,12 @@ namespace BO2.ViewModels
         private string _recentGameEventsText = AppStrings.Get("RecentEventsEmpty");
 
         public event PropertyChangedEventHandler? PropertyChanged;
+
+        public string PageStatusText
+        {
+            get => _pageStatusText;
+            private set => SetProperty(ref _pageStatusText, value);
+        }
 
         public string PointsText
         {
@@ -107,6 +114,7 @@ namespace BO2.ViewModels
         {
             ArgumentNullException.ThrowIfNull(currentGameState);
 
+            PageStatusText = currentGameState.PageStatusText;
             PointsText = currentGameState.PointsText;
             KillsText = currentGameState.KillsText;
             DownsText = currentGameState.DownsText;

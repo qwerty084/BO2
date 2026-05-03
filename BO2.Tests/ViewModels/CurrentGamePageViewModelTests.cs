@@ -1,5 +1,4 @@
 using System;
-using System.Globalization;
 using System.Reflection;
 using BO2.Services;
 using BO2.ViewModels;
@@ -10,7 +9,7 @@ namespace BO2.Tests.ViewModels
     public sealed class CurrentGamePageViewModelTests
     {
         [Fact]
-        public void ApplySnapshot_WhenSupportedStatsWithoutMonitor_ProjectsCurrentGamePageDisplayState()
+        public void ApplySnapshot_WhenSupportedStatsWithoutMonitor_ProjectsInactiveCurrentGamePageDisplayState()
         {
             CurrentGamePageViewModel viewModel = new();
             DetectedGame detectedGame = CreateSupportedGame(1001);
@@ -27,14 +26,16 @@ namespace BO2.Tests.ViewModels
                 DisconnectCommandAvailability: GameConnectionCommandAvailability.Hidden));
 
             Assert.Equal("Steam Zombies", viewModel.DetectedGameText);
-            Assert.Equal(1234.ToString("N0", CultureInfo.CurrentCulture), viewModel.PointsText);
-            Assert.Equal(5.ToString("N0", CultureInfo.CurrentCulture), viewModel.KillsText);
-            Assert.Equal(1.ToString("N0", CultureInfo.CurrentCulture), viewModel.DownsText);
-            Assert.Equal(2.ToString("N0", CultureInfo.CurrentCulture), viewModel.RevivesText);
-            Assert.Equal(3.ToString("N0", CultureInfo.CurrentCulture), viewModel.HeadshotsText);
+            Assert.Equal("CurrentGamePageStatusNotConnected", viewModel.PageStatusText);
+            Assert.Equal("--", viewModel.PointsText);
+            Assert.Equal("--", viewModel.KillsText);
+            Assert.Equal("--", viewModel.DownsText);
+            Assert.Equal("--", viewModel.RevivesText);
+            Assert.Equal("--", viewModel.HeadshotsText);
             Assert.Equal("GameProcessDetectorDisplayNameSteamZombies", viewModel.EventCompatibilityText);
             Assert.Equal("DllInjectionWaitingForConnect", viewModel.InjectionStatusText);
             Assert.Equal("EventMonitorWaitingForConnect", viewModel.EventMonitorStatusText);
+            Assert.Equal("--", viewModel.CurrentRoundText);
             Assert.Equal("RecentEventsEmpty", viewModel.BoxEventsText);
         }
 

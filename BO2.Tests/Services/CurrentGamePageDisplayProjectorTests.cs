@@ -19,17 +19,12 @@ namespace BO2.Tests.Services
                     connectionPhase: GameConnectionPhase.NoGame));
 
             Assert.Equal("NoGameDetected", state.DetectedGameText);
-            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.PointsText);
-            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.KillsText);
-            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.DownsText);
-            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.RevivesText);
-            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.HeadshotsText);
+            Assert.Equal("CurrentGamePageStatusNotConnected", state.PageStatusText);
+            AssertInactiveStats(state);
             Assert.Equal("NoGameDetected", state.EventCompatibilityText);
             Assert.Equal("DllInjectionNotAttempted", state.InjectionStatusText);
             Assert.Equal("EventMonitorWaitingForMonitor", state.EventMonitorStatusText);
-            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.CurrentRoundText);
-            Assert.Equal("RecentEventsEmpty", state.BoxEventsText);
-            Assert.Equal("RecentEventsEmpty", state.RecentGameEventsText);
+            AssertInactiveEvents(state);
         }
 
         [Fact]
@@ -44,12 +39,12 @@ namespace BO2.Tests.Services
                     connectionPhase: GameConnectionPhase.UnsupportedGame));
 
             Assert.Equal("Redacted Zombies", state.DetectedGameText);
-            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.PointsText);
+            Assert.Equal("CurrentGamePageStatusNotConnected", state.PageStatusText);
+            AssertInactiveStats(state);
             Assert.Equal("EventMonitorUnsupportedGameFormat(Redacted Zombies)", state.EventCompatibilityText);
             Assert.Equal("DllInjectionUnsupportedGameFormat(Redacted Zombies)", state.InjectionStatusText);
             Assert.Equal("EventMonitorCaptureDisabled", state.EventMonitorStatusText);
-            Assert.Equal("RecentEventsEmpty", state.BoxEventsText);
-            Assert.Equal("RecentEventsEmpty", state.RecentGameEventsText);
+            AssertInactiveEvents(state);
         }
 
         [Fact]
@@ -65,15 +60,16 @@ namespace BO2.Tests.Services
                     connectionPhase: GameConnectionPhase.Detected));
 
             Assert.Equal("Steam Zombies", state.DetectedGameText);
-            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.PointsText);
+            Assert.Equal("CurrentGamePageStatusNotConnected", state.PageStatusText);
+            AssertInactiveStats(state);
             Assert.Equal("GameProcessDetectorDisplayNameSteamZombies", state.EventCompatibilityText);
             Assert.Equal("DllInjectionWaitingForConnect", state.InjectionStatusText);
             Assert.Equal("EventMonitorWaitingForConnect", state.EventMonitorStatusText);
-            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.CurrentRoundText);
+            AssertInactiveEvents(state);
         }
 
         [Fact]
-        public void Project_WhenStatsOnlyDetected_ReturnsStatsAndWaitingForConnectState()
+        public void Project_WhenStatsOnlyDetectedBeforeConnect_ReturnsInactiveState()
         {
             DetectedGame detectedGame = CreateSupportedGame(1001);
 
@@ -85,15 +81,61 @@ namespace BO2.Tests.Services
                     canAttemptConnect: true));
 
             Assert.Equal("Steam Zombies", state.DetectedGameText);
-            Assert.Equal(1234.ToString("N0", CultureInfo.CurrentCulture), state.PointsText);
-            Assert.Equal(5.ToString("N0", CultureInfo.CurrentCulture), state.KillsText);
-            Assert.Equal(1.ToString("N0", CultureInfo.CurrentCulture), state.DownsText);
-            Assert.Equal(2.ToString("N0", CultureInfo.CurrentCulture), state.RevivesText);
-            Assert.Equal(3.ToString("N0", CultureInfo.CurrentCulture), state.HeadshotsText);
+            Assert.Equal("CurrentGamePageStatusNotConnected", state.PageStatusText);
+            AssertInactiveStats(state);
             Assert.Equal("EventMonitorWaitingForConnect", state.EventMonitorStatusText);
-            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.CurrentRoundText);
-            Assert.Equal("RecentEventsEmpty", state.BoxEventsText);
-            Assert.Equal("RecentEventsEmpty", state.RecentGameEventsText);
+            AssertInactiveEvents(state);
+        }
+
+        [Fact]
+        public void Project_WhenStatsOnlyDetectedAfterDisconnect_ReturnsInactiveStateWithoutStaleEvents()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+            DateTimeOffset receivedAt = new(2026, 5, 2, 12, 0, 0, TimeSpan.Zero);
+            GameEventMonitorStatus staleEventStatus = new(
+                GameCompatibilityState.Compatible,
+                DroppedEventCount: 0,
+                DroppedNotifyCount: 0,
+                PublishedNotifyCount: 1,
+                RecentEvents:
+                [
+                    new GameEvent(GameEventType.StartOfRound, "start_of_round", 5, 0, 0, receivedAt),
+                    new GameEvent(GameEventType.BoxEvent, "randomization_done", 5, 10, 20, receivedAt, "ray_gun_zm")
+                ]);
+
+            CurrentGamePageDisplayState state = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    CreateReadResult(detectedGame),
+                    connectionPhase: GameConnectionPhase.StatsOnlyDetected,
+                    canAttemptConnect: true,
+                    eventMonitorSummary: GameConnectionEventMonitorSummary.FromStatus(staleEventStatus)));
+
+            Assert.Equal("Steam Zombies", state.DetectedGameText);
+            Assert.Equal("CurrentGamePageStatusNotConnected", state.PageStatusText);
+            AssertInactiveStats(state);
+            Assert.Equal("EventMonitorWaitingForConnect", state.EventMonitorStatusText);
+            AssertInactiveEvents(state);
+        }
+
+        [Fact]
+        public void Project_WhenConnecting_ReturnsConnectingStateWithoutLiveStatsOrEvents()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+
+            CurrentGamePageDisplayState state = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    CreateReadResult(detectedGame),
+                    connectionPhase: GameConnectionPhase.Connecting,
+                    eventMonitorSummary: GameConnectionEventMonitorSummary.Connecting));
+
+            Assert.Equal("Steam Zombies", state.DetectedGameText);
+            Assert.Equal("CurrentGamePageStatusConnecting", state.PageStatusText);
+            AssertInactiveStats(state);
+            Assert.Equal("DllInjectionConnecting", state.InjectionStatusText);
+            Assert.Equal("EventMonitorWaitingForConnect", state.EventMonitorStatusText);
+            AssertInactiveEvents(state);
         }
 
         [Fact]
@@ -120,6 +162,7 @@ namespace BO2.Tests.Services
                     eventMonitorSummary: GameConnectionEventMonitorSummary.FromStatus(eventStatus)));
 
             Assert.Equal("Steam Zombies", state.DetectedGameText);
+            Assert.Equal("CurrentGamePageStatusConnected", state.PageStatusText);
             Assert.Equal(1234.ToString("N0", CultureInfo.CurrentCulture), state.PointsText);
             Assert.Equal("DllInjectionMonitorReady", state.InjectionStatusText);
             Assert.Equal("EventMonitorCaptureDropsFormat(EventMonitorCompatible, 2, 3, 4)", state.EventMonitorStatusText);
@@ -143,12 +186,11 @@ namespace BO2.Tests.Services
                     eventMonitorSummary: GameConnectionEventMonitorSummary.StopPending));
 
             Assert.Equal("Steam Zombies", state.DetectedGameText);
-            Assert.Equal(1234.ToString("N0", CultureInfo.CurrentCulture), state.PointsText);
+            Assert.Equal("CurrentGamePageStatusDisconnecting", state.PageStatusText);
+            AssertInactiveStats(state);
             Assert.Equal("DllInjectionDisconnecting", state.InjectionStatusText);
             Assert.Equal("EventMonitorDisconnecting", state.EventMonitorStatusText);
-            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.CurrentRoundText);
-            Assert.Equal("RecentEventsEmpty", state.BoxEventsText);
-            Assert.Equal("RecentEventsEmpty", state.RecentGameEventsText);
+            AssertInactiveEvents(state);
         }
 
         [Fact]
@@ -304,6 +346,22 @@ namespace BO2.Tests.Services
                 processId,
                 null,
                 "Unsupported variant");
+        }
+
+        private static void AssertInactiveStats(CurrentGamePageDisplayState state)
+        {
+            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.PointsText);
+            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.KillsText);
+            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.DownsText);
+            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.RevivesText);
+            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.HeadshotsText);
+        }
+
+        private static void AssertInactiveEvents(CurrentGamePageDisplayState state)
+        {
+            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.CurrentRoundText);
+            Assert.Equal("RecentEventsEmpty", state.BoxEventsText);
+            Assert.Equal("RecentEventsEmpty", state.RecentGameEventsText);
         }
     }
 }

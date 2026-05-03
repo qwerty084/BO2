@@ -29,21 +29,34 @@ namespace BO2.Services
         {
             GameConnectionSessionDisplayState state = _sessionDisplayRenderer.Render(
                 _sessionDisplayProjector.Project(snapshot));
+            bool isLive = snapshot.ConnectionPhase == GameConnectionPhase.Connected;
 
             return new CurrentGamePageDisplayState
             {
-                PointsText = state.PointsText,
-                KillsText = state.KillsText,
-                DownsText = state.DownsText,
-                RevivesText = state.RevivesText,
-                HeadshotsText = state.HeadshotsText,
+                PageStatusText = GetPageStatusText(snapshot.ConnectionPhase),
+                PointsText = isLive ? state.PointsText : CurrentGamePageDisplayState.EmptyStatText,
+                KillsText = isLive ? state.KillsText : CurrentGamePageDisplayState.EmptyStatText,
+                DownsText = isLive ? state.DownsText : CurrentGamePageDisplayState.EmptyStatText,
+                RevivesText = isLive ? state.RevivesText : CurrentGamePageDisplayState.EmptyStatText,
+                HeadshotsText = isLive ? state.HeadshotsText : CurrentGamePageDisplayState.EmptyStatText,
                 DetectedGameText = state.DetectedGameText,
                 EventCompatibilityText = state.EventCompatibilityText,
                 InjectionStatusText = state.InjectionStatusText,
                 EventMonitorStatusText = state.EventMonitorStatusText,
-                CurrentRoundText = state.CurrentRoundText,
-                BoxEventsText = state.BoxEventsText,
-                RecentGameEventsText = state.RecentGameEventsText
+                CurrentRoundText = isLive ? state.CurrentRoundText : CurrentGamePageDisplayState.EmptyStatText,
+                BoxEventsText = isLive ? state.BoxEventsText : AppStrings.Get("RecentEventsEmpty"),
+                RecentGameEventsText = isLive ? state.RecentGameEventsText : AppStrings.Get("RecentEventsEmpty")
+            };
+        }
+
+        private static string GetPageStatusText(GameConnectionPhase connectionPhase)
+        {
+            return connectionPhase switch
+            {
+                GameConnectionPhase.Connecting => AppStrings.Get("CurrentGamePageStatusConnecting"),
+                GameConnectionPhase.Connected => AppStrings.Get("CurrentGamePageStatusConnected"),
+                GameConnectionPhase.Disconnecting => AppStrings.Get("CurrentGamePageStatusDisconnecting"),
+                _ => AppStrings.Get("CurrentGamePageStatusNotConnected")
             };
         }
     }
@@ -51,6 +64,8 @@ namespace BO2.Services
     internal sealed class CurrentGamePageDisplayState
     {
         public const string EmptyStatText = GameConnectionSessionDisplayState.EmptyStatText;
+
+        public string PageStatusText { get; init; } = AppStrings.Get("CurrentGamePageStatusNotConnected");
 
         public string PointsText { get; init; } = EmptyStatText;
 

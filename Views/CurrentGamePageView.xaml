@@ -10,6 +10,11 @@
     <StackPanel
         HorizontalAlignment="Stretch"
         Spacing="12">
+        <TextBlock
+            Style="{StaticResource BO2CaptionTextBlockStyle}"
+            Text="{Binding PageStatusText, Mode=OneWay}"
+            TextWrapping="Wrap" />
+
         <Border Style="{StaticResource BO2CardBorderStyle}">
             <StackPanel Spacing="12">
                 <Grid ColumnSpacing="8">

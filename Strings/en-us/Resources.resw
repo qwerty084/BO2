@@ -360,6 +360,18 @@
   <data name="CurrentGamePageNavigationItem.Content" xml:space="preserve">
     <value>Current Game Page</value>
   </data>
+  <data name="CurrentGamePageStatusConnected" xml:space="preserve">
+    <value>Live current game stats and events are active.</value>
+  </data>
+  <data name="CurrentGamePageStatusConnecting" xml:space="preserve">
+    <value>Connecting to the game monitor...</value>
+  </data>
+  <data name="CurrentGamePageStatusDisconnecting" xml:space="preserve">
+    <value>Disconnecting from the game monitor...</value>
+  </data>
+  <data name="CurrentGamePageStatusNotConnected" xml:space="preserve">
+    <value>Not connected. Current game stats and events are inactive.</value>
+  </data>
   <data name="SettingsNavigationItem.Content" xml:space="preserve">
     <value>Settings</value>
   </data>
