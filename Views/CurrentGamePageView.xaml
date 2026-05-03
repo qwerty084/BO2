@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <UserControl
-    x:Class="BO2.Views.HomeStatsView"
+    x:Class="BO2.Views.CurrentGamePageView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -96,93 +96,6 @@
                         <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding HeadshotsText, Mode=OneWay}" />
                     </StackPanel>
                 </Grid>
-            </StackPanel>
-        </Border>
-
-        <Border Style="{StaticResource BO2CardBorderStyle}">
-            <StackPanel Spacing="12">
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <FontIcon
-                        FontSize="16"
-                        Foreground="{ThemeResource BO2TextSecondaryBrush}"
-                        Glyph="&#xE72D;" />
-                    <TextBlock
-                        x:Uid="PlayerStateTitle"
-                        Grid.Column="1"
-                        Style="{StaticResource BO2CardTitleTextBlockStyle}" />
-                </Grid>
-                <Grid ColumnSpacing="56">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock x:Uid="PositionXLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding PositionXText, Mode=OneWay}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Spacing="4">
-                        <TextBlock x:Uid="PositionYLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding PositionYText, Mode=OneWay}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock x:Uid="PositionZLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding PositionZText, Mode=OneWay}" />
-                    </StackPanel>
-                </Grid>
-
-                <Expander x:Uid="AdvancedCandidateDetailsExpander">
-                    <StackPanel Spacing="16">
-                        <TextBlock
-                            x:Uid="CandidateDetailsDescription"
-                            Style="{StaticResource BO2CaptionTextBlockStyle}"
-                            TextWrapping="Wrap" />
-
-                        <StackPanel Spacing="6">
-                            <TextBlock
-                                x:Uid="PlayerCandidateDetailsTitle"
-                                Style="{StaticResource BO2CardTitleTextBlockStyle}" />
-                            <TextBlock
-                                Style="{StaticResource BO2CaptionTextBlockStyle}"
-                                Text="{Binding PlayerCandidateDetailsText, Mode=OneWay}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <StackPanel Spacing="6">
-                            <TextBlock
-                                x:Uid="AmmoCandidateDetailsTitle"
-                                Style="{StaticResource BO2CardTitleTextBlockStyle}" />
-                            <TextBlock
-                                Style="{StaticResource BO2CaptionTextBlockStyle}"
-                                Text="{Binding AmmoCandidateDetailsText, Mode=OneWay}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <StackPanel Spacing="6">
-                            <TextBlock
-                                x:Uid="CounterCandidateDetailsTitle"
-                                Style="{StaticResource BO2CardTitleTextBlockStyle}" />
-                            <TextBlock
-                                Style="{StaticResource BO2CaptionTextBlockStyle}"
-                                Text="{Binding CounterCandidateDetailsText, Mode=OneWay}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <StackPanel Spacing="6">
-                            <TextBlock
-                                x:Uid="AddressCandidateDetailsTitle"
-                                Style="{StaticResource BO2CardTitleTextBlockStyle}" />
-                            <TextBlock
-                                Style="{StaticResource BO2CaptionTextBlockStyle}"
-                                Text="{Binding AddressCandidateDetailsText, Mode=OneWay}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-                    </StackPanel>
-                </Expander>
             </StackPanel>
         </Border>
 

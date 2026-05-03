@@ -5,25 +5,16 @@ using BO2.Services;
 
 namespace BO2.ViewModels
 {
-    public sealed class HomeStatsViewModel : INotifyPropertyChanged
+    public sealed class CurrentGamePageViewModel : INotifyPropertyChanged
     {
         private const string EmptyStatText = "--";
 
         private readonly CurrentGamePageDisplayProjector _currentGamePageDisplayProjector = new();
-        private readonly GameConnectionSessionDisplayProjector _displayProjector = new();
-        private readonly GameConnectionSessionDisplayRenderer _displayRenderer = new();
         private string _pointsText = EmptyStatText;
         private string _killsText = EmptyStatText;
         private string _downsText = EmptyStatText;
         private string _revivesText = EmptyStatText;
         private string _headshotsText = EmptyStatText;
-        private string _positionXText = EmptyStatText;
-        private string _positionYText = EmptyStatText;
-        private string _positionZText = EmptyStatText;
-        private string _playerCandidateDetailsText = EmptyStatText;
-        private string _ammoCandidateDetailsText = EmptyStatText;
-        private string _counterCandidateDetailsText = EmptyStatText;
-        private string _addressCandidateDetailsText = EmptyStatText;
         private string _detectedGameText = AppStrings.Get("NoGameDetected");
         private string _eventCompatibilityText = AppStrings.Get("NoGameDetected");
         private string _injectionStatusText = AppStrings.Get("DllInjectionNotAttempted");
@@ -62,48 +53,6 @@ namespace BO2.ViewModels
         {
             get => _headshotsText;
             private set => SetProperty(ref _headshotsText, value);
-        }
-
-        public string PositionXText
-        {
-            get => _positionXText;
-            private set => SetProperty(ref _positionXText, value);
-        }
-
-        public string PositionYText
-        {
-            get => _positionYText;
-            private set => SetProperty(ref _positionYText, value);
-        }
-
-        public string PositionZText
-        {
-            get => _positionZText;
-            private set => SetProperty(ref _positionZText, value);
-        }
-
-        public string PlayerCandidateDetailsText
-        {
-            get => _playerCandidateDetailsText;
-            private set => SetProperty(ref _playerCandidateDetailsText, value);
-        }
-
-        public string AmmoCandidateDetailsText
-        {
-            get => _ammoCandidateDetailsText;
-            private set => SetProperty(ref _ammoCandidateDetailsText, value);
-        }
-
-        public string CounterCandidateDetailsText
-        {
-            get => _counterCandidateDetailsText;
-            private set => SetProperty(ref _counterCandidateDetailsText, value);
-        }
-
-        public string AddressCandidateDetailsText
-        {
-            get => _addressCandidateDetailsText;
-            private set => SetProperty(ref _addressCandidateDetailsText, value);
         }
 
         public string DetectedGameText
@@ -151,30 +100,18 @@ namespace BO2.ViewModels
         internal void ApplySnapshot(GameConnectionSnapshot snapshot)
         {
             CurrentGamePageDisplayState currentGameState = _currentGamePageDisplayProjector.Project(snapshot);
-            GameConnectionSessionDisplayState sessionState = _displayRenderer.Render(_displayProjector.Project(snapshot));
-            ApplyDisplayState(currentGameState, sessionState);
+            ApplyDisplayState(currentGameState);
         }
 
-        private void ApplyDisplayState(
-            CurrentGamePageDisplayState currentGameState,
-            GameConnectionSessionDisplayState sessionState)
+        private void ApplyDisplayState(CurrentGamePageDisplayState currentGameState)
         {
             ArgumentNullException.ThrowIfNull(currentGameState);
-            ArgumentNullException.ThrowIfNull(sessionState);
 
             PointsText = currentGameState.PointsText;
             KillsText = currentGameState.KillsText;
             DownsText = currentGameState.DownsText;
             RevivesText = currentGameState.RevivesText;
             HeadshotsText = currentGameState.HeadshotsText;
-            // Candidate/address fields remain on Home Stats until the Current Game Page replacement removes them.
-            PositionXText = sessionState.PositionXText;
-            PositionYText = sessionState.PositionYText;
-            PositionZText = sessionState.PositionZText;
-            PlayerCandidateDetailsText = sessionState.PlayerCandidateDetailsText;
-            AmmoCandidateDetailsText = sessionState.AmmoCandidateDetailsText;
-            CounterCandidateDetailsText = sessionState.CounterCandidateDetailsText;
-            AddressCandidateDetailsText = sessionState.AddressCandidateDetailsText;
             DetectedGameText = currentGameState.DetectedGameText;
             EventCompatibilityText = currentGameState.EventCompatibilityText;
             InjectionStatusText = currentGameState.InjectionStatusText;

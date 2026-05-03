@@ -16,7 +16,7 @@ namespace BO2.ViewModels
         private readonly DispatcherQueue _dispatcherQueue;
         private readonly GameConnectionSession _connectionSession;
         private readonly ShellConnectionDisplayProjector _shellDisplayProjector;
-        private readonly HomeStatsViewModel _homeStats = new();
+        private readonly CurrentGamePageViewModel _currentGamePage = new();
         private readonly SemaphoreSlim _operationSemaphore = new(1, 1);
         private bool _disposed;
         private string _detectedGameText = AppStrings.Get("NoGameDetected");
@@ -63,7 +63,7 @@ namespace BO2.ViewModels
 
         public event EventHandler? RefreshRequested;
 
-        public HomeStatsViewModel HomeStats => _homeStats;
+        public CurrentGamePageViewModel CurrentGamePage => _currentGamePage;
 
         public string StatusText
         {
@@ -340,7 +340,7 @@ namespace BO2.ViewModels
 
         private void ApplyRefreshSnapshot(GameConnectionSnapshot snapshot)
         {
-            _homeStats.ApplySnapshot(snapshot);
+            _currentGamePage.ApplySnapshot(snapshot);
             ApplyShellDisplayState(_shellDisplayProjector.Project(snapshot));
         }
 

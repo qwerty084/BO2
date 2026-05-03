@@ -27,11 +27,11 @@
         SelectionChanged="OnNavigationViewSelectionChanged">
         <NavigationView.MenuItems>
             <NavigationViewItem
-                x:Name="HomeNavigationItem"
-                x:Uid="HomeNavigationItem"
-                Tag="home">
+                x:Name="CurrentGamePageNavigationItem"
+                x:Uid="CurrentGamePageNavigationItem"
+                Tag="current-game">
                 <NavigationViewItem.Icon>
-                    <SymbolIcon Symbol="Home" />
+                    <SymbolIcon Symbol="Play" />
                 </NavigationViewItem.Icon>
             </NavigationViewItem>
         </NavigationView.MenuItems>
@@ -240,10 +240,10 @@
                         AutomationProperties.HeadingLevel="Level1"
                         Style="{StaticResource BO2PageTitleTextBlockStyle}" />
 
-                    <views:HomeStatsView
-                        x:Name="HomeContent"
+                    <views:CurrentGamePageView
+                        x:Name="CurrentGamePageContent"
                         HorizontalAlignment="Stretch"
-                        DataContext="{x:Bind ViewModel.HomeStats, Mode=OneWay}" />
+                        DataContext="{x:Bind ViewModel.CurrentGamePage, Mode=OneWay}" />
 
                     <StackPanel
                         x:Name="SettingsContent"

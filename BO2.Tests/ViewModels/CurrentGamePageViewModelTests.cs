@@ -7,12 +7,12 @@ using Xunit;
 
 namespace BO2.Tests.ViewModels
 {
-    public sealed class HomeStatsViewModelTests
+    public sealed class CurrentGamePageViewModelTests
     {
         [Fact]
-        public void ApplySnapshot_WhenSupportedStatsWithoutMonitor_ProjectsHomeDisplayState()
+        public void ApplySnapshot_WhenSupportedStatsWithoutMonitor_ProjectsCurrentGamePageDisplayState()
         {
-            HomeStatsViewModel viewModel = new();
+            CurrentGamePageViewModel viewModel = new();
             DetectedGame detectedGame = CreateSupportedGame(1001);
             var readResult = new PlayerStatsReadResult(
                 detectedGame,
@@ -28,7 +28,10 @@ namespace BO2.Tests.ViewModels
 
             Assert.Equal("Steam Zombies", viewModel.DetectedGameText);
             Assert.Equal(1234.ToString("N0", CultureInfo.CurrentCulture), viewModel.PointsText);
-            Assert.Equal(12.345f.ToString("N2", CultureInfo.CurrentCulture), viewModel.PositionXText);
+            Assert.Equal(5.ToString("N0", CultureInfo.CurrentCulture), viewModel.KillsText);
+            Assert.Equal(1.ToString("N0", CultureInfo.CurrentCulture), viewModel.DownsText);
+            Assert.Equal(2.ToString("N0", CultureInfo.CurrentCulture), viewModel.RevivesText);
+            Assert.Equal(3.ToString("N0", CultureInfo.CurrentCulture), viewModel.HeadshotsText);
             Assert.Equal("GameProcessDetectorDisplayNameSteamZombies", viewModel.EventCompatibilityText);
             Assert.Equal("DllInjectionWaitingForConnect", viewModel.InjectionStatusText);
             Assert.Equal("EventMonitorWaitingForConnect", viewModel.EventMonitorStatusText);
@@ -38,13 +41,22 @@ namespace BO2.Tests.ViewModels
         [Fact]
         public void PresentationStateContract_ExposesReadOnlyStateWithoutConnectionCommands()
         {
-            PropertyInfo[] properties = typeof(HomeStatsViewModel)
+            PropertyInfo[] properties = typeof(CurrentGamePageViewModel)
                 .GetProperties(BindingFlags.Instance | BindingFlags.Public);
-            MethodInfo[] publicMethods = typeof(HomeStatsViewModel)
+            MethodInfo[] publicMethods = typeof(CurrentGamePageViewModel)
                 .GetMethods(BindingFlags.Instance | BindingFlags.Public);
 
             Assert.All(properties, property => Assert.Null(property.GetSetMethod()));
             Assert.DoesNotContain(publicMethods, IsConnectionCommand);
+        }
+
+        [Fact]
+        public void PresentationStateContract_DoesNotExposeCandidateAddressOrDebugProperties()
+        {
+            PropertyInfo[] properties = typeof(CurrentGamePageViewModel)
+                .GetProperties(BindingFlags.Instance | BindingFlags.Public);
+
+            Assert.DoesNotContain(properties, property => ContainsPresentationDetail(property.Name));
         }
 
         private static bool IsConnectionCommand(MethodInfo method)
@@ -52,6 +64,15 @@ namespace BO2.Tests.ViewModels
             return method.Name.Contains("Connect", StringComparison.OrdinalIgnoreCase)
                 || method.Name.Contains("Disconnect", StringComparison.OrdinalIgnoreCase)
                 || method.Name.Contains("Refresh", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool ContainsPresentationDetail(string memberName)
+        {
+            return memberName.Contains("Candidate", StringComparison.OrdinalIgnoreCase)
+                || memberName.Contains("Address", StringComparison.OrdinalIgnoreCase)
+                || memberName.Contains("Debug", StringComparison.OrdinalIgnoreCase)
+                || memberName.Contains("Diagnostic", StringComparison.OrdinalIgnoreCase)
+                || memberName.Contains("Position", StringComparison.OrdinalIgnoreCase);
         }
 
         private static PlayerStats CreateStats()
