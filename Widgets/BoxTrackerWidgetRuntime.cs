@@ -22,6 +22,33 @@ namespace BO2.Widgets
             return _nativeWindow;
         }
 
+        public bool SetEnabled(WidgetSettings settings, bool enabled, Action persistSettings)
+        {
+            ArgumentNullException.ThrowIfNull(settings);
+            ArgumentNullException.ThrowIfNull(persistSettings);
+
+            if (settings.Enabled == enabled)
+            {
+                return false;
+            }
+
+            settings.Enabled = enabled;
+            if (enabled)
+            {
+                IBoxTrackerWidgetNativeWindow nativeWindow = EnsureNativeWindow();
+                nativeWindow.UpdateText(GameEventFormatter.FormatBoxTrackerEvents(_latestEventStatus));
+                nativeWindow.Activate();
+                nativeWindow.ApplySettings(settings);
+            }
+            else
+            {
+                CloseNativeWindow(settings);
+            }
+
+            persistSettings();
+            return true;
+        }
+
         public void Restore(WidgetSettings settings)
         {
             Restore(settings, _latestEventStatus);
@@ -52,6 +79,19 @@ namespace BO2.Widgets
 
             _latestEventStatus = eventStatus;
             _nativeWindow?.UpdateText(GameEventFormatter.FormatBoxTrackerEvents(eventStatus));
+        }
+
+        private void CloseNativeWindow(WidgetSettings settings)
+        {
+            if (_nativeWindow is null)
+            {
+                return;
+            }
+
+            IBoxTrackerWidgetNativeWindow nativeWindow = _nativeWindow;
+            _nativeWindow = null;
+            nativeWindow.CapturePlacement(settings);
+            nativeWindow.Close();
         }
     }
 }

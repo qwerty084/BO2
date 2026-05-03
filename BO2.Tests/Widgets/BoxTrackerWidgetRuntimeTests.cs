@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using BO2.Services;
 using BO2.Widgets;
 using Xunit;
@@ -131,6 +132,107 @@ namespace BO2.Tests.Widgets
         }
 
         [Fact]
+        public void SetEnabled_WhenDisabled_OpensActivatesAppliesAndPersistsEnabledSettings()
+        {
+            var adapter = new FakeBoxTrackerWidgetNativeAdapter();
+            var runtime = new BoxTrackerWidgetRuntime(adapter);
+            WidgetSettingsDocument document = WidgetSettingsDocument.CreateDefault();
+            WidgetSettings settings = document.GetWidget(WidgetKind.BoxTracker);
+            var store = new WidgetSettingsStore(CreateSettingsPath());
+            int persistCallCount = 0;
+
+            bool changed = runtime.SetEnabled(settings, enabled: true, () =>
+            {
+                persistCallCount++;
+                store.Save(document);
+            });
+
+            FakeBoxTrackerWidgetNativeWindow window = Assert.IsType<FakeBoxTrackerWidgetNativeWindow>(
+                adapter.CreatedWindow);
+            Assert.True(changed);
+            Assert.True(settings.Enabled);
+            Assert.True(runtime.HasNativeWindow);
+            Assert.Equal(1, adapter.CreateWindowCallCount);
+            Assert.Equal(1, window.UpdateTextCallCount);
+            Assert.Equal(1, window.ActivateCallCount);
+            Assert.Same(settings, window.AppliedSettings);
+            Assert.Equal(1, persistCallCount);
+            Assert.True(store.Load().GetWidget(WidgetKind.BoxTracker).Enabled);
+        }
+
+        [Fact]
+        public void SetEnabled_WhenEnabled_ClosesOpenWindowAndPersistsDisabledSettings()
+        {
+            var adapter = new FakeBoxTrackerWidgetNativeAdapter();
+            var runtime = new BoxTrackerWidgetRuntime(adapter);
+            WidgetSettingsDocument document = WidgetSettingsDocument.CreateDefault();
+            WidgetSettings settings = document.GetWidget(WidgetKind.BoxTracker);
+            settings.Enabled = true;
+            var store = new WidgetSettingsStore(CreateSettingsPath());
+            runtime.Restore(settings);
+            FakeBoxTrackerWidgetNativeWindow window = Assert.IsType<FakeBoxTrackerWidgetNativeWindow>(
+                adapter.CreatedWindow);
+            int persistCallCount = 0;
+
+            bool changed = runtime.SetEnabled(settings, enabled: false, () =>
+            {
+                persistCallCount++;
+                store.Save(document);
+            });
+
+            Assert.True(changed);
+            Assert.False(settings.Enabled);
+            Assert.False(runtime.HasNativeWindow);
+            Assert.Equal(1, window.CapturePlacementCallCount);
+            Assert.Equal(1, window.CloseCallCount);
+            Assert.Equal(640, settings.X);
+            Assert.Equal(360, settings.Y);
+            Assert.Equal(1, persistCallCount);
+            WidgetSettings persistedSettings = store.Load().GetWidget(WidgetKind.BoxTracker);
+            Assert.False(persistedSettings.Enabled);
+            Assert.Equal(640, persistedSettings.X);
+            Assert.Equal(360, persistedSettings.Y);
+        }
+
+        [Fact]
+        public void SetEnabled_WhenAlreadyEnabled_DoesNotCreateDuplicateWindowOrPersistAgain()
+        {
+            var adapter = new FakeBoxTrackerWidgetNativeAdapter();
+            var runtime = new BoxTrackerWidgetRuntime(adapter);
+            WidgetSettings settings = WidgetSettings.CreateDefault();
+            int persistCallCount = 0;
+            runtime.SetEnabled(settings, enabled: true, () => persistCallCount++);
+
+            bool changed = runtime.SetEnabled(settings, enabled: true, () => persistCallCount++);
+
+            FakeBoxTrackerWidgetNativeWindow window = Assert.IsType<FakeBoxTrackerWidgetNativeWindow>(
+                adapter.CreatedWindow);
+            Assert.False(changed);
+            Assert.True(settings.Enabled);
+            Assert.True(runtime.HasNativeWindow);
+            Assert.Equal(1, adapter.CreateWindowCallCount);
+            Assert.Equal(1, window.ActivateCallCount);
+            Assert.Equal(1, persistCallCount);
+        }
+
+        [Fact]
+        public void SetEnabled_WhenAlreadyDisabled_DoesNotCloseOrPersistAgain()
+        {
+            var adapter = new FakeBoxTrackerWidgetNativeAdapter();
+            var runtime = new BoxTrackerWidgetRuntime(adapter);
+            WidgetSettings settings = WidgetSettings.CreateDefault();
+            int persistCallCount = 0;
+
+            bool changed = runtime.SetEnabled(settings, enabled: false, () => persistCallCount++);
+
+            Assert.False(changed);
+            Assert.False(settings.Enabled);
+            Assert.False(runtime.HasNativeWindow);
+            Assert.Equal(0, adapter.CreateWindowCallCount);
+            Assert.Equal(0, persistCallCount);
+        }
+
+        [Fact]
         public void EnsureNativeWindow_CreatesWindowThroughAdapter()
         {
             var adapter = new FakeBoxTrackerWidgetNativeAdapter();
@@ -153,6 +255,15 @@ namespace BO2.Tests.Widgets
                 events);
         }
 
+        private static string CreateSettingsPath()
+        {
+            return Path.GetFullPath(Path.Join(
+                Path.GetTempPath(),
+                "BO2.Tests",
+                Guid.NewGuid().ToString("N"),
+                "widgets.json"));
+        }
+
         private sealed class FakeBoxTrackerWidgetNativeAdapter : IBoxTrackerWidgetNativeAdapter
         {
             public int CreateWindowCallCount { get; private set; }
@@ -173,6 +284,10 @@ namespace BO2.Tests.Widgets
 
             public int ActivateCallCount { get; private set; }
 
+            public int CapturePlacementCallCount { get; private set; }
+
+            public int CloseCallCount { get; private set; }
+
             public int UpdateTextCallCount { get; private set; }
 
             public string Text { get; private set; } = string.Empty;
@@ -186,6 +301,7 @@ namespace BO2.Tests.Widgets
 
             public void Close()
             {
+                CloseCallCount++;
                 Closed?.Invoke(this, EventArgs.Empty);
             }
 
@@ -202,6 +318,9 @@ namespace BO2.Tests.Widgets
 
             public void CapturePlacement(WidgetSettings settings)
             {
+                CapturePlacementCallCount++;
+                settings.X = 640;
+                settings.Y = 360;
             }
         }
     }

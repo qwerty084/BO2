@@ -55,24 +55,10 @@ namespace BO2.Widgets
 
         public void SetBoxTrackerEnabled(bool enabled)
         {
-            WidgetSettings settings = BoxTrackerSettings;
-            if (settings.Enabled == enabled)
+            if (_boxTrackerRuntime.SetEnabled(BoxTrackerSettings, enabled, SaveSettings))
             {
-                return;
+                SettingsChanged?.Invoke(this, EventArgs.Empty);
             }
-
-            settings.Enabled = enabled;
-            if (enabled)
-            {
-                OpenBoxTracker();
-            }
-            else
-            {
-                CloseBoxTracker(disable: false);
-            }
-
-            SaveSettings();
-            SettingsChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public void ApplyBoxTrackerSettings(WidgetSettings settings)
