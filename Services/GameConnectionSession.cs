@@ -200,15 +200,6 @@ namespace BO2.Services
             return PublishSnapshot(result);
         }
 
-        internal bool IsMonitorConnectedFor(DetectedGame? detectedGame)
-        {
-            lock (_syncRoot)
-            {
-                return _lifecycle.IsMonitorConnectedFor(
-                    GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
-            }
-        }
-
         public GameConnectionSnapshot Connect()
         {
             GameConnectionRefreshResult connectingResult = BeginConnect();
@@ -588,16 +579,9 @@ namespace BO2.Services
             return Equals(left.CurrentGame, right.CurrentGame)
                 && left.ConnectionPhase == right.ConnectionPhase
                 && Equals(left.ReadResult, right.ReadResult)
-                && Equals(left.InjectionResult, right.InjectionResult)
-                && left.IsConnecting == right.IsConnecting
-                && left.IsDisconnecting == right.IsDisconnecting
-                && left.CanAttemptConnect == right.CanAttemptConnect
                 && left.ConnectCommandAvailability == right.ConnectCommandAvailability
                 && left.DisconnectCommandAvailability == right.DisconnectCommandAvailability
-                && left.HasInjectionAttemptForCurrentGame == right.HasInjectionAttemptForCurrentGame
-                && left.IsMonitorConnectedForCurrentGame == right.IsMonitorConnectedForCurrentGame
-                && HasSameEventMonitorSummary(left.EventMonitorSummary, right.EventMonitorSummary)
-                && HasSameEventStatus(left.EventStatus, right.EventStatus);
+                && HasSameEventMonitorSummary(left.EventMonitorSummary, right.EventMonitorSummary);
         }
 
         private static bool HasSameEventMonitorSummary(
@@ -812,16 +796,9 @@ namespace BO2.Services
                 result.CurrentGame,
                 result.ConnectionPhase,
                 result.ReadResult,
-                result.EventStatus,
                 result.EventMonitorSummary,
-                result.InjectionResult,
-                result.IsConnecting,
-                result.IsDisconnecting,
-                result.CanAttemptConnect,
                 result.ConnectCommandAvailability,
-                result.DisconnectCommandAvailability,
-                result.HasInjectionAttemptForCurrentGame,
-                result.IsMonitorConnectedForCurrentGame);
+                result.DisconnectCommandAvailability);
         }
 
         private readonly record struct GameConnectionRefreshResult(
@@ -865,16 +842,9 @@ namespace BO2.Services
         DetectedGame? CurrentGame,
         GameConnectionPhase ConnectionPhase,
         PlayerStatsReadResult? ReadResult,
-        GameEventMonitorStatus EventStatus,
         GameConnectionEventMonitorSummary EventMonitorSummary,
-        DllInjectionResult InjectionResult,
-        bool IsConnecting,
-        bool IsDisconnecting,
-        bool CanAttemptConnect,
         GameConnectionCommandAvailability ConnectCommandAvailability,
-        GameConnectionCommandAvailability DisconnectCommandAvailability,
-        bool HasInjectionAttemptForCurrentGame,
-        bool IsMonitorConnectedForCurrentGame);
+        GameConnectionCommandAvailability DisconnectCommandAvailability);
 
     internal sealed class GameConnectionSnapshotChangedEventArgs(
         GameConnectionSnapshot previousSnapshot,

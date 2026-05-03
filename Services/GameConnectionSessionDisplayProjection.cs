@@ -17,8 +17,7 @@ namespace BO2.Services
                 projection,
                 snapshot.CurrentGame,
                 snapshot.ConnectionPhase,
-                snapshot.EventMonitorSummary,
-                snapshot.HasInjectionAttemptForCurrentGame);
+                snapshot.EventMonitorSummary);
             UpdateConnectButtonState(projection, snapshot);
             ApplyCommandAvailability(projection, snapshot);
             return projection;
@@ -283,8 +282,7 @@ namespace BO2.Services
             GameConnectionSessionDisplayProjection projection,
             DetectedGame? detectedGame,
             GameConnectionPhase connectionPhase,
-            GameConnectionEventMonitorSummary eventMonitor,
-            bool hasInjectionAttemptForDetectedGame)
+            GameConnectionEventMonitorSummary eventMonitor)
         {
             projection.LatestEventStatus = eventMonitor.Status;
 
@@ -343,9 +341,7 @@ namespace BO2.Services
                     ? DisplayText.Resource("DllInjectionConnecting")
                     : eventMonitor.State is GameConnectionEventMonitorState.ReadinessFailed or GameConnectionEventMonitorState.LoadingFailed
                         ? DisplayText.Plain(eventMonitor.FailureMessage ?? string.Empty)
-                    : hasInjectionAttemptForDetectedGame
-                        ? FormatInjectionStatus(eventMonitor)
-                        : DisplayText.Resource("DllInjectionWaitingForConnect");
+                    : DisplayText.Resource("DllInjectionWaitingForConnect");
                 projection.EventMonitorStatusText = DisplayText.Resource("EventMonitorWaitingForConnect");
                 projection.ConnectionLastUpdateText = EmptyStatText;
                 projection.CurrentRoundText = EmptyStatText;

@@ -139,10 +139,8 @@ namespace BO2.Tests.Services
                 CreateSnapshot(
                     detectedGame,
                     readResult,
-                    eventStatus,
-                    new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
-                    hasInjectionAttemptForCurrentGame: true,
-                    isMonitorConnectedForCurrentGame: true));
+                    connectionPhase: GameConnectionPhase.Connected,
+                    eventMonitorSummary: GameConnectionEventMonitorSummary.FromStatus(eventStatus)));
 
             DisplayText.FormatText status = AssertFormat("ConnectedStatusFormat", projection.StatusText);
             AssertPlain("Steam Zombies", status.Arguments[0]);
@@ -188,10 +186,8 @@ namespace BO2.Tests.Services
                 CreateSnapshot(
                     detectedGame,
                     CreateReadResult(detectedGame),
-                    GameEventMonitorStatus.WaitingForMonitor,
-                    DllInjectionResult.NotAttempted,
-                    eventMonitorSummary: GameConnectionEventMonitorSummary.FromStatus(eventStatus),
-                    isMonitorConnectedForCurrentGame: true));
+                    connectionPhase: GameConnectionPhase.Connected,
+                    eventMonitorSummary: GameConnectionEventMonitorSummary.FromStatus(eventStatus)));
 
             AssertResource("DllInjectionMonitorReady", projection.InjectionStatusText);
             DisplayText.FormatText monitorStatus = AssertFormat("EventMonitorPublishedEventsFormat", projection.EventMonitorStatusText);
@@ -209,8 +205,7 @@ namespace BO2.Tests.Services
                 CreateSnapshot(
                     detectedGame,
                     CreateReadResult(detectedGame),
-                    eventMonitorSummary: GameConnectionEventMonitorSummary.ReadinessFailed("timeout"),
-                    hasInjectionAttemptForCurrentGame: true));
+                    eventMonitorSummary: GameConnectionEventMonitorSummary.ReadinessFailed("timeout")));
 
             AssertPlain("timeout", projection.InjectionStatusText);
             AssertResource("EventMonitorWaitingForConnect", projection.EventMonitorStatusText);
@@ -229,17 +224,8 @@ namespace BO2.Tests.Services
                 CreateSnapshot(
                     detectedGame,
                     readResult,
-                    new GameEventMonitorStatus(
-                        GameCompatibilityState.Compatible,
-                        DroppedEventCount: 0,
-                        DroppedNotifyCount: 0,
-                        PublishedNotifyCount: 0,
-                        RecentEvents: []),
-                    new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
                     connectionPhase: GameConnectionPhase.Disconnecting,
-                    eventMonitorSummary: GameConnectionEventMonitorSummary.StopPending,
-                    hasInjectionAttemptForCurrentGame: true,
-                    isMonitorConnectedForCurrentGame: false));
+                    eventMonitorSummary: GameConnectionEventMonitorSummary.StopPending));
 
             AssertResource("ConnectionStatusDisconnecting", projection.StatusText);
             AssertResource("DllInjectionDisconnecting", projection.InjectionStatusText);
@@ -263,7 +249,7 @@ namespace BO2.Tests.Services
                 CreateSnapshot(
                     detectedGame,
                     CreateReadResult(detectedGame),
-                    isMonitorConnectedForCurrentGame: true,
+                    connectionPhase: GameConnectionPhase.Connected,
                     connectCommandAvailability: GameConnectionCommandAvailability.VisibleEnabled,
                     disconnectCommandAvailability: GameConnectionCommandAvailability.Hidden));
 
@@ -281,13 +267,7 @@ namespace BO2.Tests.Services
         private static GameConnectionSnapshot CreateSnapshot(
             DetectedGame? currentGame,
             PlayerStatsReadResult? readResult,
-            GameEventMonitorStatus? eventStatus = null,
-            DllInjectionResult? injectionResult = null,
-            bool isConnecting = false,
-            bool isDisconnecting = false,
             bool canAttemptConnect = false,
-            bool hasInjectionAttemptForCurrentGame = false,
-            bool isMonitorConnectedForCurrentGame = false,
             GameConnectionPhase? connectionPhase = null,
             GameConnectionCommandAvailability? connectCommandAvailability = null,
             GameConnectionCommandAvailability? disconnectCommandAvailability = null,
@@ -295,49 +275,14 @@ namespace BO2.Tests.Services
         {
             GameConnectionPhase phase = connectionPhase ?? DetermineConnectionPhase(
                 currentGame,
-                readResult,
-                isConnecting,
-                isDisconnecting,
-                isMonitorConnectedForCurrentGame);
+                readResult);
             return new GameConnectionSnapshot(
                 currentGame,
                 phase,
                 readResult,
-                eventStatus ?? GameEventMonitorStatus.WaitingForMonitor,
-                eventMonitorSummary ?? CreateEventMonitorSummary(
-                    eventStatus ?? GameEventMonitorStatus.WaitingForMonitor,
-                    isConnecting,
-                    isMonitorConnectedForCurrentGame,
-                    injectionResult),
-                injectionResult ?? DllInjectionResult.NotAttempted,
-                isConnecting,
-                isDisconnecting,
-                canAttemptConnect,
+                eventMonitorSummary ?? GameConnectionEventMonitorSummary.Waiting,
                 connectCommandAvailability ?? CreateConnectCommandAvailability(phase, canAttemptConnect),
-                disconnectCommandAvailability ?? CreateDisconnectCommandAvailability(phase),
-                hasInjectionAttemptForCurrentGame,
-                isMonitorConnectedForCurrentGame);
-        }
-
-        private static GameConnectionEventMonitorSummary CreateEventMonitorSummary(
-            GameEventMonitorStatus eventStatus,
-            bool isConnecting,
-            bool isMonitorConnectedForCurrentGame,
-            DllInjectionResult? injectionResult)
-        {
-            if (isConnecting)
-            {
-                return GameConnectionEventMonitorSummary.Connecting;
-            }
-
-            if (injectionResult?.State == DllInjectionState.Failed)
-            {
-                return GameConnectionEventMonitorSummary.LoadingFailed(injectionResult.Message);
-            }
-
-            return isMonitorConnectedForCurrentGame
-                ? GameConnectionEventMonitorSummary.FromStatus(eventStatus)
-                : GameConnectionEventMonitorSummary.Waiting;
+                disconnectCommandAvailability ?? CreateDisconnectCommandAvailability(phase));
         }
 
         private static GameConnectionCommandAvailability CreateConnectCommandAvailability(
@@ -367,10 +312,7 @@ namespace BO2.Tests.Services
 
         private static GameConnectionPhase DetermineConnectionPhase(
             DetectedGame? currentGame,
-            PlayerStatsReadResult? readResult,
-            bool isConnecting,
-            bool isDisconnecting,
-            bool isMonitorConnectedForCurrentGame)
+            PlayerStatsReadResult? readResult)
         {
             if (currentGame is null)
             {
@@ -380,21 +322,6 @@ namespace BO2.Tests.Services
             if (!currentGame.IsStatsSupported)
             {
                 return GameConnectionPhase.UnsupportedGame;
-            }
-
-            if (isDisconnecting)
-            {
-                return GameConnectionPhase.Disconnecting;
-            }
-
-            if (isConnecting)
-            {
-                return GameConnectionPhase.Connecting;
-            }
-
-            if (isMonitorConnectedForCurrentGame)
-            {
-                return GameConnectionPhase.Connected;
             }
 
             return readResult?.DetectedGame.ProcessId == currentGame.ProcessId
