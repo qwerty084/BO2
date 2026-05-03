@@ -74,8 +74,8 @@
     <Compile Include="..\Services\GameConnectionEventMonitorSummary.cs" Link="Services\GameConnectionEventMonitorSummary.cs" />
     <Compile Include="..\Services\GameConnectionSessionLifecycle.cs" Link="Services\GameConnectionSessionLifecycle.cs" />
     <Compile Include="..\Services\GameConnectionSession.cs"     Link="Services\GameConnectionSession.cs" />
-    <Compile Include="..\Services\GameConnectionSessionDisplayProjection.cs" Link="Services\GameConnectionSessionDisplayProjection.cs" />
-    <Compile Include="..\Services\GameConnectionSessionDisplayRenderer.cs" Link="Services\GameConnectionSessionDisplayRenderer.cs" />
+    <Compile Include="..\Services\DisplayTextRenderer.cs" Link="Services\DisplayTextRenderer.cs" />
+    <Compile Include="..\Services\GameConnectionDisplayTextProjector.cs" Link="Services\GameConnectionDisplayTextProjector.cs" />
     <Compile Include="..\Services\CurrentGamePageDisplayProjector.cs" Link="Services\CurrentGamePageDisplayProjector.cs" />
     <Compile Include="..\Services\ShellConnectionDisplayProjector.cs" Link="Services\ShellConnectionDisplayProjector.cs" />
     <Compile Include="..\Services\StatFormatter.cs"             Link="Services\StatFormatter.cs" />

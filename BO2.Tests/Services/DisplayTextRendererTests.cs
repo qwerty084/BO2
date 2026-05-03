@@ -5,24 +5,8 @@ using Xunit;
 
 namespace BO2.Tests.Services
 {
-    public sealed class GameConnectionSessionDisplayRendererTests
+    public sealed class DisplayTextRendererTests
     {
-        [Fact]
-        public void Render_WhenProjectionHasDefaults_ReturnsDefaultDisplayState()
-        {
-            GameConnectionSessionDisplayState state = CreateRenderer().Render(
-                GameConnectionSessionDisplayProjection.CreateDefault());
-
-            Assert.Equal(GameConnectionSessionDisplayState.EmptyStatText, state.PointsText);
-            Assert.Equal("NoGameDetected", state.DetectedGameText);
-            Assert.Equal("DllInjectionNotAttempted", state.InjectionStatusText);
-            Assert.Equal("RecentEventsEmpty", state.BoxEventsText);
-            Assert.Equal("GameNotRunning", state.StatusText);
-            Assert.True(state.IsConnectButtonVisible);
-            Assert.False(state.IsDisconnectButtonEnabled);
-            Assert.True(state.IsFooterDisconnectedStatusVisible);
-        }
-
         [Fact]
         public void Render_WhenTextIsResource_ReturnsResourceValue()
         {
@@ -86,9 +70,9 @@ namespace BO2.Tests.Services
             Assert.Equal(receivedAt.ToLocalTime().ToString("HH:mm:ss", CultureInfo.CurrentCulture), text);
         }
 
-        private static GameConnectionSessionDisplayRenderer CreateRenderer()
+        private static DisplayTextRenderer CreateRenderer()
         {
-            return new GameConnectionSessionDisplayRenderer();
+            return new DisplayTextRenderer();
         }
     }
 }

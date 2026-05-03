@@ -119,6 +119,46 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void Project_WhenEventMonitorReadinessFailedBeforeConnect_ReturnsFailureStatus()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+
+            CurrentGamePageDisplayState state = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    CreateReadResult(detectedGame),
+                    connectionPhase: GameConnectionPhase.StatsOnlyDetected,
+                    canAttemptConnect: true,
+                    eventMonitorSummary: GameConnectionEventMonitorSummary.ReadinessFailed("timeout")));
+
+            Assert.Equal("Steam Zombies", state.DetectedGameText);
+            Assert.Equal("timeout", state.InjectionStatusText);
+            Assert.Equal("EventMonitorWaitingForConnect", state.EventMonitorStatusText);
+            AssertInactiveStats(state);
+            AssertInactiveEvents(state);
+        }
+
+        [Fact]
+        public void Project_WhenEventMonitorLoadingFailedBeforeConnect_ReturnsFailureStatus()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+
+            CurrentGamePageDisplayState state = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    CreateReadResult(detectedGame),
+                    connectionPhase: GameConnectionPhase.StatsOnlyDetected,
+                    canAttemptConnect: true,
+                    eventMonitorSummary: GameConnectionEventMonitorSummary.LoadingFailed("load failed")));
+
+            Assert.Equal("Steam Zombies", state.DetectedGameText);
+            Assert.Equal("load failed", state.InjectionStatusText);
+            Assert.Equal("EventMonitorWaitingForConnect", state.EventMonitorStatusText);
+            AssertInactiveStats(state);
+            AssertInactiveEvents(state);
+        }
+
+        [Fact]
         public void Project_WhenConnecting_ReturnsConnectingStateWithoutLiveStatsOrEvents()
         {
             DetectedGame detectedGame = CreateSupportedGame(1001);
@@ -171,6 +211,30 @@ namespace BO2.Tests.Services
             Assert.Contains("randomization_done", state.BoxEventsText, StringComparison.Ordinal);
             Assert.Contains("Ray Gun (ray_gun_zm)", state.BoxEventsText, StringComparison.Ordinal);
             Assert.Contains("RecentEventFormat", state.RecentGameEventsText, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void Project_WhenConnectedWithPublishedEvents_ReturnsPublishedMonitorStatus()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+            GameEventMonitorStatus eventStatus = new(
+                GameCompatibilityState.Compatible,
+                DroppedEventCount: 0,
+                DroppedNotifyCount: 0,
+                PublishedNotifyCount: 1,
+                RecentEvents: []);
+
+            CurrentGamePageDisplayState state = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    CreateReadResult(detectedGame),
+                    connectionPhase: GameConnectionPhase.Connected,
+                    eventMonitorSummary: GameConnectionEventMonitorSummary.FromStatus(eventStatus)));
+
+            Assert.Equal("DllInjectionMonitorReady", state.InjectionStatusText);
+            Assert.Equal("EventMonitorPublishedEventsFormat(EventMonitorCompatible, 1)", state.EventMonitorStatusText);
+            Assert.Equal(CurrentGamePageDisplayState.EmptyStatText, state.CurrentRoundText);
+            Assert.Equal("RecentEventsEmpty", state.BoxEventsText);
         }
 
         [Fact]

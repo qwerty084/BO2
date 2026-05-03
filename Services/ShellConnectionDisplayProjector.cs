@@ -4,16 +4,16 @@ namespace BO2.Services
 {
     internal sealed class ShellConnectionDisplayProjector
     {
-        private static readonly DisplayText EmptyText = DisplayText.Plain("--");
+        private static readonly DisplayText EmptyText = GameConnectionDisplayTextProjector.EmptyValueText;
 
-        private readonly GameConnectionSessionDisplayRenderer _renderer;
+        private readonly DisplayTextRenderer _renderer;
 
         public ShellConnectionDisplayProjector()
-            : this(new GameConnectionSessionDisplayRenderer())
+            : this(new DisplayTextRenderer())
         {
         }
 
-        private ShellConnectionDisplayProjector(GameConnectionSessionDisplayRenderer renderer)
+        private ShellConnectionDisplayProjector(DisplayTextRenderer renderer)
         {
             ArgumentNullException.ThrowIfNull(renderer);
 
@@ -54,7 +54,7 @@ namespace BO2.Services
 
             if (connectionPhase == GameConnectionPhase.UnsupportedGame)
             {
-                projection.MainStatusText = FormatUnsupportedStatus(detectedGame);
+                projection.MainStatusText = GameConnectionDisplayTextProjector.FormatUnsupportedStatus(detectedGame);
                 SetConnectionState(projection, detectedGame, ConnectionState.Unsupported, connectionPhase);
                 return;
             }
@@ -86,16 +86,6 @@ namespace BO2.Services
                 "GameDetectedConnectPromptFormat",
                 DisplayText.Plain(detectedGame.DisplayName));
             SetConnectionState(projection, detectedGame, ConnectionState.Detected, connectionPhase);
-        }
-
-        private static DisplayText FormatUnsupportedStatus(DetectedGame detectedGame)
-        {
-            return string.IsNullOrWhiteSpace(detectedGame.UnsupportedReason)
-                ? DisplayText.Format("UnsupportedStatusFormat", DisplayText.Plain(detectedGame.DisplayName))
-                : DisplayText.Format(
-                    "UnsupportedStatusWithReasonFormat",
-                    DisplayText.Plain(detectedGame.DisplayName),
-                    DisplayText.Plain(detectedGame.UnsupportedReason));
         }
 
         private static void ApplyEventMonitorStatus(
@@ -143,45 +133,7 @@ namespace BO2.Services
             }
 
             projection.ConnectionLastUpdateText = DisplayText.Resource("ConnectionLastUpdateJustNow");
-            projection.EventMonitorStatusText = FormatMonitorStatus(eventMonitor);
-        }
-
-        private static DisplayText FormatMonitorStatus(GameConnectionEventMonitorSummary eventMonitor)
-        {
-            DisplayText monitorStatusText = FormatEventCompatibility(eventMonitor.State);
-            if (eventMonitor.Status.DroppedEventCount > 0 || eventMonitor.Status.DroppedNotifyCount > 0)
-            {
-                return DisplayText.Format(
-                    "EventMonitorCaptureDropsFormat",
-                    monitorStatusText,
-                    eventMonitor.Status.DroppedEventCount,
-                    eventMonitor.Status.DroppedNotifyCount,
-                    eventMonitor.Status.PublishedNotifyCount);
-            }
-
-            if (eventMonitor.Status.PublishedNotifyCount > 0)
-            {
-                return DisplayText.Format(
-                    "EventMonitorPublishedEventsFormat",
-                    monitorStatusText,
-                    eventMonitor.Status.PublishedNotifyCount);
-            }
-
-            return monitorStatusText;
-        }
-
-        private static DisplayText FormatEventCompatibility(GameConnectionEventMonitorState state)
-        {
-            return state switch
-            {
-                GameConnectionEventMonitorState.Waiting => DisplayText.Resource("EventMonitorWaitingForMonitor"),
-                GameConnectionEventMonitorState.Connecting => DisplayText.Resource("EventMonitorWaitingForMonitor"),
-                GameConnectionEventMonitorState.Ready => DisplayText.Resource("EventMonitorCompatible"),
-                GameConnectionEventMonitorState.UnsupportedVersion => DisplayText.Resource("EventMonitorUnsupportedVersion"),
-                GameConnectionEventMonitorState.CaptureDisabled => DisplayText.Resource("EventMonitorCaptureDisabled"),
-                GameConnectionEventMonitorState.PollingFallback => DisplayText.Resource("EventMonitorPollingFallback"),
-                _ => DisplayText.Resource("EventMonitorUnknown")
-            };
+            projection.EventMonitorStatusText = GameConnectionDisplayTextProjector.FormatMonitorStatus(eventMonitor);
         }
 
         private static void ApplyCommandPresentation(
