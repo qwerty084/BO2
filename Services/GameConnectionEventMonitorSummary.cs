@@ -11,7 +11,12 @@ namespace BO2.Services
         CaptureDisabled,
         PollingFallback,
         ReadinessFailed,
-        LoadingFailed
+        LoadingFailed,
+        Disconnecting,
+        StopPending,
+        StopCompleted,
+        StopTimedOut,
+        CleanupRequested
     }
 
     internal sealed record GameConnectionEventMonitorSummary(
@@ -42,6 +47,26 @@ namespace BO2.Services
                 GameEventMonitorStatus.WaitingForMonitor,
                 failureMessage);
         }
+
+        public static GameConnectionEventMonitorSummary Disconnecting { get; } = new(
+            GameConnectionEventMonitorState.Disconnecting,
+            GameEventMonitorStatus.WaitingForMonitor);
+
+        public static GameConnectionEventMonitorSummary StopPending { get; } = new(
+            GameConnectionEventMonitorState.StopPending,
+            GameEventMonitorStatus.WaitingForMonitor);
+
+        public static GameConnectionEventMonitorSummary StopCompleted { get; } = new(
+            GameConnectionEventMonitorState.StopCompleted,
+            GameEventMonitorStatus.WaitingForMonitor);
+
+        public static GameConnectionEventMonitorSummary StopTimedOut { get; } = new(
+            GameConnectionEventMonitorState.StopTimedOut,
+            GameEventMonitorStatus.WaitingForMonitor);
+
+        public static GameConnectionEventMonitorSummary CleanupRequested { get; } = new(
+            GameConnectionEventMonitorState.CleanupRequested,
+            GameEventMonitorStatus.WaitingForMonitor);
 
         public static GameConnectionEventMonitorSummary FromStatus(GameEventMonitorStatus status)
         {

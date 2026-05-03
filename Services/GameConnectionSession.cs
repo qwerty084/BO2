@@ -318,7 +318,12 @@ namespace BO2.Services
                 _eventMonitor.RequestStop(completion.StopRequest.MonitorProcessId);
             }
 
-            return ReadSnapshot(detectedGame, receivedAt);
+            return ReadSnapshot(
+                detectedGame,
+                receivedAt,
+                completion.StopRequest.ShouldRequestStop
+                    ? GameConnectionEventMonitorSummary.CleanupRequested
+                    : null);
         }
 
         private GameConnectionRefreshResult BeginDisconnect()
@@ -332,7 +337,9 @@ namespace BO2.Services
                 disconnectAction = _lifecycle.BeginDisconnect(receivedAt);
                 if (!disconnectAction.ShouldReadSnapshot)
                 {
-                    result = CreateDisconnectingSnapshotLocked(detectedGame);
+                    result = CreateDisconnectingSnapshotLocked(
+                        detectedGame,
+                        CreateEventMonitorSummaryOverride(disconnectAction.EventMonitorState));
                 }
             }
 
@@ -367,7 +374,9 @@ namespace BO2.Services
                 disconnectAction = _lifecycle.RefreshDisconnect();
                 if (!disconnectAction.ShouldReadSnapshot && !disconnectAction.ShouldCheckStopComplete)
                 {
-                    result = CreateDisconnectingSnapshotLocked(detectedGame);
+                    result = CreateDisconnectingSnapshotLocked(
+                        detectedGame,
+                        CreateEventMonitorSummaryOverride(disconnectAction.EventMonitorState));
                 }
             }
 
@@ -384,13 +393,18 @@ namespace BO2.Services
                         MonitorDisconnectTimeout);
                     if (!disconnectAction.ShouldReadSnapshot && !disconnectAction.ShouldCheckStopComplete)
                     {
-                        result = CreateDisconnectingSnapshotLocked(detectedGame);
+                        result = CreateDisconnectingSnapshotLocked(
+                            detectedGame,
+                            CreateEventMonitorSummaryOverride(disconnectAction.EventMonitorState));
                     }
                 }
             }
 
             return disconnectAction.ShouldReadSnapshot
-                ? ReadSnapshot(detectedGame, receivedAt)
+                ? ReadSnapshot(
+                    detectedGame,
+                    receivedAt,
+                    CreateEventMonitorSummaryOverride(disconnectAction.EventMonitorState))
                 : result!.Value;
         }
 
@@ -437,7 +451,8 @@ namespace BO2.Services
 
         private GameConnectionRefreshResult ReadSnapshot(
             DetectedGame? detectedGame,
-            DateTimeOffset receivedAt)
+            DateTimeOffset receivedAt,
+            GameConnectionEventMonitorSummary? eventMonitorSummaryOverride = null)
         {
             PlayerStatsReadResult? readResult = ReadPlayerStats(detectedGame);
             int? ownedMonitorProcessId;
@@ -470,7 +485,7 @@ namespace BO2.Services
                 }
 
                 stopRequest = ApplyMonitorReadinessTimeoutLocked(readResult?.DetectedGame, eventStatus, receivedAt);
-                result = CreateRefreshResultLocked(detectedGame, readResult, eventStatus);
+                result = CreateRefreshResultLocked(detectedGame, readResult, eventStatus, eventMonitorSummaryOverride);
             }
 
             if (stopRequest.ShouldRequestStop)
@@ -512,7 +527,11 @@ namespace BO2.Services
                     currentLifecycleGame,
                     detectedLifecycleGame);
                 snapshotChangedArgs = UpdateSnapshotLocked(
-                    CreateSnapshot(CreateStatusSnapshotLocked(detectedGame)));
+                    CreateSnapshot(CreateStatusSnapshotLocked(
+                        detectedGame,
+                        stopRequest.ShouldRequestStop
+                            ? GameConnectionEventMonitorSummary.CleanupRequested
+                            : null)));
             }
 
             if (stopRequest.ShouldRequestStop)
@@ -624,26 +643,47 @@ namespace BO2.Services
             return exception is InvalidOperationException or Win32Exception;
         }
 
-        private GameConnectionRefreshResult CreateStatusSnapshotLocked(DetectedGame? detectedGame)
+        private static GameConnectionEventMonitorSummary? CreateEventMonitorSummaryOverride(
+            GameConnectionEventMonitorState? state)
         {
-            return CreateRefreshResultLocked(
-                detectedGame,
-                null,
-                GameEventMonitorStatus.WaitingForMonitor);
+            return state switch
+            {
+                GameConnectionEventMonitorState.Disconnecting => GameConnectionEventMonitorSummary.Disconnecting,
+                GameConnectionEventMonitorState.StopPending => GameConnectionEventMonitorSummary.StopPending,
+                GameConnectionEventMonitorState.StopCompleted => GameConnectionEventMonitorSummary.StopCompleted,
+                GameConnectionEventMonitorState.StopTimedOut => GameConnectionEventMonitorSummary.StopTimedOut,
+                GameConnectionEventMonitorState.CleanupRequested => GameConnectionEventMonitorSummary.CleanupRequested,
+                _ => null
+            };
         }
 
-        private GameConnectionRefreshResult CreateDisconnectingSnapshotLocked(DetectedGame? detectedGame)
+        private GameConnectionRefreshResult CreateStatusSnapshotLocked(
+            DetectedGame? detectedGame,
+            GameConnectionEventMonitorSummary? eventMonitorSummaryOverride = null)
         {
             return CreateRefreshResultLocked(
                 detectedGame,
                 null,
-                GameEventMonitorStatus.WaitingForMonitor);
+                GameEventMonitorStatus.WaitingForMonitor,
+                eventMonitorSummaryOverride);
+        }
+
+        private GameConnectionRefreshResult CreateDisconnectingSnapshotLocked(
+            DetectedGame? detectedGame,
+            GameConnectionEventMonitorSummary? eventMonitorSummaryOverride)
+        {
+            return CreateRefreshResultLocked(
+                detectedGame,
+                null,
+                GameEventMonitorStatus.WaitingForMonitor,
+                eventMonitorSummaryOverride ?? GameConnectionEventMonitorSummary.Disconnecting);
         }
 
         private GameConnectionRefreshResult CreateRefreshResultLocked(
             DetectedGame? detectedGame,
             PlayerStatsReadResult? readResult,
-            GameEventMonitorStatus eventStatus)
+            GameEventMonitorStatus eventStatus,
+            GameConnectionEventMonitorSummary? eventMonitorSummaryOverride = null)
         {
             GameConnectionSessionLifecycleSnapshot lifecycleSnapshot = _lifecycle.CreateSnapshot(
                 GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
@@ -653,7 +693,8 @@ namespace BO2.Services
                 lifecycleSnapshot);
             GameConnectionEventMonitorSummary eventMonitorSummary = CreateEventMonitorSummary(
                 lifecycleSnapshot,
-                eventStatus);
+                eventStatus,
+                eventMonitorSummaryOverride);
             return new GameConnectionRefreshResult(
                 detectedGame,
                 connectionPhase,
@@ -690,11 +731,22 @@ namespace BO2.Services
 
         private static GameConnectionEventMonitorSummary CreateEventMonitorSummary(
             GameConnectionSessionLifecycleSnapshot lifecycleSnapshot,
-            GameEventMonitorStatus eventStatus)
+            GameEventMonitorStatus eventStatus,
+            GameConnectionEventMonitorSummary? eventMonitorSummaryOverride)
         {
+            if (eventMonitorSummaryOverride is not null)
+            {
+                return eventMonitorSummaryOverride;
+            }
+
             if (lifecycleSnapshot.IsConnecting)
             {
                 return GameConnectionEventMonitorSummary.Connecting;
+            }
+
+            if (lifecycleSnapshot.IsDisconnecting)
+            {
+                return GameConnectionEventMonitorSummary.Disconnecting;
             }
 
             if (lifecycleSnapshot.HasMonitorReadinessFailureForCurrentGame)

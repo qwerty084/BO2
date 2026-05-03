@@ -252,6 +252,7 @@ namespace BO2.Tests.Services
             Assert.False(action.ShouldReadSnapshot);
             Assert.True(action.ShouldRequestStop);
             Assert.Equal(1001, action.MonitorProcessId);
+            Assert.Equal(GameConnectionEventMonitorState.Disconnecting, action.EventMonitorState);
             Assert.True(lifecycle.IsDisconnecting);
             Assert.Equal(1001, lifecycle.DisconnectProcessId);
             Assert.Equal(requestedAt, lifecycle.DisconnectRequestedAt);
@@ -273,6 +274,7 @@ namespace BO2.Tests.Services
             Assert.True(firstAction.ShouldRequestStop);
             Assert.False(secondAction.ShouldReadSnapshot);
             Assert.False(secondAction.ShouldRequestStop);
+            Assert.Equal(GameConnectionEventMonitorState.Disconnecting, secondAction.EventMonitorState);
             Assert.True(lifecycle.IsDisconnecting);
             Assert.Equal(1001, lifecycle.DisconnectProcessId);
             Assert.Equal(requestedAt, lifecycle.DisconnectRequestedAt);
@@ -295,6 +297,7 @@ namespace BO2.Tests.Services
 
             Assert.True(action.ShouldReadSnapshot);
             Assert.False(action.ShouldCheckStopComplete);
+            Assert.Equal(GameConnectionEventMonitorState.StopCompleted, action.EventMonitorState);
             Assert.False(lifecycle.IsDisconnecting);
             Assert.Null(lifecycle.DisconnectProcessId);
             Assert.Equal(DllInjectionState.NotAttempted, snapshot.InjectionResult.State);
@@ -320,6 +323,7 @@ namespace BO2.Tests.Services
 
             Assert.True(action.ShouldReadSnapshot);
             Assert.False(action.ShouldCheckStopComplete);
+            Assert.Equal(GameConnectionEventMonitorState.StopTimedOut, action.EventMonitorState);
             Assert.False(lifecycle.IsDisconnecting);
             Assert.Null(lifecycle.DisconnectProcessId);
             Assert.Equal(DllInjectionState.NotAttempted, snapshot.InjectionResult.State);
@@ -346,6 +350,7 @@ namespace BO2.Tests.Services
             Assert.False(action.ShouldReadSnapshot);
             Assert.False(action.ShouldCheckStopComplete);
             Assert.Equal(1001, action.MonitorProcessId);
+            Assert.Equal(GameConnectionEventMonitorState.StopPending, action.EventMonitorState);
             Assert.True(lifecycle.IsDisconnecting);
             Assert.True(snapshot.IsDisconnecting);
             Assert.False(snapshot.CanAttemptConnect);

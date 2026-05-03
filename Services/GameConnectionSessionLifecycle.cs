@@ -180,10 +180,16 @@ namespace BO2.Services
                 return GameConnectionSessionDisconnectRefreshAction.ReadSnapshot;
             }
 
-            if (isStopComplete || HasDisconnectTimedOut(receivedAt, disconnectTimeout))
+            if (isStopComplete)
             {
                 ResetMonitorConnectionState(requestStop: false);
-                return GameConnectionSessionDisconnectRefreshAction.ReadSnapshot;
+                return GameConnectionSessionDisconnectRefreshAction.StopCompleted;
+            }
+
+            if (HasDisconnectTimedOut(receivedAt, disconnectTimeout))
+            {
+                ResetMonitorConnectionState(requestStop: false);
+                return GameConnectionSessionDisconnectRefreshAction.StopTimedOut;
             }
 
             return GameConnectionSessionDisconnectRefreshAction.CreateDisconnectingSnapshot(monitorProcessId);
@@ -339,43 +345,62 @@ namespace BO2.Services
     internal readonly record struct GameConnectionSessionDisconnectAction(
         bool ShouldReadSnapshot,
         bool ShouldRequestStop,
-        int? MonitorProcessId)
+        int? MonitorProcessId,
+        GameConnectionEventMonitorState? EventMonitorState)
     {
         public static GameConnectionSessionDisconnectAction ReadSnapshot { get; } = new(
             ShouldReadSnapshot: true,
             ShouldRequestStop: false,
-            MonitorProcessId: null);
+            MonitorProcessId: null,
+            EventMonitorState: null);
 
         public static GameConnectionSessionDisconnectAction CreateDisconnectingSnapshot { get; } = new(
             ShouldReadSnapshot: false,
             ShouldRequestStop: false,
-            MonitorProcessId: null);
+            MonitorProcessId: null,
+            EventMonitorState: GameConnectionEventMonitorState.Disconnecting);
 
         public static GameConnectionSessionDisconnectAction RequestStop(int monitorProcessId)
         {
             return new GameConnectionSessionDisconnectAction(
                 ShouldReadSnapshot: false,
                 ShouldRequestStop: true,
-                monitorProcessId);
+                monitorProcessId,
+                GameConnectionEventMonitorState.Disconnecting);
         }
     }
 
     internal readonly record struct GameConnectionSessionDisconnectRefreshAction(
         bool ShouldReadSnapshot,
         bool ShouldCheckStopComplete,
-        int? MonitorProcessId)
+        int? MonitorProcessId,
+        GameConnectionEventMonitorState? EventMonitorState)
     {
         public static GameConnectionSessionDisconnectRefreshAction ReadSnapshot { get; } = new(
             ShouldReadSnapshot: true,
             ShouldCheckStopComplete: false,
-            MonitorProcessId: null);
+            MonitorProcessId: null,
+            EventMonitorState: null);
+
+        public static GameConnectionSessionDisconnectRefreshAction StopCompleted { get; } = new(
+            ShouldReadSnapshot: true,
+            ShouldCheckStopComplete: false,
+            MonitorProcessId: null,
+            EventMonitorState: GameConnectionEventMonitorState.StopCompleted);
+
+        public static GameConnectionSessionDisconnectRefreshAction StopTimedOut { get; } = new(
+            ShouldReadSnapshot: true,
+            ShouldCheckStopComplete: false,
+            MonitorProcessId: null,
+            EventMonitorState: GameConnectionEventMonitorState.StopTimedOut);
 
         public static GameConnectionSessionDisconnectRefreshAction CreateDisconnectingSnapshot(int monitorProcessId)
         {
             return new GameConnectionSessionDisconnectRefreshAction(
                 ShouldReadSnapshot: false,
                 ShouldCheckStopComplete: false,
-                monitorProcessId);
+                monitorProcessId,
+                GameConnectionEventMonitorState.StopPending);
         }
 
         public static GameConnectionSessionDisconnectRefreshAction CheckStopComplete(int monitorProcessId)
@@ -383,7 +408,8 @@ namespace BO2.Services
             return new GameConnectionSessionDisconnectRefreshAction(
                 ShouldReadSnapshot: false,
                 ShouldCheckStopComplete: true,
-                monitorProcessId);
+                monitorProcessId,
+                null);
         }
     }
 }

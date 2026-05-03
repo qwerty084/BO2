@@ -218,7 +218,7 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void Project_WhenDisconnecting_ReturnsDisconnectingDisplayProjection()
+        public void Project_WhenPhaseIsDisconnecting_ReturnsDisconnectingDisplayProjection()
         {
             DetectedGame detectedGame = CreateSupportedGame(1001);
             var readResult = new PlayerStatsReadResult(
@@ -236,9 +236,10 @@ namespace BO2.Tests.Services
                         PublishedNotifyCount: 0,
                         RecentEvents: []),
                     new DllInjectionResult(DllInjectionState.Loaded, "Loaded"),
-                    isDisconnecting: true,
+                    connectionPhase: GameConnectionPhase.Disconnecting,
+                    eventMonitorSummary: GameConnectionEventMonitorSummary.StopPending,
                     hasInjectionAttemptForCurrentGame: true,
-                    isMonitorConnectedForCurrentGame: true));
+                    isMonitorConnectedForCurrentGame: false));
 
             AssertResource("ConnectionStatusDisconnecting", projection.StatusText);
             AssertResource("DllInjectionDisconnecting", projection.InjectionStatusText);

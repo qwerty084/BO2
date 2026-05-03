@@ -12,19 +12,13 @@ namespace BO2.Services
                 projection,
                 snapshot.CurrentGame,
                 snapshot.ConnectionPhase,
-                snapshot.ReadResult,
-                snapshot.IsConnecting,
-                snapshot.IsDisconnecting,
-                snapshot.IsMonitorConnectedForCurrentGame);
+                snapshot.ReadResult);
             ApplyEventMonitorStatus(
                 projection,
                 snapshot.CurrentGame,
                 snapshot.ConnectionPhase,
                 snapshot.EventMonitorSummary,
-                snapshot.IsConnecting,
-                snapshot.IsDisconnecting,
-                snapshot.HasInjectionAttemptForCurrentGame,
-                snapshot.IsMonitorConnectedForCurrentGame);
+                snapshot.HasInjectionAttemptForCurrentGame);
             UpdateConnectButtonState(projection, snapshot);
             ApplyCommandAvailability(projection, snapshot);
             return projection;
@@ -44,10 +38,7 @@ namespace BO2.Services
             GameConnectionSessionDisplayProjection projection,
             DetectedGame? currentGame,
             GameConnectionPhase connectionPhase,
-            PlayerStatsReadResult? result,
-            bool isConnecting,
-            bool isDisconnecting,
-            bool isMonitorConnectedForDetectedGame)
+            PlayerStatsReadResult? result)
         {
             projection.DetectedGameText = currentGame is null
                 ? DisplayText.Resource("NoGameDetected")
@@ -55,10 +46,7 @@ namespace BO2.Services
             ApplyConnectionStatus(
                 projection,
                 currentGame,
-                connectionPhase,
-                isConnecting,
-                isDisconnecting,
-                isMonitorConnectedForDetectedGame);
+                connectionPhase);
 
             if (result?.Stats is null)
             {
@@ -99,59 +87,56 @@ namespace BO2.Services
         private static void ApplyConnectionStatus(
             GameConnectionSessionDisplayProjection projection,
             DetectedGame? detectedGame,
-            GameConnectionPhase connectionPhase,
-            bool isConnecting,
-            bool isDisconnecting,
-            bool isMonitorConnectedForDetectedGame)
+            GameConnectionPhase connectionPhase)
         {
             if (connectionPhase == GameConnectionPhase.NoGame)
             {
                 projection.StatusText = DisplayText.Resource("GameNotRunning");
-                SetConnectionState(projection, detectedGame, ConnectionState.Disconnected, isConnecting, isDisconnecting);
+                SetConnectionState(projection, detectedGame, ConnectionState.Disconnected, connectionPhase);
                 return;
             }
 
             if (detectedGame is null)
             {
                 projection.StatusText = DisplayText.Resource("GameNotRunning");
-                SetConnectionState(projection, detectedGame, ConnectionState.Disconnected, isConnecting, isDisconnecting);
+                SetConnectionState(projection, detectedGame, ConnectionState.Disconnected, connectionPhase);
                 return;
             }
 
             if (connectionPhase == GameConnectionPhase.UnsupportedGame)
             {
                 projection.StatusText = FormatUnsupportedStatus(detectedGame);
-                SetConnectionState(projection, detectedGame, ConnectionState.Unsupported, isConnecting, isDisconnecting);
+                SetConnectionState(projection, detectedGame, ConnectionState.Unsupported, connectionPhase);
                 return;
             }
 
-            if (isDisconnecting)
+            if (connectionPhase == GameConnectionPhase.Disconnecting)
             {
                 projection.StatusText = DisplayText.Resource("ConnectionStatusDisconnecting");
-                SetConnectionState(projection, detectedGame, ConnectionState.Disconnecting, isConnecting, isDisconnecting);
+                SetConnectionState(projection, detectedGame, ConnectionState.Disconnecting, connectionPhase);
                 return;
             }
 
-            if (isConnecting)
+            if (connectionPhase == GameConnectionPhase.Connecting)
             {
                 projection.StatusText = DisplayText.Resource("ConnectionStatusConnecting");
-                SetConnectionState(projection, detectedGame, ConnectionState.Detected, isConnecting, isDisconnecting);
+                SetConnectionState(projection, detectedGame, ConnectionState.Detected, connectionPhase);
                 return;
             }
 
-            if (isMonitorConnectedForDetectedGame)
+            if (connectionPhase == GameConnectionPhase.Connected)
             {
                 projection.StatusText = DisplayText.Format(
                     "ConnectedStatusFormat",
                     DisplayText.Plain(detectedGame.DisplayName));
-                SetConnectionState(projection, detectedGame, ConnectionState.Connected, isConnecting, isDisconnecting);
+                SetConnectionState(projection, detectedGame, ConnectionState.Connected, connectionPhase);
                 return;
             }
 
             if (connectionPhase is GameConnectionPhase.Detected or GameConnectionPhase.StatsOnlyDetected)
             {
                 projection.StatusText = DisplayText.Format("GameDetectedConnectPromptFormat", DisplayText.Plain(detectedGame.DisplayName));
-                SetConnectionState(projection, detectedGame, ConnectionState.Detected, isConnecting, isDisconnecting);
+                SetConnectionState(projection, detectedGame, ConnectionState.Detected, connectionPhase);
             }
         }
 
@@ -259,7 +244,7 @@ namespace BO2.Services
         private static void ApplyDisconnectingState(
             GameConnectionSessionDisplayProjection projection,
             DetectedGame? detectedGame,
-            bool isMonitorConnectedForDetectedGame)
+            GameConnectionPhase connectionPhase)
         {
             projection.StatusText = DisplayText.Resource("ConnectionStatusDisconnecting");
             projection.InjectionStatusText = DisplayText.Resource("DllInjectionDisconnecting");
@@ -273,8 +258,7 @@ namespace BO2.Services
                 projection,
                 detectedGame,
                 ConnectionState.Disconnecting,
-                isConnecting: false,
-                isDisconnecting: true);
+                connectionPhase);
         }
 
         private static DisplayText FormatInjectionStatus(GameConnectionEventMonitorSummary eventMonitor)
@@ -300,16 +284,14 @@ namespace BO2.Services
             DetectedGame? detectedGame,
             GameConnectionPhase connectionPhase,
             GameConnectionEventMonitorSummary eventMonitor,
-            bool isConnecting,
-            bool isDisconnecting,
-            bool hasInjectionAttemptForDetectedGame,
-            bool isMonitorConnectedForDetectedGame)
+            bool hasInjectionAttemptForDetectedGame)
         {
             projection.LatestEventStatus = eventMonitor.Status;
 
-            if (isDisconnecting)
+            if (connectionPhase == GameConnectionPhase.Disconnecting
+                || eventMonitor.State is GameConnectionEventMonitorState.Disconnecting or GameConnectionEventMonitorState.StopPending)
             {
-                ApplyDisconnectingState(projection, detectedGame, isMonitorConnectedForDetectedGame);
+                ApplyDisconnectingState(projection, detectedGame, connectionPhase);
                 return;
             }
 
@@ -355,9 +337,9 @@ namespace BO2.Services
 
             projection.EventCompatibilityText = DisplayText.Resource("GameProcessDetectorDisplayNameSteamZombies");
             if (connectionPhase is GameConnectionPhase.Detected or GameConnectionPhase.StatsOnlyDetected
-                || !isMonitorConnectedForDetectedGame)
+                || connectionPhase != GameConnectionPhase.Connected)
             {
-                projection.InjectionStatusText = isConnecting
+                projection.InjectionStatusText = connectionPhase == GameConnectionPhase.Connecting
                     ? DisplayText.Resource("DllInjectionConnecting")
                     : eventMonitor.State is GameConnectionEventMonitorState.ReadinessFailed or GameConnectionEventMonitorState.LoadingFailed
                         ? DisplayText.Plain(eventMonitor.FailureMessage ?? string.Empty)
@@ -408,10 +390,7 @@ namespace BO2.Services
         {
             projection.ConnectButtonText = GetConnectButtonText(
                 snapshot.CurrentGame,
-                snapshot.ConnectionPhase,
-                snapshot.IsConnecting,
-                snapshot.IsDisconnecting,
-                snapshot.IsMonitorConnectedForCurrentGame);
+                snapshot.ConnectionPhase);
         }
 
         private static void ApplyCommandAvailability(
@@ -426,27 +405,24 @@ namespace BO2.Services
 
         private static DisplayText GetConnectButtonText(
             DetectedGame? detectedGame,
-            GameConnectionPhase connectionPhase,
-            bool isConnecting,
-            bool isDisconnecting,
-            bool isMonitorConnectedForDetectedGame)
+            GameConnectionPhase connectionPhase)
         {
             if (connectionPhase == GameConnectionPhase.NoGame || detectedGame is null)
             {
                 return DisplayText.Resource("ConnectButtonWaitingForGameText");
             }
 
-            if (isConnecting)
+            if (connectionPhase == GameConnectionPhase.Connecting)
             {
                 return DisplayText.Resource("ConnectButtonConnectingText");
             }
 
-            if (isDisconnecting)
+            if (connectionPhase == GameConnectionPhase.Disconnecting)
             {
                 return DisplayText.Resource("ConnectionCardStatusDisconnecting");
             }
 
-            if (isMonitorConnectedForDetectedGame)
+            if (connectionPhase == GameConnectionPhase.Connected)
             {
                 return DisplayText.Resource("ConnectButtonConnectedText");
             }
@@ -463,9 +439,10 @@ namespace BO2.Services
             GameConnectionSessionDisplayProjection projection,
             DetectedGame? detectedGame,
             ConnectionState connectionState,
-            bool isConnecting,
-            bool isDisconnecting)
+            GameConnectionPhase connectionPhase)
         {
+            bool isConnecting = connectionPhase == GameConnectionPhase.Connecting;
+            bool isDisconnecting = connectionPhase == GameConnectionPhase.Disconnecting;
             UpdateGameFooterState(projection, detectedGame);
             UpdateEventFooterState(projection, detectedGame, connectionState, isConnecting, isDisconnecting);
             UpdateFooterIndicator(projection, connectionState);
