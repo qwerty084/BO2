@@ -16,6 +16,10 @@ _Avoid_: connection manager, stats refresh service
 A point-in-time read-only view of a **Game Connection Session** for app pages and widgets.
 _Avoid_: refresh result, UI state
 
+**Current Game Page**:
+An app page that displays round-focused stats and event context from the current **Game Connection Snapshot** without debug or candidate-address details.
+_Avoid_: home stats view, current game view
+
 **Event Monitor**:
 The native `BO2Monitor` payload loaded into Steam Zombies to publish read-only game events through a shared snapshot.
 _Avoid_: injector, hook
@@ -37,6 +41,9 @@ _Avoid_: widget manager, overlay service
 - A **Game Connection Session** has zero or one current **Detected Game**.
 - A **Game Connection Session** owns zero or one **Event Monitor** for the current **Detected Game**.
 - A **Game Connection Session** exposes one current **Game Connection Snapshot** at a time.
+- A **Current Game Page** displays round-focused state from the current **Game Connection Snapshot**.
+- A **Current Game Page** does not own **Game Connection Session** commands; connect and disconnect controls live in the app shell footer/sidebar.
+- A **Current Game Page** is the planned default first page, replacing the current home stats surface rather than duplicating it.
 - A **Player Stats Read** belongs to exactly one **Detected Game** when Steam Zombies is supported.
 - An **Event Monitor** can provide event data only after the **Game Connection Session** connects to Steam Zombies.
 - A **Box Tracker Widget** displays recent box events from the current **Event Monitor**.
@@ -50,3 +57,4 @@ _Avoid_: widget manager, overlay service
 ## Flagged Ambiguities
 
 - "refresh" can mean UI timer work, process memory reads, or monitor snapshot reads. Use **Player Stats Read** for memory sampling and **Game Connection Session** for lifecycle coordination.
+- Today, **Player Stats Read** can occur before the user connects the **Game Connection Session**. Planned direction: connect should become the user's explicit initiation point for active game reads, including **Player Stats Read** and **Event Monitor** data.
