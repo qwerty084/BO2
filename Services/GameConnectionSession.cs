@@ -766,7 +766,8 @@ namespace BO2.Services
                 return GameConnectionPhase.Connected;
             }
 
-            return readResult?.DetectedGame.ProcessId == detectedGame.ProcessId
+            return readResult is not null
+                && readResult.DetectedGame.ProcessId == detectedGame.ProcessId
                 && readResult.Stats is not null
                     ? GameConnectionPhase.StatsOnlyDetected
                     : GameConnectionPhase.Detected;

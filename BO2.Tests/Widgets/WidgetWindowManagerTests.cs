@@ -38,7 +38,7 @@ namespace BO2.Tests.Widgets
         {
             var adapter = new FakeBoxTrackerWidgetNativeAdapter();
             var store = new WidgetSettingsStore(CreateSettingsPath());
-            var manager = new WidgetWindowManager(
+            using var manager = new WidgetWindowManager(
                 store,
                 new BoxTrackerWidgetRuntime(adapter));
             manager.SetBoxTrackerEnabled(true);

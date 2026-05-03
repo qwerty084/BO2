@@ -340,7 +340,8 @@ namespace BO2.Tests.Services
                 return GameConnectionPhase.UnsupportedGame;
             }
 
-            return readResult?.DetectedGame.ProcessId == currentGame.ProcessId
+            return readResult is not null
+                && readResult.DetectedGame.ProcessId == currentGame.ProcessId
                 && readResult.Stats is not null
                     ? GameConnectionPhase.StatsOnlyDetected
                     : GameConnectionPhase.Detected;

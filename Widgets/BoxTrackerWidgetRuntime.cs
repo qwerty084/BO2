@@ -3,19 +3,14 @@ using BO2.Services;
 
 namespace BO2.Widgets
 {
-    internal sealed class BoxTrackerWidgetRuntime
+    internal sealed class BoxTrackerWidgetRuntime(IBoxTrackerWidgetNativeAdapter nativeAdapter)
     {
-        private readonly IBoxTrackerWidgetNativeAdapter _nativeAdapter;
+        private readonly IBoxTrackerWidgetNativeAdapter _nativeAdapter = nativeAdapter ?? throw new ArgumentNullException(nameof(nativeAdapter));
         private IBoxTrackerWidgetNativeWindow? _nativeWindow;
         private WidgetSettings? _settings;
         private Action? _persistSettings;
         private Action? _notifySettingsChanged;
         private GameEventMonitorStatus _latestEventStatus = GameEventMonitorStatus.WaitingForMonitor;
-
-        public BoxTrackerWidgetRuntime(IBoxTrackerWidgetNativeAdapter nativeAdapter)
-        {
-            _nativeAdapter = nativeAdapter ?? throw new ArgumentNullException(nameof(nativeAdapter));
-        }
 
         private IBoxTrackerWidgetNativeWindow EnsureNativeWindow()
         {
