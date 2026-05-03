@@ -7,6 +7,7 @@ namespace BO2.Widgets
     {
         private readonly WidgetSettingsStore _settingsStore;
         private readonly WidgetSettingsDocument _settingsDocument;
+        private readonly BoxTrackerWidgetRuntime _boxTrackerRuntime;
         private BoxTrackerWidgetWindow? _boxTrackerWindow;
         private GameEventMonitorStatus _latestEventStatus = GameEventMonitorStatus.WaitingForMonitor;
         private bool _isShuttingDown;
@@ -17,9 +18,17 @@ namespace BO2.Widgets
         }
 
         public WidgetWindowManager(WidgetSettingsStore settingsStore)
+            : this(settingsStore, new BoxTrackerWidgetRuntime(new BoxTrackerWidgetNativeAdapter()))
         {
-            _settingsStore = settingsStore;
+        }
+
+        internal WidgetWindowManager(
+            WidgetSettingsStore settingsStore,
+            BoxTrackerWidgetRuntime boxTrackerRuntime)
+        {
+            _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
             _settingsDocument = _settingsStore.Load();
+            _boxTrackerRuntime = boxTrackerRuntime ?? throw new ArgumentNullException(nameof(boxTrackerRuntime));
         }
 
         public event EventHandler? SettingsChanged;
@@ -32,15 +41,15 @@ namespace BO2.Widgets
 
         public void RestoreEnabledWidgets()
         {
-            if (BoxTrackerSettings.Enabled)
-            {
-                OpenBoxTracker();
-            }
+            _boxTrackerRuntime.Restore(BoxTrackerSettings, _latestEventStatus);
         }
 
         public void UpdateEventStatus(GameEventMonitorStatus eventStatus)
         {
+            ArgumentNullException.ThrowIfNull(eventStatus);
+
             _latestEventStatus = eventStatus;
+            _boxTrackerRuntime.UpdateEventStatus(eventStatus);
             _boxTrackerWindow?.UpdateText(GameEventFormatter.FormatBoxTrackerEvents(eventStatus));
         }
 

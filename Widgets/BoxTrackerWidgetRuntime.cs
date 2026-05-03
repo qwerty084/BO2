@@ -7,6 +7,7 @@ namespace BO2.Widgets
     {
         private readonly IBoxTrackerWidgetNativeAdapter _nativeAdapter;
         private IBoxTrackerWidgetNativeWindow? _nativeWindow;
+        private GameEventMonitorStatus _latestEventStatus = GameEventMonitorStatus.WaitingForMonitor;
 
         public BoxTrackerWidgetRuntime(IBoxTrackerWidgetNativeAdapter nativeAdapter)
         {
@@ -23,12 +24,34 @@ namespace BO2.Widgets
 
         public void Restore(WidgetSettings settings)
         {
+            Restore(settings, _latestEventStatus);
+        }
+
+        public void Restore(WidgetSettings settings, GameEventMonitorStatus eventStatus)
+        {
             ArgumentNullException.ThrowIfNull(settings);
+            ArgumentNullException.ThrowIfNull(eventStatus);
+
+            _latestEventStatus = eventStatus;
 
             if (!settings.Enabled)
             {
                 _nativeWindow = null;
+                return;
             }
+
+            IBoxTrackerWidgetNativeWindow nativeWindow = EnsureNativeWindow();
+            nativeWindow.UpdateText(GameEventFormatter.FormatBoxTrackerEvents(_latestEventStatus));
+            nativeWindow.Activate();
+            nativeWindow.ApplySettings(settings);
+        }
+
+        public void UpdateEventStatus(GameEventMonitorStatus eventStatus)
+        {
+            ArgumentNullException.ThrowIfNull(eventStatus);
+
+            _latestEventStatus = eventStatus;
+            _nativeWindow?.UpdateText(GameEventFormatter.FormatBoxTrackerEvents(eventStatus));
         }
     }
 }
