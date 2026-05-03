@@ -567,6 +567,7 @@ namespace BO2.Services
             GameConnectionSnapshot right)
         {
             return Equals(left.CurrentGame, right.CurrentGame)
+                && left.ConnectionPhase == right.ConnectionPhase
                 && Equals(left.ReadResult, right.ReadResult)
                 && Equals(left.InjectionResult, right.InjectionResult)
                 && left.IsConnecting == right.IsConnecting
@@ -636,6 +637,7 @@ namespace BO2.Services
                 GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
             return new GameConnectionRefreshResult(
                 detectedGame,
+                DetermineConnectionPhase(detectedGame, readResult, lifecycleSnapshot),
                 readResult,
                 eventStatus,
                 lifecycleSnapshot.InjectionResult,
@@ -646,10 +648,47 @@ namespace BO2.Services
                 lifecycleSnapshot.IsMonitorConnectedForCurrentGame);
         }
 
+        private static GameConnectionPhase DetermineConnectionPhase(
+            DetectedGame? detectedGame,
+            PlayerStatsReadResult? readResult,
+            GameConnectionSessionLifecycleSnapshot lifecycleSnapshot)
+        {
+            if (detectedGame is null)
+            {
+                return GameConnectionPhase.NoGame;
+            }
+
+            if (!detectedGame.IsStatsSupported)
+            {
+                return GameConnectionPhase.UnsupportedGame;
+            }
+
+            if (lifecycleSnapshot.IsDisconnecting)
+            {
+                return GameConnectionPhase.Disconnecting;
+            }
+
+            if (lifecycleSnapshot.IsConnecting)
+            {
+                return GameConnectionPhase.Connecting;
+            }
+
+            if (lifecycleSnapshot.IsMonitorConnectedForCurrentGame)
+            {
+                return GameConnectionPhase.Connected;
+            }
+
+            return readResult?.DetectedGame.ProcessId == detectedGame.ProcessId
+                && readResult.Stats is not null
+                    ? GameConnectionPhase.StatsOnlyDetected
+                    : GameConnectionPhase.Detected;
+        }
+
         private static GameConnectionSnapshot CreateSnapshot(GameConnectionRefreshResult result)
         {
             return new GameConnectionSnapshot(
                 result.CurrentGame,
+                result.ConnectionPhase,
                 result.ReadResult,
                 result.EventStatus,
                 result.InjectionResult,
@@ -662,6 +701,7 @@ namespace BO2.Services
 
         private readonly record struct GameConnectionRefreshResult(
             DetectedGame? CurrentGame,
+            GameConnectionPhase ConnectionPhase,
             PlayerStatsReadResult? ReadResult,
             GameEventMonitorStatus EventStatus,
             DllInjectionResult InjectionResult,
@@ -674,6 +714,7 @@ namespace BO2.Services
 
     internal readonly record struct GameConnectionSnapshot(
         DetectedGame? CurrentGame,
+        GameConnectionPhase ConnectionPhase,
         PlayerStatsReadResult? ReadResult,
         GameEventMonitorStatus EventStatus,
         DllInjectionResult InjectionResult,

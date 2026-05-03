@@ -70,6 +70,7 @@
     <Compile Include="..\Services\PlayerStatAddressMap.cs"      Link="Services\PlayerStatAddressMap.cs" />
     <Compile Include="..\Services\PlayerStats.cs"               Link="Services\PlayerStats.cs" />
     <Compile Include="..\Services\PlayerStatsReadResult.cs"     Link="Services\PlayerStatsReadResult.cs" />
+    <Compile Include="..\Services\GameConnectionPhase.cs"       Link="Services\GameConnectionPhase.cs" />
     <Compile Include="..\Services\GameConnectionSessionLifecycle.cs" Link="Services\GameConnectionSessionLifecycle.cs" />
     <Compile Include="..\Services\GameConnectionSession.cs"     Link="Services\GameConnectionSession.cs" />
     <Compile Include="..\Services\GameConnectionSessionDisplayProjection.cs" Link="Services\GameConnectionSessionDisplayProjection.cs" />

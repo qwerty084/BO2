@@ -10,7 +10,10 @@ namespace BO2.Tests.Services
         public void Project_WhenNoGame_ReturnsDisconnectedDisplayProjection()
         {
             GameConnectionSessionDisplayProjection projection = CreateProjector().Project(
-                CreateSnapshot(null, null));
+                CreateSnapshot(
+                    null,
+                    null,
+                    connectionPhase: GameConnectionPhase.NoGame));
 
             AssertResource("NoGameDetected", projection.DetectedGameText);
             AssertResource("GameNotRunning", projection.StatusText);
@@ -21,6 +24,53 @@ namespace BO2.Tests.Services
             Assert.True(projection.IsConnectButtonVisible);
             Assert.False(projection.IsDisconnectButtonVisible);
             Assert.True(projection.IsFooterDisconnectedStatusVisible);
+            AssertPlain("--", projection.PointsText);
+        }
+
+        [Fact]
+        public void Project_WhenUnsupportedGame_ReturnsUnsupportedDisplayProjection()
+        {
+            DetectedGame detectedGame = CreateUnsupportedGame(1001);
+
+            GameConnectionSessionDisplayProjection projection = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    null,
+                    connectionPhase: GameConnectionPhase.UnsupportedGame));
+
+            AssertPlain("Redacted Zombies", projection.DetectedGameText);
+            DisplayText.FormatText status = AssertFormat("UnsupportedStatusWithReasonFormat", projection.StatusText);
+            AssertPlain("Redacted Zombies", status.Arguments[0]);
+            AssertPlain("Unsupported variant", status.Arguments[1]);
+            DisplayText.FormatText injectionStatus = AssertFormat("DllInjectionUnsupportedGameFormat", projection.InjectionStatusText);
+            AssertPlain("Redacted Zombies", injectionStatus.Arguments[0]);
+            AssertResource("FooterEventsUnsupported", projection.EventConnectionStatusText);
+            AssertResource("ConnectButtonUnsupportedText", projection.ConnectButtonText);
+            Assert.False(projection.IsConnectButtonEnabled);
+            Assert.True(projection.IsFooterPendingStatusVisible);
+            AssertPlain("--", projection.PointsText);
+        }
+
+        [Fact]
+        public void Project_WhenDetectedWithoutStats_ReturnsDetectedDisplayProjection()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+
+            GameConnectionSessionDisplayProjection projection = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    null,
+                    canAttemptConnect: true,
+                    connectionPhase: GameConnectionPhase.Detected));
+
+            AssertPlain("Steam Zombies", projection.DetectedGameText);
+            DisplayText.FormatText status = AssertFormat("GameDetectedConnectPromptFormat", projection.StatusText);
+            AssertPlain("Steam Zombies", status.Arguments[0]);
+            AssertResource("DllInjectionWaitingForConnect", projection.InjectionStatusText);
+            AssertResource("EventMonitorWaitingForConnect", projection.EventMonitorStatusText);
+            AssertResource("ConnectButtonText", projection.ConnectButtonText);
+            Assert.True(projection.IsConnectButtonEnabled);
+            Assert.True(projection.IsFooterPendingStatusVisible);
             AssertPlain("--", projection.PointsText);
         }
 
@@ -37,6 +87,7 @@ namespace BO2.Tests.Services
                 CreateSnapshot(
                     detectedGame,
                     readResult,
+                    connectionPhase: GameConnectionPhase.StatsOnlyDetected,
                     canAttemptConnect: true));
 
             AssertPlain("Steam Zombies", projection.DetectedGameText);
@@ -170,10 +221,17 @@ namespace BO2.Tests.Services
             bool isDisconnecting = false,
             bool canAttemptConnect = false,
             bool hasInjectionAttemptForCurrentGame = false,
-            bool isMonitorConnectedForCurrentGame = false)
+            bool isMonitorConnectedForCurrentGame = false,
+            GameConnectionPhase? connectionPhase = null)
         {
             return new GameConnectionSnapshot(
                 currentGame,
+                connectionPhase ?? DetermineConnectionPhase(
+                    currentGame,
+                    readResult,
+                    isConnecting,
+                    isDisconnecting,
+                    isMonitorConnectedForCurrentGame),
                 readResult,
                 eventStatus ?? GameEventMonitorStatus.WaitingForMonitor,
                 injectionResult ?? DllInjectionResult.NotAttempted,
@@ -182,6 +240,44 @@ namespace BO2.Tests.Services
                 canAttemptConnect,
                 hasInjectionAttemptForCurrentGame,
                 isMonitorConnectedForCurrentGame);
+        }
+
+        private static GameConnectionPhase DetermineConnectionPhase(
+            DetectedGame? currentGame,
+            PlayerStatsReadResult? readResult,
+            bool isConnecting,
+            bool isDisconnecting,
+            bool isMonitorConnectedForCurrentGame)
+        {
+            if (currentGame is null)
+            {
+                return GameConnectionPhase.NoGame;
+            }
+
+            if (!currentGame.IsStatsSupported)
+            {
+                return GameConnectionPhase.UnsupportedGame;
+            }
+
+            if (isDisconnecting)
+            {
+                return GameConnectionPhase.Disconnecting;
+            }
+
+            if (isConnecting)
+            {
+                return GameConnectionPhase.Connecting;
+            }
+
+            if (isMonitorConnectedForCurrentGame)
+            {
+                return GameConnectionPhase.Connected;
+            }
+
+            return readResult?.DetectedGame.ProcessId == currentGame.ProcessId
+                && readResult.Stats is not null
+                    ? GameConnectionPhase.StatsOnlyDetected
+                    : GameConnectionPhase.Detected;
         }
 
         private static PlayerStats CreateStats()
@@ -233,6 +329,17 @@ namespace BO2.Tests.Services
                 processId,
                 PlayerStatAddressMap.SteamZombies,
                 null);
+        }
+
+        private static DetectedGame CreateUnsupportedGame(int processId)
+        {
+            return new DetectedGame(
+                GameVariant.RedactedZombies,
+                "Redacted Zombies",
+                "t6zm",
+                processId,
+                null,
+                "Unsupported variant");
         }
 
         private static DisplayText.FormatText AssertFormat(string resourceId, DisplayText text)

@@ -20,6 +20,7 @@ namespace BO2.Tests.ViewModels
 
             viewModel.ApplySnapshot(new GameConnectionSnapshot(
                 detectedGame,
+                GameConnectionPhase.StatsOnlyDetected,
                 readResult,
                 GameEventMonitorStatus.WaitingForMonitor,
                 DllInjectionResult.NotAttempted,
