@@ -98,6 +98,7 @@ namespace BO2.Widgets
         {
             ArgumentNullException.ThrowIfNull(settings);
 
+            settings.Normalize();
             BindSettings(settings, persistSettings, notifySettingsChanged);
             if (!settings.Enabled)
             {

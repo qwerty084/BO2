@@ -132,6 +132,115 @@ namespace BO2.Tests.Widgets
         }
 
         [Fact]
+        public void ApplySettings_WhenEnabledAndWindowClosed_OpensActivatesUpdatesTextAndAppliesSettings()
+        {
+            var adapter = new FakeBoxTrackerWidgetNativeAdapter();
+            var runtime = new BoxTrackerWidgetRuntime(adapter);
+            WidgetSettings settings = CreateCustomEnabledSettings();
+            GameEventMonitorStatus status = CreateStatus(
+                new GameEvent(
+                    GameEventType.BoxEvent,
+                    "randomization_done",
+                    0,
+                    4,
+                    1138,
+                    new DateTimeOffset(2026, 4, 26, 12, 36, 56, TimeSpan.Zero),
+                    "python_zm"));
+
+            runtime.UpdateEventStatus(status);
+            runtime.ApplySettings(settings);
+
+            FakeBoxTrackerWidgetNativeWindow window = Assert.IsType<FakeBoxTrackerWidgetNativeWindow>(
+                adapter.CreatedWindow);
+            Assert.True(runtime.HasNativeWindow);
+            Assert.Equal(1, adapter.CreateWindowCallCount);
+            Assert.Equal(1, window.UpdateTextCallCount);
+            Assert.Equal(1, window.ActivateCallCount);
+            Assert.Equal(1, window.ApplySettingsCallCount);
+            Assert.Same(settings, window.AppliedSettings);
+            Assert.Contains("Python (python_zm)", window.Text, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void ApplySettings_WhenEnabledAndWindowOpen_UpdatesExistingNativeWindowAppearance()
+        {
+            var adapter = new FakeBoxTrackerWidgetNativeAdapter();
+            var runtime = new BoxTrackerWidgetRuntime(adapter);
+            WidgetSettings initialSettings = WidgetSettings.CreateDefault();
+            initialSettings.Enabled = true;
+            runtime.Restore(initialSettings);
+            FakeBoxTrackerWidgetNativeWindow window = Assert.IsType<FakeBoxTrackerWidgetNativeWindow>(
+                adapter.CreatedWindow);
+            WidgetSettings updatedSettings = CreateCustomEnabledSettings();
+            updatedSettings.Width = 720;
+            updatedSettings.Height = 280;
+            updatedSettings.BackgroundColor = "#FF102030";
+            updatedSettings.TextColor = "#FFFFCC00";
+            updatedSettings.TransparentBackground = true;
+            updatedSettings.AlwaysOnTop = true;
+            updatedSettings.CenterAlign = false;
+
+            runtime.ApplySettings(updatedSettings);
+
+            Assert.True(runtime.HasNativeWindow);
+            Assert.Equal(1, adapter.CreateWindowCallCount);
+            Assert.Equal(2, window.ApplySettingsCallCount);
+            Assert.Same(updatedSettings, window.AppliedSettings);
+            WidgetSettings appliedSettings = Assert.IsType<WidgetSettings>(window.AppliedSettingsSnapshot);
+            Assert.Equal(720, appliedSettings.Width);
+            Assert.Equal(280, appliedSettings.Height);
+            Assert.Equal("#FF102030", appliedSettings.BackgroundColor);
+            Assert.Equal("#FFFFCC00", appliedSettings.TextColor);
+            Assert.True(appliedSettings.TransparentBackground);
+            Assert.True(appliedSettings.AlwaysOnTop);
+            Assert.False(appliedSettings.CenterAlign);
+        }
+
+        [Fact]
+        public void ApplySettings_WhenDisabledAndWindowOpen_ClosesNativeWindowAndCapturesPlacement()
+        {
+            var adapter = new FakeBoxTrackerWidgetNativeAdapter();
+            var runtime = new BoxTrackerWidgetRuntime(adapter);
+            WidgetSettings initialSettings = WidgetSettings.CreateDefault();
+            initialSettings.Enabled = true;
+            runtime.Restore(initialSettings);
+            FakeBoxTrackerWidgetNativeWindow window = Assert.IsType<FakeBoxTrackerWidgetNativeWindow>(
+                adapter.CreatedWindow);
+            WidgetSettings disabledSettings = WidgetSettings.CreateDefault();
+
+            runtime.ApplySettings(disabledSettings);
+
+            Assert.False(runtime.HasNativeWindow);
+            Assert.Equal(1, window.CapturePlacementCallCount);
+            Assert.Equal(1, window.CloseCallCount);
+            Assert.Equal(640, disabledSettings.X);
+            Assert.Equal(360, disabledSettings.Y);
+        }
+
+        [Fact]
+        public void ApplySettings_NormalizesBeforeNativeAdapterApplication()
+        {
+            var adapter = new FakeBoxTrackerWidgetNativeAdapter();
+            var runtime = new BoxTrackerWidgetRuntime(adapter);
+            WidgetSettings settings = WidgetSettings.CreateDefault();
+            settings.Enabled = true;
+            settings.Width = 1;
+            settings.Height = 9999;
+            settings.BackgroundColor = "bad";
+            settings.TextColor = "bad";
+
+            runtime.ApplySettings(settings);
+
+            FakeBoxTrackerWidgetNativeWindow window = Assert.IsType<FakeBoxTrackerWidgetNativeWindow>(
+                adapter.CreatedWindow);
+            WidgetSettings appliedSettings = Assert.IsType<WidgetSettings>(window.AppliedSettingsSnapshot);
+            Assert.Equal(160, appliedSettings.Width);
+            Assert.Equal(2160, appliedSettings.Height);
+            Assert.Equal(WidgetSettings.DefaultBackgroundColor, appliedSettings.BackgroundColor);
+            Assert.Equal(WidgetSettings.DefaultTextColor, appliedSettings.TextColor);
+        }
+
+        [Fact]
         public void SetEnabled_WhenDisabled_OpensActivatesAppliesAndPersistsEnabledSettings()
         {
             var adapter = new FakeBoxTrackerWidgetNativeAdapter();
@@ -340,6 +449,23 @@ namespace BO2.Tests.Widgets
                 events);
         }
 
+        private static WidgetSettings CreateCustomEnabledSettings()
+        {
+            return new WidgetSettings
+            {
+                Enabled = true,
+                Width = 640,
+                Height = 240,
+                X = 100,
+                Y = 200,
+                BackgroundColor = "#AA102030",
+                TextColor = "#FFFFCC00",
+                TransparentBackground = true,
+                AlwaysOnTop = true,
+                CenterAlign = false
+            };
+        }
+
         private static string CreateSettingsPath()
         {
             return Path.GetFullPath(Path.Join(
@@ -392,11 +518,15 @@ namespace BO2.Tests.Widgets
 
             public int CloseCallCount { get; private set; }
 
+            public int ApplySettingsCallCount { get; private set; }
+
             public int UpdateTextCallCount { get; private set; }
 
             public string Text { get; private set; } = string.Empty;
 
             public WidgetSettings? AppliedSettings { get; private set; }
+
+            public WidgetSettings? AppliedSettingsSnapshot { get; private set; }
 
             public Action? CapturePlacementCallback { get; set; }
 
@@ -419,7 +549,9 @@ namespace BO2.Tests.Widgets
 
             public void ApplySettings(WidgetSettings settings)
             {
+                ApplySettingsCallCount++;
                 AppliedSettings = settings;
+                AppliedSettingsSnapshot = settings.Clone();
             }
 
             public void CapturePlacement(WidgetSettings settings)
