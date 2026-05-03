@@ -577,7 +577,17 @@ namespace BO2.Services
                 && left.DisconnectCommandAvailability == right.DisconnectCommandAvailability
                 && left.HasInjectionAttemptForCurrentGame == right.HasInjectionAttemptForCurrentGame
                 && left.IsMonitorConnectedForCurrentGame == right.IsMonitorConnectedForCurrentGame
+                && HasSameEventMonitorSummary(left.EventMonitorSummary, right.EventMonitorSummary)
                 && HasSameEventStatus(left.EventStatus, right.EventStatus);
+        }
+
+        private static bool HasSameEventMonitorSummary(
+            GameConnectionEventMonitorSummary left,
+            GameConnectionEventMonitorSummary right)
+        {
+            return left.State == right.State
+                && left.FailureMessage == right.FailureMessage
+                && HasSameEventStatus(left.Status, right.Status);
         }
 
         private static bool HasSameEventStatus(
@@ -641,11 +651,15 @@ namespace BO2.Services
             GameConnectionSessionCommandAvailability commandAvailability = CreateCommandAvailability(
                 connectionPhase,
                 lifecycleSnapshot);
+            GameConnectionEventMonitorSummary eventMonitorSummary = CreateEventMonitorSummary(
+                lifecycleSnapshot,
+                eventStatus);
             return new GameConnectionRefreshResult(
                 detectedGame,
                 connectionPhase,
                 readResult,
                 eventStatus,
+                eventMonitorSummary,
                 lifecycleSnapshot.InjectionResult,
                 lifecycleSnapshot.IsConnecting,
                 lifecycleSnapshot.IsDisconnecting,
@@ -672,6 +686,36 @@ namespace BO2.Services
                 : GameConnectionCommandAvailability.Hidden;
 
             return new GameConnectionSessionCommandAvailability(connect, disconnect);
+        }
+
+        private static GameConnectionEventMonitorSummary CreateEventMonitorSummary(
+            GameConnectionSessionLifecycleSnapshot lifecycleSnapshot,
+            GameEventMonitorStatus eventStatus)
+        {
+            if (lifecycleSnapshot.IsConnecting)
+            {
+                return GameConnectionEventMonitorSummary.Connecting;
+            }
+
+            if (lifecycleSnapshot.HasMonitorReadinessFailureForCurrentGame)
+            {
+                return GameConnectionEventMonitorSummary.ReadinessFailed(
+                    lifecycleSnapshot.InjectionResult.Message);
+            }
+
+            if (!lifecycleSnapshot.IsMonitorConnectedForCurrentGame)
+            {
+                if (lifecycleSnapshot.HasInjectionAttemptForCurrentGame
+                    && lifecycleSnapshot.InjectionResult.State != DllInjectionState.NotAttempted)
+                {
+                    return GameConnectionEventMonitorSummary.LoadingFailed(
+                        lifecycleSnapshot.InjectionResult.Message);
+                }
+
+                return GameConnectionEventMonitorSummary.Waiting;
+            }
+
+            return GameConnectionEventMonitorSummary.FromStatus(eventStatus);
         }
 
         private static GameConnectionPhase DetermineConnectionPhase(
@@ -717,6 +761,7 @@ namespace BO2.Services
                 result.ConnectionPhase,
                 result.ReadResult,
                 result.EventStatus,
+                result.EventMonitorSummary,
                 result.InjectionResult,
                 result.IsConnecting,
                 result.IsDisconnecting,
@@ -732,6 +777,7 @@ namespace BO2.Services
             GameConnectionPhase ConnectionPhase,
             PlayerStatsReadResult? ReadResult,
             GameEventMonitorStatus EventStatus,
+            GameConnectionEventMonitorSummary EventMonitorSummary,
             DllInjectionResult InjectionResult,
             bool IsConnecting,
             bool IsDisconnecting,
@@ -768,6 +814,7 @@ namespace BO2.Services
         GameConnectionPhase ConnectionPhase,
         PlayerStatsReadResult? ReadResult,
         GameEventMonitorStatus EventStatus,
+        GameConnectionEventMonitorSummary EventMonitorSummary,
         DllInjectionResult InjectionResult,
         bool IsConnecting,
         bool IsDisconnecting,

@@ -29,6 +29,8 @@ namespace BO2.Tests.Services
             Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
             Assert.Null(snapshot.ReadResult);
             Assert.Equal(GameCompatibilityState.WaitingForMonitor, snapshot.EventStatus.CompatibilityState);
+            Assert.Equal(GameConnectionEventMonitorState.Waiting, snapshot.EventMonitorSummary.State);
+            Assert.Same(GameEventMonitorStatus.WaitingForMonitor, snapshot.EventMonitorSummary.Status);
             Assert.Equal(DllInjectionState.NotAttempted, snapshot.InjectionResult.State);
             Assert.False(snapshot.IsConnecting);
             Assert.False(snapshot.IsDisconnecting);
@@ -311,6 +313,7 @@ namespace BO2.Tests.Services
             Assert.True(statusSnapshotDuringInjection.HasValue);
             GameConnectionSnapshot statusSnapshot = statusSnapshotDuringInjection.Value;
             Assert.True(statusSnapshot.IsConnecting);
+            Assert.Equal(GameConnectionEventMonitorState.Connecting, statusSnapshot.EventMonitorSummary.State);
             Assert.False(statusSnapshot.CanAttemptConnect);
             AssertCommandAvailability(
                 statusSnapshot,
@@ -389,6 +392,7 @@ namespace BO2.Tests.Services
             Assert.False(connectedSnapshot.IsConnecting);
             Assert.Same(detectedGame, connectedSnapshot.CurrentGame);
             Assert.Equal(DllInjectionState.Loaded, connectedSnapshot.InjectionResult.State);
+            Assert.Equal(GameConnectionEventMonitorState.Ready, connectedSnapshot.EventMonitorSummary.State);
             Assert.True(connectedSnapshot.IsMonitorConnectedForCurrentGame);
             AssertCommandAvailability(
                 connectedSnapshot,
@@ -565,10 +569,51 @@ namespace BO2.Tests.Services
             GameConnectionSnapshot snapshot = session.Read();
 
             Assert.Same(compatibleStatus, snapshot.EventStatus);
+            Assert.Equal(GameConnectionEventMonitorState.Ready, snapshot.EventMonitorSummary.State);
+            Assert.Same(compatibleStatus, snapshot.EventMonitorSummary.Status);
             Assert.True(snapshot.IsMonitorConnectedForCurrentGame);
             Assert.Equal(2, eventMonitor.ReadStatusCallCount);
             Assert.Equal(timeProvider.GetUtcNow(), eventMonitor.LastReceivedAt);
             Assert.Equal(1001, eventMonitor.LastTargetProcessId);
+        }
+
+        [Theory]
+        [InlineData(GameCompatibilityState.UnsupportedVersion, GameConnectionEventMonitorState.UnsupportedVersion)]
+        [InlineData(GameCompatibilityState.CaptureDisabled, GameConnectionEventMonitorState.CaptureDisabled)]
+        [InlineData(GameCompatibilityState.PollingFallback, GameConnectionEventMonitorState.PollingFallback)]
+        public void Read_WhenMonitorReportsCompatibilityState_ExposesEventMonitorSummary(
+            GameCompatibilityState compatibilityState,
+            GameConnectionEventMonitorState expectedState)
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            GameEventMonitorStatus monitorStatus = new(
+                compatibilityState,
+                DroppedEventCount: 1,
+                DroppedNotifyCount: 2,
+                PublishedNotifyCount: 3,
+                RecentEvents:
+                [
+                    new GameEvent(
+                        GameEventType.BoxEvent,
+                        "randomization_done",
+                        5,
+                        10,
+                        20,
+                        new DateTimeOffset(2026, 5, 2, 12, 0, 0, TimeSpan.Zero),
+                        "ray_gun_zm")
+                ]);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = monitorStatus
+            };
+            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame);
+            CompleteConnectWithLoadedMonitor(session);
+
+            GameConnectionSnapshot snapshot = session.Read();
+
+            Assert.Equal(expectedState, snapshot.EventMonitorSummary.State);
+            Assert.Same(monitorStatus, snapshot.EventMonitorSummary.Status);
+            Assert.Same(monitorStatus.RecentEvents, snapshot.EventMonitorSummary.Status.RecentEvents);
         }
 
         [Fact]
@@ -662,6 +707,8 @@ namespace BO2.Tests.Services
             GameConnectionSnapshot snapshot = session.Read();
 
             Assert.Equal(DllInjectionState.Failed, snapshot.InjectionResult.State);
+            Assert.Equal(GameConnectionEventMonitorState.ReadinessFailed, snapshot.EventMonitorSummary.State);
+            Assert.Equal(AppStrings.Get("DllInjectionReadinessTimedOut"), snapshot.EventMonitorSummary.FailureMessage);
             Assert.False(snapshot.IsMonitorConnectedForCurrentGame);
             Assert.Equal(1, eventMonitor.RequestStopCallCount);
             Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);

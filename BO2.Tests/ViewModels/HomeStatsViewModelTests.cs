@@ -23,6 +23,7 @@ namespace BO2.Tests.ViewModels
                 GameConnectionPhase.StatsOnlyDetected,
                 readResult,
                 GameEventMonitorStatus.WaitingForMonitor,
+                GameConnectionEventMonitorSummary.Waiting,
                 DllInjectionResult.NotAttempted,
                 IsConnecting: false,
                 IsDisconnecting: false,

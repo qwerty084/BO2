@@ -9,6 +9,7 @@ namespace BO2.Services
         private DllInjectionResult _lastInjectionResult = DllInjectionResult.NotAttempted;
         private int? _lastInjectionProcessId;
         private DateTimeOffset? _lastInjectionAttemptedAt;
+        private bool _hasMonitorReadinessFailure;
         private GameConnectionSessionLifecycleGame? _connectTargetGame;
         private int? _disconnectProcessId;
         private DateTimeOffset? _disconnectRequestedAt;
@@ -66,6 +67,7 @@ namespace BO2.Services
                 _lastInjectionAttemptedAt = IsMonitorLoadedInjectionState(injectionResult.State)
                     ? receivedAt
                     : null;
+                _hasMonitorReadinessFailure = false;
             }
 
             _connectTargetGame = null;
@@ -197,6 +199,7 @@ namespace BO2.Services
             _lastInjectionProcessId = null;
             _lastInjectionAttemptedAt = null;
             _lastInjectionResult = DllInjectionResult.NotAttempted;
+            _hasMonitorReadinessFailure = false;
             return new GameConnectionSessionMonitorStopRequest(
                 monitorProcessId,
                 requestStop && !stopAlreadyRequested && monitorProcessId is not null);
@@ -233,6 +236,7 @@ namespace BO2.Services
                 DllInjectionState.Failed,
                 timeoutMessage);
             _lastInjectionAttemptedAt = null;
+            _hasMonitorReadinessFailure = true;
             return new GameConnectionSessionMonitorStopRequest(monitorProcessId, ShouldRequestStop: true);
         }
 
@@ -245,7 +249,8 @@ namespace BO2.Services
                 _isDisconnecting,
                 CanAttemptConnect(detectedGame),
                 HasInjectionAttemptFor(detectedGame),
-                IsMonitorConnectedFor(detectedGame));
+                IsMonitorConnectedFor(detectedGame),
+                HasMonitorReadinessFailureFor(detectedGame));
         }
 
         public bool IsMonitorConnectedFor(GameConnectionSessionLifecycleGame? detectedGame)
@@ -270,6 +275,13 @@ namespace BO2.Services
             return detectedGame is GameConnectionSessionLifecycleGame game
                 && _lastInjectionProcessId == game.ProcessId
                 && _lastInjectionResult.State != DllInjectionState.NotAttempted;
+        }
+
+        private bool HasMonitorReadinessFailureFor(GameConnectionSessionLifecycleGame? detectedGame)
+        {
+            return detectedGame is GameConnectionSessionLifecycleGame game
+                && _lastInjectionProcessId == game.ProcessId
+                && _hasMonitorReadinessFailure;
         }
 
         private bool IsMonitorLoaded => IsMonitorLoadedInjectionState(_lastInjectionResult.State);
@@ -308,7 +320,8 @@ namespace BO2.Services
         bool IsDisconnecting,
         bool CanAttemptConnect,
         bool HasInjectionAttemptForCurrentGame,
-        bool IsMonitorConnectedForCurrentGame);
+        bool IsMonitorConnectedForCurrentGame,
+        bool HasMonitorReadinessFailureForCurrentGame);
 
     internal readonly record struct GameConnectionSessionConnectCompletion(
         bool IsTargetMatch,

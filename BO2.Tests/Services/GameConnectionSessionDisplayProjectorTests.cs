@@ -174,6 +174,50 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void Project_WhenEventMonitorSummaryIsReady_UsesSummaryForMonitorDisplay()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+            GameEventMonitorStatus eventStatus = new(
+                GameCompatibilityState.Compatible,
+                DroppedEventCount: 0,
+                DroppedNotifyCount: 0,
+                PublishedNotifyCount: 1,
+                RecentEvents: []);
+
+            GameConnectionSessionDisplayProjection projection = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    CreateReadResult(detectedGame),
+                    GameEventMonitorStatus.WaitingForMonitor,
+                    DllInjectionResult.NotAttempted,
+                    eventMonitorSummary: GameConnectionEventMonitorSummary.FromStatus(eventStatus),
+                    isMonitorConnectedForCurrentGame: true));
+
+            AssertResource("DllInjectionMonitorReady", projection.InjectionStatusText);
+            DisplayText.FormatText monitorStatus = AssertFormat("EventMonitorPublishedEventsFormat", projection.EventMonitorStatusText);
+            AssertResource("EventMonitorCompatible", monitorStatus.Arguments[0]);
+            Assert.Equal(1u, monitorStatus.Arguments[1]);
+            Assert.Same(eventStatus, projection.LatestEventStatus);
+        }
+
+        [Fact]
+        public void Project_WhenEventMonitorSummaryIsReadinessFailed_UsesSummaryFailureMessage()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+
+            GameConnectionSessionDisplayProjection projection = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    CreateReadResult(detectedGame),
+                    eventMonitorSummary: GameConnectionEventMonitorSummary.ReadinessFailed("timeout"),
+                    hasInjectionAttemptForCurrentGame: true));
+
+            AssertPlain("timeout", projection.InjectionStatusText);
+            AssertResource("EventMonitorWaitingForConnect", projection.EventMonitorStatusText);
+            AssertResource("RecentEventsEmpty", projection.BoxEventsText);
+        }
+
+        [Fact]
         public void Project_WhenDisconnecting_ReturnsDisconnectingDisplayProjection()
         {
             DetectedGame detectedGame = CreateSupportedGame(1001);
@@ -245,7 +289,8 @@ namespace BO2.Tests.Services
             bool isMonitorConnectedForCurrentGame = false,
             GameConnectionPhase? connectionPhase = null,
             GameConnectionCommandAvailability? connectCommandAvailability = null,
-            GameConnectionCommandAvailability? disconnectCommandAvailability = null)
+            GameConnectionCommandAvailability? disconnectCommandAvailability = null,
+            GameConnectionEventMonitorSummary? eventMonitorSummary = null)
         {
             GameConnectionPhase phase = connectionPhase ?? DetermineConnectionPhase(
                 currentGame,
@@ -258,6 +303,11 @@ namespace BO2.Tests.Services
                 phase,
                 readResult,
                 eventStatus ?? GameEventMonitorStatus.WaitingForMonitor,
+                eventMonitorSummary ?? CreateEventMonitorSummary(
+                    eventStatus ?? GameEventMonitorStatus.WaitingForMonitor,
+                    isConnecting,
+                    isMonitorConnectedForCurrentGame,
+                    injectionResult),
                 injectionResult ?? DllInjectionResult.NotAttempted,
                 isConnecting,
                 isDisconnecting,
@@ -266,6 +316,27 @@ namespace BO2.Tests.Services
                 disconnectCommandAvailability ?? CreateDisconnectCommandAvailability(phase),
                 hasInjectionAttemptForCurrentGame,
                 isMonitorConnectedForCurrentGame);
+        }
+
+        private static GameConnectionEventMonitorSummary CreateEventMonitorSummary(
+            GameEventMonitorStatus eventStatus,
+            bool isConnecting,
+            bool isMonitorConnectedForCurrentGame,
+            DllInjectionResult? injectionResult)
+        {
+            if (isConnecting)
+            {
+                return GameConnectionEventMonitorSummary.Connecting;
+            }
+
+            if (injectionResult?.State == DllInjectionState.Failed)
+            {
+                return GameConnectionEventMonitorSummary.LoadingFailed(injectionResult.Message);
+            }
+
+            return isMonitorConnectedForCurrentGame
+                ? GameConnectionEventMonitorSummary.FromStatus(eventStatus)
+                : GameConnectionEventMonitorSummary.Waiting;
         }
 
         private static GameConnectionCommandAvailability CreateConnectCommandAvailability(

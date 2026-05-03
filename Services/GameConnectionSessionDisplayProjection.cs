@@ -20,8 +20,7 @@ namespace BO2.Services
                 projection,
                 snapshot.CurrentGame,
                 snapshot.ConnectionPhase,
-                snapshot.InjectionResult,
-                snapshot.EventStatus,
+                snapshot.EventMonitorSummary,
                 snapshot.IsConnecting,
                 snapshot.IsDisconnecting,
                 snapshot.HasInjectionAttemptForCurrentGame,
@@ -218,22 +217,23 @@ namespace BO2.Services
                 FormatLine("GEntitySizeLabel", DisplayText.Address(candidates.GEntitySize)));
         }
 
-        private static DisplayText FormatEventCompatibility(GameCompatibilityState compatibilityState)
+        private static DisplayText FormatEventCompatibility(GameConnectionEventMonitorState state)
         {
-            return compatibilityState switch
+            return state switch
             {
-                GameCompatibilityState.WaitingForMonitor => DisplayText.Resource("EventMonitorWaitingForMonitor"),
-                GameCompatibilityState.Compatible => DisplayText.Resource("EventMonitorCompatible"),
-                GameCompatibilityState.UnsupportedVersion => DisplayText.Resource("EventMonitorUnsupportedVersion"),
-                GameCompatibilityState.CaptureDisabled => DisplayText.Resource("EventMonitorCaptureDisabled"),
-                GameCompatibilityState.PollingFallback => DisplayText.Resource("EventMonitorPollingFallback"),
+                GameConnectionEventMonitorState.Waiting => DisplayText.Resource("EventMonitorWaitingForMonitor"),
+                GameConnectionEventMonitorState.Connecting => DisplayText.Resource("EventMonitorWaitingForMonitor"),
+                GameConnectionEventMonitorState.Ready => DisplayText.Resource("EventMonitorCompatible"),
+                GameConnectionEventMonitorState.UnsupportedVersion => DisplayText.Resource("EventMonitorUnsupportedVersion"),
+                GameConnectionEventMonitorState.CaptureDisabled => DisplayText.Resource("EventMonitorCaptureDisabled"),
+                GameConnectionEventMonitorState.PollingFallback => DisplayText.Resource("EventMonitorPollingFallback"),
                 _ => DisplayText.Resource("EventMonitorUnknown")
             };
         }
 
-        private static DisplayText FormatRoundSession(GameEventMonitorStatus eventStatus)
+        private static DisplayText FormatRoundSession(GameConnectionEventMonitorSummary eventMonitor)
         {
-            GameEvent? sessionEvent = eventStatus.RecentEvents
+            GameEvent? sessionEvent = eventMonitor.Status.RecentEvents
                 .LastOrDefault(gameEvent => gameEvent.EventType is GameEventType.StartOfRound or GameEventType.EndOfRound or GameEventType.EndGame);
             if (sessionEvent is null)
             {
@@ -277,23 +277,21 @@ namespace BO2.Services
                 isDisconnecting: true);
         }
 
-        private static DisplayText FormatInjectionStatus(
-            DllInjectionResult injectionResult,
-            GameEventMonitorStatus eventStatus)
+        private static DisplayText FormatInjectionStatus(GameConnectionEventMonitorSummary eventMonitor)
         {
-            if (injectionResult.State is not (DllInjectionState.Loaded or DllInjectionState.AlreadyInjected))
+            if (eventMonitor.State is GameConnectionEventMonitorState.ReadinessFailed or GameConnectionEventMonitorState.LoadingFailed)
             {
-                return DisplayText.Plain(injectionResult.Message);
+                return DisplayText.Plain(eventMonitor.FailureMessage ?? string.Empty);
             }
 
-            return eventStatus.CompatibilityState switch
+            return eventMonitor.State switch
             {
-                GameCompatibilityState.Compatible => DisplayText.Resource("DllInjectionMonitorReady"),
-                GameCompatibilityState.PollingFallback => DisplayText.Resource("DllInjectionPollingFallback"),
-                GameCompatibilityState.UnsupportedVersion => DisplayText.Resource("DllInjectionUnsupportedVersion"),
-                GameCompatibilityState.CaptureDisabled => DisplayText.Resource("DllInjectionCaptureDisabled"),
-                GameCompatibilityState.WaitingForMonitor => DisplayText.Resource("DllInjectionWaitingForReadiness"),
-                _ => DisplayText.Plain(injectionResult.Message)
+                GameConnectionEventMonitorState.Ready => DisplayText.Resource("DllInjectionMonitorReady"),
+                GameConnectionEventMonitorState.PollingFallback => DisplayText.Resource("DllInjectionPollingFallback"),
+                GameConnectionEventMonitorState.UnsupportedVersion => DisplayText.Resource("DllInjectionUnsupportedVersion"),
+                GameConnectionEventMonitorState.CaptureDisabled => DisplayText.Resource("DllInjectionCaptureDisabled"),
+                GameConnectionEventMonitorState.Waiting => DisplayText.Resource("DllInjectionWaitingForReadiness"),
+                _ => DisplayText.Resource("DllInjectionNotAttempted")
             };
         }
 
@@ -301,14 +299,13 @@ namespace BO2.Services
             GameConnectionSessionDisplayProjection projection,
             DetectedGame? detectedGame,
             GameConnectionPhase connectionPhase,
-            DllInjectionResult injectionResult,
-            GameEventMonitorStatus eventStatus,
+            GameConnectionEventMonitorSummary eventMonitor,
             bool isConnecting,
             bool isDisconnecting,
             bool hasInjectionAttemptForDetectedGame,
             bool isMonitorConnectedForDetectedGame)
         {
-            projection.LatestEventStatus = eventStatus;
+            projection.LatestEventStatus = eventMonitor.Status;
 
             if (isDisconnecting)
             {
@@ -362,8 +359,10 @@ namespace BO2.Services
             {
                 projection.InjectionStatusText = isConnecting
                     ? DisplayText.Resource("DllInjectionConnecting")
+                    : eventMonitor.State is GameConnectionEventMonitorState.ReadinessFailed or GameConnectionEventMonitorState.LoadingFailed
+                        ? DisplayText.Plain(eventMonitor.FailureMessage ?? string.Empty)
                     : hasInjectionAttemptForDetectedGame
-                        ? DisplayText.Plain(injectionResult.Message)
+                        ? FormatInjectionStatus(eventMonitor)
                         : DisplayText.Resource("DllInjectionWaitingForConnect");
                 projection.EventMonitorStatusText = DisplayText.Resource("EventMonitorWaitingForConnect");
                 projection.ConnectionLastUpdateText = EmptyStatText;
@@ -373,33 +372,33 @@ namespace BO2.Services
                 return;
             }
 
-            projection.InjectionStatusText = FormatInjectionStatus(injectionResult, eventStatus);
+            projection.InjectionStatusText = FormatInjectionStatus(eventMonitor);
             projection.ConnectionLastUpdateText = DisplayText.Resource("ConnectionLastUpdateJustNow");
-            DisplayText monitorStatusText = FormatEventCompatibility(eventStatus.CompatibilityState);
-            if (eventStatus.DroppedEventCount > 0 || eventStatus.DroppedNotifyCount > 0)
+            DisplayText monitorStatusText = FormatEventCompatibility(eventMonitor.State);
+            if (eventMonitor.Status.DroppedEventCount > 0 || eventMonitor.Status.DroppedNotifyCount > 0)
             {
                 monitorStatusText = DisplayText.Format(
                     "EventMonitorCaptureDropsFormat",
                     monitorStatusText,
-                    eventStatus.DroppedEventCount,
-                    eventStatus.DroppedNotifyCount,
-                    eventStatus.PublishedNotifyCount);
+                    eventMonitor.Status.DroppedEventCount,
+                    eventMonitor.Status.DroppedNotifyCount,
+                    eventMonitor.Status.PublishedNotifyCount);
             }
-            else if (eventStatus.PublishedNotifyCount > 0)
+            else if (eventMonitor.Status.PublishedNotifyCount > 0)
             {
                 monitorStatusText = DisplayText.Format(
                     "EventMonitorPublishedEventsFormat",
                     monitorStatusText,
-                    eventStatus.PublishedNotifyCount);
+                    eventMonitor.Status.PublishedNotifyCount);
             }
 
             projection.EventMonitorStatusText = monitorStatusText;
-            projection.CurrentRoundText = FormatRoundSession(eventStatus);
+            projection.CurrentRoundText = FormatRoundSession(eventMonitor);
             projection.BoxEventsText = GameEventDisplayTextProjector.FormatRecentBoxEvents(
-                eventStatus,
+                eventMonitor.Status,
                 DisplayText.Resource("RecentEventsEmpty"));
             projection.RecentGameEventsText = GameEventDisplayTextProjector.FormatRecentGameEvents(
-                eventStatus,
+                eventMonitor.Status,
                 DisplayText.Resource("RecentEventsEmpty"));
         }
 
