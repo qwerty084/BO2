@@ -213,6 +213,22 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void Project_WhenEventMonitorSummaryIsLoadingFailed_UsesSummaryFailureMessage()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+
+            GameConnectionSessionDisplayProjection projection = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    CreateReadResult(detectedGame),
+                    eventMonitorSummary: GameConnectionEventMonitorSummary.LoadingFailed("load failed")));
+
+            AssertPlain("load failed", projection.InjectionStatusText);
+            AssertResource("EventMonitorWaitingForConnect", projection.EventMonitorStatusText);
+            AssertResource("RecentEventsEmpty", projection.BoxEventsText);
+        }
+
+        [Fact]
         public void Project_WhenPhaseIsDisconnecting_ReturnsDisconnectingDisplayProjection()
         {
             DetectedGame detectedGame = CreateSupportedGame(1001);

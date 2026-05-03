@@ -41,6 +41,64 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void Snapshot_WhenSessionStartsWithoutCurrentGame_ExposesNoGameStatusState()
+        {
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                memoryAccessor: memoryAccessor);
+
+            GameConnectionSnapshot snapshot = session.Snapshot;
+
+            Assert.Null(snapshot.CurrentGame);
+            Assert.Equal(GameConnectionPhase.NoGame, snapshot.ConnectionPhase);
+            Assert.Null(snapshot.ReadResult);
+            Assert.Equal(GameConnectionEventMonitorState.Waiting, snapshot.EventMonitorSummary.State);
+            AssertCommandAvailability(
+                snapshot,
+                connectEnabled: false,
+                connectVisible: true,
+                disconnectEnabled: false,
+                disconnectVisible: false);
+            Assert.Equal(0, memoryAccessor.AttachCallCount);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+        }
+
+        [Fact]
+        public void Snapshot_WhenSessionStartsWithUnsupportedGame_ExposesUnsupportedStatusState()
+        {
+            DetectedGame detectedGame = CreateUnsupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                memoryAccessor: memoryAccessor);
+
+            GameConnectionSnapshot snapshot = session.Snapshot;
+
+            Assert.Same(detectedGame, snapshot.CurrentGame);
+            Assert.Equal(GameConnectionPhase.UnsupportedGame, snapshot.ConnectionPhase);
+            Assert.Null(snapshot.ReadResult);
+            Assert.Equal(GameConnectionEventMonitorState.Waiting, snapshot.EventMonitorSummary.State);
+            AssertCommandAvailability(
+                snapshot,
+                connectEnabled: false,
+                connectVisible: true,
+                disconnectEnabled: false,
+                disconnectVisible: false);
+            Assert.Equal(0, memoryAccessor.AttachCallCount);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+        }
+
+        [Fact]
         public void Read_WhenStatsChange_PublishesSnapshotChangedAndUpdatesCurrentSnapshot()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
@@ -68,6 +126,32 @@ namespace BO2.Tests.Services
             Assert.Equal(readSnapshot.EventMonitorSummary, change.Snapshot.EventMonitorSummary);
             Assert.Equal(change.Snapshot, session.Snapshot);
             Assert.Equal(1, memoryAccessor.AttachCallCount);
+        }
+
+        [Fact]
+        public void Read_WhenObservableStateIsUnchanged_DoesNotPublishSnapshotChanged()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                memoryAccessor: memoryAccessor);
+            GameConnectionSnapshot firstSnapshot = session.Read();
+            List<GameConnectionSnapshotChangedEventArgs> changes = [];
+            session.SnapshotChanged += (_, args) => changes.Add(args);
+
+            GameConnectionSnapshot secondSnapshot = session.Read();
+
+            Assert.Empty(changes);
+            Assert.Equal(firstSnapshot, secondSnapshot);
+            Assert.Equal(firstSnapshot, session.Snapshot);
+            Assert.Equal(2, memoryAccessor.AttachCallCount);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
         }
 
         [Fact]
@@ -235,6 +319,64 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void GetStatusSnapshot_WhenNoCurrentGame_ReturnsNoGameStatusWithoutPlayerStatsRead()
+        {
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                memoryAccessor: memoryAccessor);
+
+            GameConnectionSnapshot snapshot = session.GetStatusSnapshot();
+
+            Assert.Null(snapshot.CurrentGame);
+            Assert.Equal(GameConnectionPhase.NoGame, snapshot.ConnectionPhase);
+            Assert.Null(snapshot.ReadResult);
+            AssertCommandAvailability(
+                snapshot,
+                connectEnabled: false,
+                connectVisible: true,
+                disconnectEnabled: false,
+                disconnectVisible: false);
+            Assert.Equal(0, memoryAccessor.AttachCallCount);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(snapshot, session.Snapshot);
+        }
+
+        [Fact]
+        public void GetStatusSnapshot_WhenCurrentGameUnsupported_ReturnsUnsupportedStatusWithoutPlayerStatsRead()
+        {
+            DetectedGame detectedGame = CreateUnsupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                memoryAccessor: memoryAccessor);
+
+            GameConnectionSnapshot snapshot = session.GetStatusSnapshot();
+
+            Assert.Same(detectedGame, snapshot.CurrentGame);
+            Assert.Equal(GameConnectionPhase.UnsupportedGame, snapshot.ConnectionPhase);
+            Assert.Null(snapshot.ReadResult);
+            AssertCommandAvailability(
+                snapshot,
+                connectEnabled: false,
+                connectVisible: true,
+                disconnectEnabled: false,
+                disconnectVisible: false);
+            Assert.Equal(0, memoryAccessor.AttachCallCount);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(snapshot, session.Snapshot);
+        }
+
+        [Fact]
         public void ProcessDetectionChanged_WhenCurrentGameChanges_PublishesSnapshotTransition()
         {
             DetectedGame originalGame = CreateSupportedGame(processId: 1001);
@@ -259,6 +401,69 @@ namespace BO2.Tests.Services
             Assert.Same(originalGame, change.PreviousSnapshot.CurrentGame);
             Assert.Same(detectedGame, change.Snapshot.CurrentGame);
             Assert.Equal(GameConnectionPhase.Detected, change.Snapshot.ConnectionPhase);
+            Assert.Null(change.Snapshot.ReadResult);
+            Assert.Equal(GameConnectionEventMonitorState.Waiting, change.Snapshot.EventMonitorSummary.State);
+            Assert.Equal(change.Snapshot, context.Session.Snapshot);
+            Assert.Equal(0, memoryAccessor.AttachCallCount);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+        }
+
+        [Fact]
+        public void ProcessDetectionChanged_WhenCurrentGameStops_PublishesNoGameTransition()
+        {
+            DetectedGame originalGame = CreateSupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            SessionContext context = CreateSessionContext(
+                eventMonitor,
+                detectedGame: originalGame,
+                memoryAccessor: memoryAccessor);
+            context.Session.Start();
+            List<GameConnectionSnapshotChangedEventArgs> changes = [];
+            context.Session.SnapshotChanged += (_, args) => changes.Add(args);
+            context.EventDetector.Result = null;
+
+            context.LifecycleEventSource.RaiseStopped(originalGame.ProcessName, originalGame.ProcessId);
+
+            GameConnectionSnapshotChangedEventArgs change = Assert.Single(changes);
+            Assert.Same(originalGame, change.PreviousSnapshot.CurrentGame);
+            Assert.Null(change.Snapshot.CurrentGame);
+            Assert.Equal(GameConnectionPhase.NoGame, change.Snapshot.ConnectionPhase);
+            Assert.Null(change.Snapshot.ReadResult);
+            Assert.Equal(GameConnectionEventMonitorState.Waiting, change.Snapshot.EventMonitorSummary.State);
+            Assert.Equal(change.Snapshot, context.Session.Snapshot);
+            Assert.Equal(0, memoryAccessor.AttachCallCount);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+        }
+
+        [Fact]
+        public void ProcessDetectionChanged_WhenCurrentGameChangesToUnsupported_PublishesUnsupportedTransition()
+        {
+            DetectedGame originalGame = CreateSupportedGame(processId: 1001);
+            DetectedGame detectedGame = CreateUnsupportedGame(processId: 2002);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            SessionContext context = CreateSessionContext(
+                eventMonitor,
+                detectedGame: originalGame,
+                memoryAccessor: memoryAccessor);
+            context.Session.Start();
+            List<GameConnectionSnapshotChangedEventArgs> changes = [];
+            context.Session.SnapshotChanged += (_, args) => changes.Add(args);
+            context.EventDetector.Result = detectedGame;
+
+            context.LifecycleEventSource.RaiseStarted(detectedGame.ProcessName, detectedGame.ProcessId);
+
+            GameConnectionSnapshotChangedEventArgs change = Assert.Single(changes);
+            Assert.Same(originalGame, change.PreviousSnapshot.CurrentGame);
+            Assert.Same(detectedGame, change.Snapshot.CurrentGame);
+            Assert.Equal(GameConnectionPhase.UnsupportedGame, change.Snapshot.ConnectionPhase);
             Assert.Null(change.Snapshot.ReadResult);
             Assert.Equal(GameConnectionEventMonitorState.Waiting, change.Snapshot.EventMonitorSummary.State);
             Assert.Equal(change.Snapshot, context.Session.Snapshot);
@@ -443,6 +648,36 @@ namespace BO2.Tests.Services
                 disconnectEnabled: false,
                 disconnectVisible: false);
             Assert.False(injectionAttempted);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+        }
+
+        [Fact]
+        public void Connect_WhenMonitorLoadingFails_ExposesLoadingFailedSummary()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            DllInjector dllInjector = CreateDllInjector(fileExists: _ => false);
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                dllInjector: dllInjector);
+
+            GameConnectionSnapshot snapshot = session.Connect();
+
+            Assert.Equal(GameConnectionPhase.StatsOnlyDetected, snapshot.ConnectionPhase);
+            Assert.Equal(GameConnectionEventMonitorState.LoadingFailed, snapshot.EventMonitorSummary.State);
+            Assert.Equal(
+                AppStrings.Format("DllInjectionMissingDllFormat", string.Empty),
+                snapshot.EventMonitorSummary.FailureMessage);
+            AssertCommandAvailability(
+                snapshot,
+                connectEnabled: true,
+                connectVisible: true,
+                disconnectEnabled: false,
+                disconnectVisible: false);
             Assert.Equal(0, eventMonitor.ReadStatusCallCount);
         }
 

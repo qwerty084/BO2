@@ -111,17 +111,6 @@ namespace BO2.Services
             }
         }
 
-        private bool IsConnecting
-        {
-            get
-            {
-                lock (_syncRoot)
-                {
-                    return _lifecycle.IsConnecting;
-                }
-            }
-        }
-
         private bool IsDisconnecting
         {
             get
@@ -203,7 +192,7 @@ namespace BO2.Services
         public GameConnectionSnapshot Connect()
         {
             GameConnectionRefreshResult connectingResult = BeginConnect();
-            if (!connectingResult.IsConnecting)
+            if (connectingResult.ConnectionPhase != GameConnectionPhase.Connecting)
             {
                 return CreateSnapshot(connectingResult);
             }
@@ -683,16 +672,9 @@ namespace BO2.Services
                 detectedGame,
                 connectionPhase,
                 readResult,
-                eventStatus,
                 eventMonitorSummary,
-                lifecycleSnapshot.InjectionResult,
-                lifecycleSnapshot.IsConnecting,
-                lifecycleSnapshot.IsDisconnecting,
-                lifecycleSnapshot.CanAttemptConnect,
                 commandAvailability.Connect,
-                commandAvailability.Disconnect,
-                lifecycleSnapshot.HasInjectionAttemptForCurrentGame,
-                lifecycleSnapshot.IsMonitorConnectedForCurrentGame);
+                commandAvailability.Disconnect);
         }
 
         private static GameConnectionSessionCommandAvailability CreateCommandAvailability(
@@ -805,16 +787,9 @@ namespace BO2.Services
             DetectedGame? CurrentGame,
             GameConnectionPhase ConnectionPhase,
             PlayerStatsReadResult? ReadResult,
-            GameEventMonitorStatus EventStatus,
             GameConnectionEventMonitorSummary EventMonitorSummary,
-            DllInjectionResult InjectionResult,
-            bool IsConnecting,
-            bool IsDisconnecting,
-            bool CanAttemptConnect,
             GameConnectionCommandAvailability ConnectCommandAvailability,
-            GameConnectionCommandAvailability DisconnectCommandAvailability,
-            bool HasInjectionAttemptForCurrentGame,
-            bool IsMonitorConnectedForCurrentGame);
+            GameConnectionCommandAvailability DisconnectCommandAvailability);
     }
 
     internal readonly record struct GameConnectionCommandAvailability(
