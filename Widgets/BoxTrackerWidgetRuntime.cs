@@ -59,6 +59,7 @@ namespace BO2.Widgets
             }
 
             persistSettings();
+            notifySettingsChanged?.Invoke();
             return true;
         }
 
@@ -103,6 +104,7 @@ namespace BO2.Widgets
             if (!settings.Enabled)
             {
                 CloseNativeWindow(settings);
+                PersistAndNotifySettingsChanged();
                 return;
             }
 
@@ -110,6 +112,7 @@ namespace BO2.Widgets
             nativeWindow.UpdateText(GameEventFormatter.FormatBoxTrackerEvents(_latestEventStatus));
             nativeWindow.Activate();
             nativeWindow.ApplySettings(settings);
+            PersistAndNotifySettingsChanged();
         }
 
         public void UpdateEventStatus(GameEventMonitorStatus eventStatus)
@@ -158,6 +161,12 @@ namespace BO2.Widgets
             _nativeWindow = null;
             nativeWindow.Close();
             return true;
+        }
+
+        private void PersistAndNotifySettingsChanged()
+        {
+            _persistSettings?.Invoke();
+            _notifySettingsChanged?.Invoke();
         }
 
         private void OnNativeWindowClosed(object? sender, EventArgs args)

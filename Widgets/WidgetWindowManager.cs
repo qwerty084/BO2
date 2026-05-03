@@ -56,27 +56,20 @@ namespace BO2.Widgets
 
         public void SetBoxTrackerEnabled(bool enabled)
         {
-            if (_boxTrackerRuntime.SetEnabled(
+            _boxTrackerRuntime.SetEnabled(
                 BoxTrackerSettings,
                 enabled,
                 SaveSettings,
-                NotifySettingsChanged))
-            {
-                NotifySettingsChanged();
-            }
+                NotifySettingsChanged);
         }
 
         public void ApplyBoxTrackerSettings(WidgetSettings settings)
         {
-            settings.Normalize();
             _settingsDocument.SetWidget(WidgetKind.BoxTracker, settings);
             _boxTrackerRuntime.ApplySettings(
                 BoxTrackerSettings,
                 SaveSettings,
                 NotifySettingsChanged);
-
-            SaveSettings();
-            NotifySettingsChanged();
         }
 
         public void Dispose()
