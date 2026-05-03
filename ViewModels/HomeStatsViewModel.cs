@@ -9,6 +9,7 @@ namespace BO2.ViewModels
     {
         private const string EmptyStatText = "--";
 
+        private readonly CurrentGamePageDisplayProjector _currentGamePageDisplayProjector = new();
         private readonly GameConnectionSessionDisplayProjector _displayProjector = new();
         private readonly GameConnectionSessionDisplayRenderer _displayRenderer = new();
         private string _pointsText = EmptyStatText;
@@ -149,32 +150,38 @@ namespace BO2.ViewModels
 
         internal void ApplySnapshot(GameConnectionSnapshot snapshot)
         {
-            ApplyDisplayState(_displayRenderer.Render(_displayProjector.Project(snapshot)));
+            CurrentGamePageDisplayState currentGameState = _currentGamePageDisplayProjector.Project(snapshot);
+            GameConnectionSessionDisplayState sessionState = _displayRenderer.Render(_displayProjector.Project(snapshot));
+            ApplyDisplayState(currentGameState, sessionState);
         }
 
-        private void ApplyDisplayState(GameConnectionSessionDisplayState state)
+        private void ApplyDisplayState(
+            CurrentGamePageDisplayState currentGameState,
+            GameConnectionSessionDisplayState sessionState)
         {
-            ArgumentNullException.ThrowIfNull(state);
+            ArgumentNullException.ThrowIfNull(currentGameState);
+            ArgumentNullException.ThrowIfNull(sessionState);
 
-            PointsText = state.PointsText;
-            KillsText = state.KillsText;
-            DownsText = state.DownsText;
-            RevivesText = state.RevivesText;
-            HeadshotsText = state.HeadshotsText;
-            PositionXText = state.PositionXText;
-            PositionYText = state.PositionYText;
-            PositionZText = state.PositionZText;
-            PlayerCandidateDetailsText = state.PlayerCandidateDetailsText;
-            AmmoCandidateDetailsText = state.AmmoCandidateDetailsText;
-            CounterCandidateDetailsText = state.CounterCandidateDetailsText;
-            AddressCandidateDetailsText = state.AddressCandidateDetailsText;
-            DetectedGameText = state.DetectedGameText;
-            EventCompatibilityText = state.EventCompatibilityText;
-            InjectionStatusText = state.InjectionStatusText;
-            EventMonitorStatusText = state.EventMonitorStatusText;
-            CurrentRoundText = state.CurrentRoundText;
-            BoxEventsText = state.BoxEventsText;
-            RecentGameEventsText = state.RecentGameEventsText;
+            PointsText = currentGameState.PointsText;
+            KillsText = currentGameState.KillsText;
+            DownsText = currentGameState.DownsText;
+            RevivesText = currentGameState.RevivesText;
+            HeadshotsText = currentGameState.HeadshotsText;
+            // Candidate/address fields remain on Home Stats until the Current Game Page replacement removes them.
+            PositionXText = sessionState.PositionXText;
+            PositionYText = sessionState.PositionYText;
+            PositionZText = sessionState.PositionZText;
+            PlayerCandidateDetailsText = sessionState.PlayerCandidateDetailsText;
+            AmmoCandidateDetailsText = sessionState.AmmoCandidateDetailsText;
+            CounterCandidateDetailsText = sessionState.CounterCandidateDetailsText;
+            AddressCandidateDetailsText = sessionState.AddressCandidateDetailsText;
+            DetectedGameText = currentGameState.DetectedGameText;
+            EventCompatibilityText = currentGameState.EventCompatibilityText;
+            InjectionStatusText = currentGameState.InjectionStatusText;
+            EventMonitorStatusText = currentGameState.EventMonitorStatusText;
+            CurrentRoundText = currentGameState.CurrentRoundText;
+            BoxEventsText = currentGameState.BoxEventsText;
+            RecentGameEventsText = currentGameState.RecentGameEventsText;
         }
 
         private void SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
