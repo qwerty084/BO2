@@ -11,11 +11,17 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="InjectorOrchestration.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="InjectorArguments.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="InjectorOrchestration.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="InjectorArguments.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
