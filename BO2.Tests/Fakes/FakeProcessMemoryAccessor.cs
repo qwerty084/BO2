@@ -19,6 +19,8 @@ namespace BO2.Tests.Fakes
 
         public Action<int, string>? AttachCallback { get; set; }
 
+        public Action? CloseCallback { get; set; }
+
         public int AttachCallCount { get; private set; }
 
         public int CloseCallCount { get; private set; }
@@ -79,6 +81,7 @@ namespace BO2.Tests.Fakes
         public void Close()
         {
             CloseCallCount++;
+            CloseCallback?.Invoke();
         }
 
         public void Dispose()

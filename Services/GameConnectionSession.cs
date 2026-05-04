@@ -325,6 +325,7 @@ namespace BO2.Services
 
             if (disconnectAction.ShouldRequestStop)
             {
+                _memoryReader.ClearAttachedGame();
                 _eventMonitor.RequestStop(disconnectAction.MonitorProcessId);
             }
 
@@ -338,6 +339,17 @@ namespace BO2.Services
         public void Dispose()
         {
             _processDetectionService.DetectedGameChanged -= OnDetectedGameChanged;
+            GameConnectionSessionMonitorStopRequest stopRequest;
+            lock (_syncRoot)
+            {
+                stopRequest = _lifecycle.ResetMonitorConnectionState();
+            }
+
+            if (stopRequest.ShouldRequestStop)
+            {
+                _eventMonitor.RequestStop(stopRequest.MonitorProcessId);
+            }
+
             _processDetectionService.Dispose();
             _eventMonitor.Dispose();
             _memoryReader.Dispose();
@@ -449,7 +461,7 @@ namespace BO2.Services
                     GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
                 shouldReadEventMonitor = ShouldReadEventMonitor(detectedGame, lifecycleSnapshot);
                 shouldReadPlayerStats = ShouldReadPlayerStats(detectedGame, lifecycleSnapshot);
-                shouldClearAttachedGame = detectedGame?.AddressMap is null;
+                shouldClearAttachedGame = !shouldReadPlayerStats;
                 if (!shouldReadPlayerStats && !shouldReadEventMonitor)
                 {
                     statusOnlyResult = CreateRefreshResultLocked(
@@ -467,7 +479,15 @@ namespace BO2.Services
                     _memoryReader.ClearAttachedGame();
                 }
 
-                return statusOnlyResult!.Value;
+                lock (_syncRoot)
+                {
+                    if (!Equals(_currentGame, detectedGame))
+                    {
+                        return CreateStatusSnapshotLocked(_currentGame);
+                    }
+
+                    return statusOnlyResult!.Value;
+                }
             }
 
             PlayerStatsReadResult? readResult = null;
