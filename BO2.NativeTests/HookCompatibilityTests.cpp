@@ -203,10 +203,36 @@ namespace BO2NativeTests
             }
         }
 
-        TEST_METHOD(StringResolutionFailureReturnsUnsupportedVersion)
+        TEST_METHOD(OneStringResolutionFailureKeepsCompatibleResolvedTargets)
         {
             FakeHookCompatibilityProbe probe;
             probe.FailingName = "chest_accessed";
+            std::array<BO2Monitor::ResolvedNotifyHookTarget, BO2Monitor::NotifyHookTargetCount> targets{};
+            const BO2Monitor::HookCompatibilityRequest request = MakeRequest();
+
+            const BO2Monitor::GameCompatibilityState state = Determine(request, probe, targets);
+
+            Assert::IsTrue(state == BO2Monitor::GameCompatibilityState::Compatible);
+            Assert::AreEqual(1, probe.InstallCallCount);
+            Assert::AreEqual("chest_accessed", targets[5].Name);
+            Assert::IsFalse(targets[5].Resolved);
+            Assert::AreEqual(0u, targets[5].StringValue);
+            for (std::size_t index = 0; index < targets.size(); ++index)
+            {
+                if (index == 5)
+                {
+                    continue;
+                }
+
+                Assert::IsTrue(targets[index].Resolved);
+                Assert::IsTrue(targets[index].StringValue >= 1000u);
+            }
+        }
+
+        TEST_METHOD(AllStringResolutionFailureReturnsUnsupportedVersion)
+        {
+            FakeHookCompatibilityProbe probe;
+            probe.ResolveStrings = false;
             std::array<BO2Monitor::ResolvedNotifyHookTarget, BO2Monitor::NotifyHookTargetCount> targets{};
             const BO2Monitor::HookCompatibilityRequest request = MakeRequest();
 

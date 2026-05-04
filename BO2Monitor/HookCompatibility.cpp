@@ -50,20 +50,21 @@ namespace BO2Monitor
     {
         notifyTargets = CreateUnresolvedNotifyHookTargets();
 
+        bool resolvedAnyTarget = false;
         for (ResolvedNotifyHookTarget& target : notifyTargets)
         {
             unsigned int stringValue = 0;
             if (!probe.TryResolveStringId(target.Name, stringValue) || stringValue == 0)
             {
-                notifyTargets = CreateUnresolvedNotifyHookTargets();
-                return false;
+                continue;
             }
 
             target.StringValue = stringValue;
             target.Resolved = true;
+            resolvedAnyTarget = true;
         }
 
-        return true;
+        return resolvedAnyTarget;
     }
 
     GameCompatibilityState DetermineHookCompatibility(
