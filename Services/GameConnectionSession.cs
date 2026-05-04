@@ -775,7 +775,7 @@ namespace BO2.Services
         {
             GameConnectionSessionLifecycleSnapshot lifecycleSnapshot = _lifecycle.CreateSnapshot(
                 GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
-            GameConnectionPhase connectionPhase = DetermineConnectionPhase(detectedGame, readResult, lifecycleSnapshot);
+            GameConnectionPhase connectionPhase = DetermineConnectionPhase(detectedGame, lifecycleSnapshot);
             GameConnectionSessionCommandAvailability commandAvailability = CreateCommandAvailability(
                 connectionPhase,
                 lifecycleSnapshot);
@@ -853,7 +853,6 @@ namespace BO2.Services
 
         private static GameConnectionPhase DetermineConnectionPhase(
             DetectedGame? detectedGame,
-            PlayerStatsReadResult? readResult,
             GameConnectionSessionLifecycleSnapshot lifecycleSnapshot)
         {
             if (detectedGame is null)
@@ -881,11 +880,7 @@ namespace BO2.Services
                 return GameConnectionPhase.Connected;
             }
 
-            return readResult is not null
-                && readResult.DetectedGame.ProcessId == detectedGame.ProcessId
-                && readResult.Stats is not null
-                    ? GameConnectionPhase.StatsOnlyDetected
-                    : GameConnectionPhase.Detected;
+            return GameConnectionPhase.Detected;
         }
 
         private static GameConnectionSnapshot CreateSnapshot(GameConnectionRefreshResult result)

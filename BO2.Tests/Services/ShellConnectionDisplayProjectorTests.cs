@@ -96,19 +96,15 @@ namespace BO2.Tests.Services
             Assert.False(state.IsFooterErrorIndicatorVisible);
         }
 
-        [Theory]
-        [InlineData((int)GameConnectionPhase.Detected)]
-        [InlineData((int)GameConnectionPhase.StatsOnlyDetected)]
-        public void Project_WhenDetectedNonConnectedSnapshotHasCurrentMonitorStatus_PublishesWaitingLatestEventStatus(
-            int connectionPhaseValue)
+        [Fact]
+        public void Project_WhenDetectedNonConnectedSnapshotHasCurrentMonitorStatus_PublishesWaitingLatestEventStatus()
         {
             DetectedGame detectedGame = CreateSupportedGame(1001);
-            GameConnectionPhase connectionPhase = (GameConnectionPhase)connectionPhaseValue;
 
             ShellConnectionDisplayState state = CreateProjector().Project(
                 CreateSnapshot(
                     detectedGame,
-                    connectionPhase: connectionPhase,
+                    connectionPhase: GameConnectionPhase.Detected,
                     eventMonitorSummary: CreateSummaryWithCurrentStatus(GameConnectionEventMonitorState.Ready)));
 
             Assert.Same(GameEventMonitorStatus.WaitingForMonitor, state.LatestEventStatus);

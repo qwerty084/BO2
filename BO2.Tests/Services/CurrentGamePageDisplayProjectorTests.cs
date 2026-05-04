@@ -57,24 +57,7 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void Project_WhenStatsOnlyDetectedBeforeConnect_ReturnsInactiveState()
-        {
-            DetectedGame detectedGame = CreateSupportedGame(1001);
-
-            CurrentGamePageDisplayState state = CreateProjector().Project(
-                CreateSnapshot(
-                    detectedGame,
-                    CreateReadResult(detectedGame),
-                    connectionPhase: GameConnectionPhase.StatsOnlyDetected,
-                    canAttemptConnect: true));
-
-            Assert.Equal("CurrentGamePageStatusNotConnected", state.PageStatusText);
-            AssertInactiveStats(state);
-            AssertInactiveEvents(state);
-        }
-
-        [Fact]
-        public void Project_WhenStatsOnlyDetectedAfterDisconnect_ReturnsInactiveStateWithoutStaleEvents()
+        public void Project_WhenDetectedAfterDisconnect_ReturnsInactiveStateWithoutStaleEvents()
         {
             DetectedGame detectedGame = CreateSupportedGame(1001);
             DateTimeOffset receivedAt = new(2026, 5, 2, 12, 0, 0, TimeSpan.Zero);
@@ -92,8 +75,8 @@ namespace BO2.Tests.Services
             CurrentGamePageDisplayState state = CreateProjector().Project(
                 CreateSnapshot(
                     detectedGame,
-                    CreateReadResult(detectedGame),
-                    connectionPhase: GameConnectionPhase.StatsOnlyDetected,
+                    null,
+                    connectionPhase: GameConnectionPhase.Detected,
                     canAttemptConnect: true,
                     eventMonitorSummary: GameConnectionEventMonitorSummary.FromStatus(staleEventStatus)));
 
@@ -110,8 +93,8 @@ namespace BO2.Tests.Services
             CurrentGamePageDisplayState state = CreateProjector().Project(
                 CreateSnapshot(
                     detectedGame,
-                    CreateReadResult(detectedGame),
-                    connectionPhase: GameConnectionPhase.StatsOnlyDetected,
+                    null,
+                    connectionPhase: GameConnectionPhase.Detected,
                     canAttemptConnect: true,
                     eventMonitorSummary: GameConnectionEventMonitorSummary.ReadinessFailed("timeout")));
 
@@ -128,8 +111,8 @@ namespace BO2.Tests.Services
             CurrentGamePageDisplayState state = CreateProjector().Project(
                 CreateSnapshot(
                     detectedGame,
-                    CreateReadResult(detectedGame),
-                    connectionPhase: GameConnectionPhase.StatsOnlyDetected,
+                    null,
+                    connectionPhase: GameConnectionPhase.Detected,
                     canAttemptConnect: true,
                     eventMonitorSummary: GameConnectionEventMonitorSummary.LoadingFailed("load failed")));
 
@@ -270,9 +253,7 @@ namespace BO2.Tests.Services
             GameConnectionPhase? connectionPhase = null,
             GameConnectionEventMonitorSummary? eventMonitorSummary = null)
         {
-            GameConnectionPhase phase = connectionPhase ?? DetermineConnectionPhase(
-                currentGame,
-                readResult);
+            GameConnectionPhase phase = connectionPhase ?? DetermineConnectionPhase(currentGame);
             return new GameConnectionSnapshot(
                 currentGame,
                 phase,
@@ -307,9 +288,7 @@ namespace BO2.Tests.Services
             return new PlayerStatsReadResult(detectedGame, CreateStats());
         }
 
-        private static GameConnectionPhase DetermineConnectionPhase(
-            DetectedGame? currentGame,
-            PlayerStatsReadResult? readResult)
+        private static GameConnectionPhase DetermineConnectionPhase(DetectedGame? currentGame)
         {
             if (currentGame is null)
             {
@@ -321,11 +300,7 @@ namespace BO2.Tests.Services
                 return GameConnectionPhase.UnsupportedGame;
             }
 
-            return readResult is not null
-                && readResult.DetectedGame.ProcessId == currentGame.ProcessId
-                && readResult.Stats is not null
-                    ? GameConnectionPhase.StatsOnlyDetected
-                    : GameConnectionPhase.Detected;
+            return GameConnectionPhase.Detected;
         }
 
         private static PlayerStats CreateStats()

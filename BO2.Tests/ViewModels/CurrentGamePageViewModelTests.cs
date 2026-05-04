@@ -1,6 +1,5 @@
 using System;
 using System.Reflection;
-using BO2.Services;
 using BO2.ViewModels;
 using Xunit;
 
@@ -8,34 +7,6 @@ namespace BO2.Tests.ViewModels
 {
     public sealed class CurrentGamePageViewModelTests
     {
-        [Fact]
-        public void ApplySnapshot_WhenSupportedStatsWithoutMonitor_ProjectsInactiveCurrentGamePageDisplayState()
-        {
-            CurrentGamePageViewModel viewModel = new();
-            DetectedGame detectedGame = CreateSupportedGame(1001);
-            var readResult = new PlayerStatsReadResult(
-                detectedGame,
-                CreateStats());
-
-            viewModel.ApplySnapshot(new GameConnectionSnapshot(
-                detectedGame,
-                GameConnectionPhase.StatsOnlyDetected,
-                readResult,
-                GameConnectionEventMonitorSummary.Waiting,
-                ConnectCommandAvailability: GameConnectionCommandAvailability.VisibleEnabled,
-                DisconnectCommandAvailability: GameConnectionCommandAvailability.Hidden));
-
-            Assert.Equal("CurrentGamePageStatusNotConnected", viewModel.PageStatusText);
-            Assert.Equal("--", viewModel.PointsText);
-            Assert.Equal("--", viewModel.KillsText);
-            Assert.Equal("--", viewModel.DownsText);
-            Assert.Equal("--", viewModel.RevivesText);
-            Assert.Equal("--", viewModel.HeadshotsText);
-            Assert.Equal("--", viewModel.CurrentRoundText);
-            Assert.Equal("RecentEventsEmpty", viewModel.BoxEventsText);
-            Assert.Equal("RecentEventsEmpty", viewModel.RecentGameEventsText);
-        }
-
         [Fact]
         public void PresentationStateContract_ExposesReadOnlyStateWithoutConnectionCommands()
         {
@@ -74,57 +45,6 @@ namespace BO2.Tests.ViewModels
                 || memberName.Contains("LowLevel", StringComparison.OrdinalIgnoreCase)
                 || memberName.Contains("Monitor", StringComparison.OrdinalIgnoreCase)
                 || memberName.Contains("Position", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static PlayerStats CreateStats()
-        {
-            return new PlayerStats(
-                1234,
-                5,
-                1,
-                2,
-                3,
-                new PlayerCandidateStats(
-                    PositionX: 12.345f,
-                    PositionY: null,
-                    PositionZ: -1.25f,
-                    LegacyHealth: 100,
-                    PlayerInfoHealth: null,
-                    GEntityPlayerHealth: 90,
-                    VelocityX: 1.5f,
-                    VelocityY: null,
-                    VelocityZ: null,
-                    Gravity: 800,
-                    Speed: null,
-                    LastJumpHeight: null,
-                    AdsAmount: null,
-                    ViewAngleX: null,
-                    ViewAngleY: null,
-                    HeightInt: null,
-                    HeightFloat: null,
-                    AmmoSlot0: 30,
-                    AmmoSlot1: null,
-                    LethalAmmo: null,
-                    AmmoSlot2: null,
-                    TacticalAmmo: null,
-                    AmmoSlot3: null,
-                    AmmoSlot4: null,
-                    AlternateKills: null,
-                    AlternateHeadshots: null,
-                    SecondaryKills: null,
-                    SecondaryHeadshots: null,
-                    Round: 7));
-        }
-
-        private static DetectedGame CreateSupportedGame(int processId)
-        {
-            return new DetectedGame(
-                GameVariant.SteamZombies,
-                "Steam Zombies",
-                "t6zm",
-                processId,
-                PlayerStatAddressMap.SteamZombies,
-                null);
         }
     }
 }
