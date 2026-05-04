@@ -7,6 +7,9 @@
     <Deploy />
   </Project>
   <Project Path="BO2.Tests\BO2.Tests.csproj" />
+  <Project Path="BO2.NativeTests\BO2.NativeTests.vcxproj" Id="77d8c568-cc7c-45c4-89dd-77915a1d5688">
+    <Platform Solution="*|x86" Project="Win32" />
+  </Project>
   <Project Path="BO2Monitor\BO2Monitor.vcxproj" Id="c5e69ca8-8e73-4b60-b3d2-293990b3b682">
     <Platform Project="Win32" />
   </Project>

@@ -74,6 +74,10 @@ jobs:
             -- `
             DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
 
+      - name: Test native components
+        shell: pwsh
+        run: .\tools\Run-NativeTests.ps1 -Configuration Release
+
       - name: Upload test results artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -84,10 +88,20 @@ jobs:
           retention-days: 14
 
       - name: Upload coverage artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-cobertura
           path: TestResults/**/coverage.cobertura.xml
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload native test artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-test-results
+          path: TestResults/Native/*.trx
           if-no-files-found: error
           retention-days: 14
 

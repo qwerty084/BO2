@@ -40,6 +40,14 @@ dotnet test .\BO2.Tests\BO2.Tests.csproj
 
 `BO2.Tests` is a non-UI xUnit project. It links testable service source files directly and uses fakes for process discovery, memory reads, and resource strings so tests stay deterministic and do not require WinAppSDK runtime startup or a live game process.
 
+Run native C++ unit tests for repo-owned monitor and injector-helper logic:
+
+```powershell
+.\tools\Run-NativeTests.ps1 -Configuration Release
+```
+
+`BO2.NativeTests` uses Microsoft Native Unit Test Framework through Visual Studio and keeps phase 1 deterministic: no live BO2 process, DLL injection automation, MinHook tests, or third-party source tests.
+
 Live Steam Zombies verification is covered by the [native smoke test](docs/native-smoke-test.md).
 
 ## Runtime Notes

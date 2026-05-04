@@ -5,8 +5,20 @@
       <UniqueIdentifier>{B6E8107D-9D0A-4EB6-A2C7-9B78592CB31A}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{956A78B9-8F93-4B76-BEB0-19B3C5DA93F0}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="InjectorArguments.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="InjectorArguments.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="Program.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

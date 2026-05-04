@@ -1,4 +1,5 @@
 #include "Hook.h"
+#include "HookPure.h"
 #include "NotifyLog.h"
 #include "MinHook.h"
 
@@ -7,7 +8,6 @@
 #include <array>
 #include <cstddef>
 #include <cstring>
-#include <limits>
 
 namespace BO2Monitor
 {
@@ -320,33 +320,6 @@ namespace BO2Monitor
             return index > 0;
         }
 
-        bool IsLikelyZombieWeaponAlias(const char* value)
-        {
-            if (value == nullptr)
-            {
-                return false;
-            }
-
-            std::size_t length = 0;
-            for (; length < MaxWeaponNameBytes && value[length] != '\0'; ++length)
-            {
-                const char character = value[length];
-                const bool allowed = (character >= 'a' && character <= 'z')
-                    || (character >= '0' && character <= '9')
-                    || character == '_';
-                if (!allowed)
-                {
-                    return false;
-                }
-            }
-
-            return length > 3
-                && length < MaxWeaponNameBytes
-                && value[length - 3] == '_'
-                && value[length - 2] == 'z'
-                && value[length - 1] == 'm';
-        }
-
         ScriptFieldReadStatus TryReadOwnerWeaponAliasField(
             std::int32_t inst,
             unsigned int ownerId,
@@ -415,12 +388,6 @@ namespace BO2Monitor
             }
 
             return ScriptFieldReadStatus::NotFound;
-        }
-
-        std::uint32_t SaturateCounter(std::uint64_t value)
-        {
-            constexpr std::uint32_t MaxCounterValue = std::numeric_limits<std::uint32_t>::max();
-            return value > MaxCounterValue ? MaxCounterValue : static_cast<std::uint32_t>(value);
         }
 
         bool TryReadRoundValue(std::int32_t& roundValue)
