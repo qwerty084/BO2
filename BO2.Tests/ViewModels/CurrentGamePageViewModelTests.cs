@@ -25,18 +25,15 @@ namespace BO2.Tests.ViewModels
                 ConnectCommandAvailability: GameConnectionCommandAvailability.VisibleEnabled,
                 DisconnectCommandAvailability: GameConnectionCommandAvailability.Hidden));
 
-            Assert.Equal("Steam Zombies", viewModel.DetectedGameText);
             Assert.Equal("CurrentGamePageStatusNotConnected", viewModel.PageStatusText);
             Assert.Equal("--", viewModel.PointsText);
             Assert.Equal("--", viewModel.KillsText);
             Assert.Equal("--", viewModel.DownsText);
             Assert.Equal("--", viewModel.RevivesText);
             Assert.Equal("--", viewModel.HeadshotsText);
-            Assert.Equal("GameProcessDetectorDisplayNameSteamZombies", viewModel.EventCompatibilityText);
-            Assert.Equal("DllInjectionWaitingForConnect", viewModel.InjectionStatusText);
-            Assert.Equal("EventMonitorWaitingForConnect", viewModel.EventMonitorStatusText);
             Assert.Equal("--", viewModel.CurrentRoundText);
             Assert.Equal("RecentEventsEmpty", viewModel.BoxEventsText);
+            Assert.Equal("RecentEventsEmpty", viewModel.RecentGameEventsText);
         }
 
         [Fact]
@@ -73,6 +70,9 @@ namespace BO2.Tests.ViewModels
                 || memberName.Contains("Address", StringComparison.OrdinalIgnoreCase)
                 || memberName.Contains("Debug", StringComparison.OrdinalIgnoreCase)
                 || memberName.Contains("Diagnostic", StringComparison.OrdinalIgnoreCase)
+                || memberName.Contains("Injection", StringComparison.OrdinalIgnoreCase)
+                || memberName.Contains("LowLevel", StringComparison.OrdinalIgnoreCase)
+                || memberName.Contains("Monitor", StringComparison.OrdinalIgnoreCase)
                 || memberName.Contains("Position", StringComparison.OrdinalIgnoreCase);
         }
 

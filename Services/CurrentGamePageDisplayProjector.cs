@@ -22,11 +22,9 @@ namespace BO2.Services
         {
             var projection = CurrentGamePageDisplayProjection.CreateDefault();
             projection.PageStatusText = GetPageStatusText(snapshot.ConnectionPhase);
-            ApplyDetectedGame(projection, snapshot.CurrentGame);
             ApplyStats(projection, snapshot.ConnectionPhase, snapshot.ReadResult);
             ApplyEventMonitorStatus(
                 projection,
-                snapshot.CurrentGame,
                 snapshot.ConnectionPhase,
                 snapshot.EventMonitorSummary);
 
@@ -38,23 +36,10 @@ namespace BO2.Services
                 DownsText = _renderer.Render(projection.DownsText),
                 RevivesText = _renderer.Render(projection.RevivesText),
                 HeadshotsText = _renderer.Render(projection.HeadshotsText),
-                DetectedGameText = _renderer.Render(projection.DetectedGameText),
-                EventCompatibilityText = _renderer.Render(projection.EventCompatibilityText),
-                InjectionStatusText = _renderer.Render(projection.InjectionStatusText),
-                EventMonitorStatusText = _renderer.Render(projection.EventMonitorStatusText),
                 CurrentRoundText = _renderer.Render(projection.CurrentRoundText),
                 BoxEventsText = _renderer.Render(projection.BoxEventsText),
                 RecentGameEventsText = _renderer.Render(projection.RecentGameEventsText)
             };
-        }
-
-        private static void ApplyDetectedGame(
-            CurrentGamePageDisplayProjection projection,
-            DetectedGame? currentGame)
-        {
-            projection.DetectedGameText = currentGame is null
-                ? DisplayText.Resource("NoGameDetected")
-                : DisplayText.Plain(currentGame.DisplayName);
         }
 
         private static void ApplyStats(
@@ -77,66 +62,22 @@ namespace BO2.Services
 
         private static void ApplyEventMonitorStatus(
             CurrentGamePageDisplayProjection projection,
-            DetectedGame? detectedGame,
             GameConnectionPhase connectionPhase,
             GameConnectionEventMonitorSummary eventMonitor)
         {
             if (connectionPhase == GameConnectionPhase.Disconnecting
                 || eventMonitor.State is GameConnectionEventMonitorState.Disconnecting or GameConnectionEventMonitorState.StopPending)
             {
-                projection.InjectionStatusText = DisplayText.Resource("DllInjectionDisconnecting");
-                projection.EventMonitorStatusText = DisplayText.Resource("EventMonitorDisconnecting");
                 ClearEvents(projection);
                 return;
             }
 
-            if (connectionPhase == GameConnectionPhase.NoGame)
+            if (connectionPhase != GameConnectionPhase.Connected)
             {
-                projection.InjectionStatusText = DisplayText.Resource("DllInjectionNotAttempted");
-                projection.EventCompatibilityText = DisplayText.Resource("NoGameDetected");
-                projection.EventMonitorStatusText = DisplayText.Resource("EventMonitorWaitingForMonitor");
                 ClearEvents(projection);
                 return;
             }
 
-            if (connectionPhase == GameConnectionPhase.UnsupportedGame && detectedGame is not null)
-            {
-                projection.InjectionStatusText = DisplayText.Format(
-                    "DllInjectionUnsupportedGameFormat",
-                    DisplayText.Plain(detectedGame.DisplayName));
-                projection.EventCompatibilityText = DisplayText.Format(
-                    "EventMonitorUnsupportedGameFormat",
-                    DisplayText.Plain(detectedGame.DisplayName));
-                projection.EventMonitorStatusText = DisplayText.Resource("EventMonitorCaptureDisabled");
-                ClearEvents(projection);
-                return;
-            }
-
-            if (detectedGame is null)
-            {
-                projection.InjectionStatusText = DisplayText.Resource("DllInjectionNotAttempted");
-                projection.EventCompatibilityText = DisplayText.Resource("NoGameDetected");
-                projection.EventMonitorStatusText = DisplayText.Resource("EventMonitorWaitingForMonitor");
-                ClearEvents(projection);
-                return;
-            }
-
-            projection.EventCompatibilityText = DisplayText.Resource("GameProcessDetectorDisplayNameSteamZombies");
-            if (connectionPhase is GameConnectionPhase.Detected or GameConnectionPhase.StatsOnlyDetected
-                || connectionPhase != GameConnectionPhase.Connected)
-            {
-                projection.InjectionStatusText = connectionPhase == GameConnectionPhase.Connecting
-                    ? DisplayText.Resource("DllInjectionConnecting")
-                    : eventMonitor.State is GameConnectionEventMonitorState.ReadinessFailed or GameConnectionEventMonitorState.LoadingFailed
-                        ? DisplayText.Plain(eventMonitor.FailureMessage ?? string.Empty)
-                        : DisplayText.Resource("DllInjectionWaitingForConnect");
-                projection.EventMonitorStatusText = DisplayText.Resource("EventMonitorWaitingForConnect");
-                ClearEvents(projection);
-                return;
-            }
-
-            projection.InjectionStatusText = GameConnectionDisplayTextProjector.FormatInjectionStatus(eventMonitor);
-            projection.EventMonitorStatusText = GameConnectionDisplayTextProjector.FormatMonitorStatus(eventMonitor);
             projection.CurrentRoundText = GameConnectionDisplayTextProjector.FormatCurrentRound(eventMonitor);
             projection.BoxEventsText = GameEventDisplayTextProjector.FormatRecentBoxEvents(
                 eventMonitor.Status,
@@ -188,14 +129,6 @@ namespace BO2.Services
 
         public DisplayText HeadshotsText { get; set; } = GameConnectionDisplayTextProjector.EmptyValueText;
 
-        public DisplayText DetectedGameText { get; set; } = DisplayText.Resource("NoGameDetected");
-
-        public DisplayText EventCompatibilityText { get; set; } = DisplayText.Resource("NoGameDetected");
-
-        public DisplayText InjectionStatusText { get; set; } = DisplayText.Resource("DllInjectionNotAttempted");
-
-        public DisplayText EventMonitorStatusText { get; set; } = DisplayText.Resource("EventMonitorWaitingForMonitor");
-
         public DisplayText CurrentRoundText { get; set; } = GameConnectionDisplayTextProjector.EmptyValueText;
 
         public DisplayText BoxEventsText { get; set; } = DisplayText.Resource("RecentEventsEmpty");
@@ -223,14 +156,6 @@ namespace BO2.Services
         public string RevivesText { get; init; } = EmptyStatText;
 
         public string HeadshotsText { get; init; } = EmptyStatText;
-
-        public string DetectedGameText { get; init; } = AppStrings.Get("NoGameDetected");
-
-        public string EventCompatibilityText { get; init; } = AppStrings.Get("NoGameDetected");
-
-        public string InjectionStatusText { get; init; } = AppStrings.Get("DllInjectionNotAttempted");
-
-        public string EventMonitorStatusText { get; init; } = AppStrings.Get("EventMonitorWaitingForMonitor");
 
         public string CurrentRoundText { get; init; } = EmptyStatText;
 

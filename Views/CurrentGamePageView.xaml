@@ -120,10 +120,6 @@
                         Grid.Column="1"
                         Style="{StaticResource BO2CardTitleTextBlockStyle}" />
                 </Grid>
-                <TextBlock
-                    x:Uid="GameEventsDescription"
-                    Style="{StaticResource BO2CaptionTextBlockStyle}"
-                    TextWrapping="Wrap" />
                 <Grid
                     ColumnSpacing="24"
                     RowSpacing="8">
@@ -135,26 +131,14 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock x:Uid="DetectedGameLabel" Grid.Row="0" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                    <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding DetectedGameText, Mode=OneWay}" TextWrapping="Wrap" />
-                    <TextBlock x:Uid="EventCompatibilityLabel" Grid.Row="1" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                    <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding EventCompatibilityText, Mode=OneWay}" TextWrapping="Wrap" />
-                    <TextBlock x:Uid="DllInjectionStatusLabel" Grid.Row="2" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                    <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding InjectionStatusText, Mode=OneWay}" TextWrapping="Wrap" />
-                    <TextBlock x:Uid="EventMonitorStatusLabel" Grid.Row="3" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                    <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding EventMonitorStatusText, Mode=OneWay}" TextWrapping="Wrap" />
-                    <TextBlock x:Uid="CurrentRoundLabel" Grid.Row="4" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                    <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding CurrentRoundText, Mode=OneWay}" TextWrapping="Wrap" />
-                    <TextBlock x:Uid="BoxEventsLabel" Grid.Row="5" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                    <TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding BoxEventsText, Mode=OneWay}" TextWrapping="Wrap" />
-                    <TextBlock x:Uid="RecentEventsLabel" Grid.Row="6" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                    <TextBlock Grid.Row="6" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding RecentGameEventsText, Mode=OneWay}" TextWrapping="Wrap" />
+                    <TextBlock x:Uid="CurrentRoundLabel" Grid.Row="0" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding CurrentRoundText, Mode=OneWay}" TextWrapping="Wrap" />
+                    <TextBlock x:Uid="BoxEventsLabel" Grid.Row="1" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding BoxEventsText, Mode=OneWay}" TextWrapping="Wrap" />
+                    <TextBlock x:Uid="RecentEventsLabel" Grid.Row="2" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding RecentGameEventsText, Mode=OneWay}" TextWrapping="Wrap" />
                 </Grid>
             </StackPanel>
         </Border>

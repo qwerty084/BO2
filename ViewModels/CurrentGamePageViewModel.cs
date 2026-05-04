@@ -16,10 +16,6 @@ namespace BO2.ViewModels
         private string _downsText = EmptyStatText;
         private string _revivesText = EmptyStatText;
         private string _headshotsText = EmptyStatText;
-        private string _detectedGameText = AppStrings.Get("NoGameDetected");
-        private string _eventCompatibilityText = AppStrings.Get("NoGameDetected");
-        private string _injectionStatusText = AppStrings.Get("DllInjectionNotAttempted");
-        private string _eventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForMonitor");
         private string _currentRoundText = EmptyStatText;
         private string _boxEventsText = AppStrings.Get("RecentEventsEmpty");
         private string _recentGameEventsText = AppStrings.Get("RecentEventsEmpty");
@@ -62,30 +58,6 @@ namespace BO2.ViewModels
             private set => SetProperty(ref _headshotsText, value);
         }
 
-        public string DetectedGameText
-        {
-            get => _detectedGameText;
-            private set => SetProperty(ref _detectedGameText, value);
-        }
-
-        public string EventCompatibilityText
-        {
-            get => _eventCompatibilityText;
-            private set => SetProperty(ref _eventCompatibilityText, value);
-        }
-
-        public string InjectionStatusText
-        {
-            get => _injectionStatusText;
-            private set => SetProperty(ref _injectionStatusText, value);
-        }
-
-        public string EventMonitorStatusText
-        {
-            get => _eventMonitorStatusText;
-            private set => SetProperty(ref _eventMonitorStatusText, value);
-        }
-
         public string CurrentRoundText
         {
             get => _currentRoundText;
@@ -120,10 +92,6 @@ namespace BO2.ViewModels
             DownsText = currentGameState.DownsText;
             RevivesText = currentGameState.RevivesText;
             HeadshotsText = currentGameState.HeadshotsText;
-            DetectedGameText = currentGameState.DetectedGameText;
-            EventCompatibilityText = currentGameState.EventCompatibilityText;
-            InjectionStatusText = currentGameState.InjectionStatusText;
-            EventMonitorStatusText = currentGameState.EventMonitorStatusText;
             CurrentRoundText = currentGameState.CurrentRoundText;
             BoxEventsText = currentGameState.BoxEventsText;
             RecentGameEventsText = currentGameState.RecentGameEventsText;

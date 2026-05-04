@@ -282,9 +282,6 @@
   <data name="EventMonitorWaitingForMonitor" xml:space="preserve">
     <value>Waiting for BO2Monitor shared memory</value>
   </data>
-  <data name="GameEventsDescription.Text" xml:space="preserve">
-    <value>Event capture is inactive until a validated BO2 monitor publishes read-only event snapshots.</value>
-  </data>
   <data name="GameEventsTitle.Text" xml:space="preserve">
     <value>Game events</value>
   </data>
