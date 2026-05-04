@@ -26,62 +26,19 @@
     <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>
 
-  <!-- Link pure service source files directly; AppStrings.cs is intentionally excluded and
-       replaced by the test stub in Fakes/ so WinAppSDK ResourceLoader is never invoked. -->
+  <!-- Link pure service source files directly. AppStrings.cs is intentionally excluded and
+       replaced by the test stub in Fakes/ so WinAppSDK ResourceLoader is never invoked.
+       The glob keeps newly added service files compiling under tests without maintaining
+       this project by hand. -->
   <ItemGroup>
-    <Compile Include="..\Services\ConnectionState.cs"           Link="Services\ConnectionState.cs" />
-    <Compile Include="..\Services\AppPreferences.cs"            Link="Services\AppPreferences.cs" />
-    <Compile Include="..\Services\AppPreferencesStore.cs"       Link="Services\AppPreferencesStore.cs" />
-    <Compile Include="..\Services\ThemeMode.cs"                 Link="Services\ThemeMode.cs" />
-    <Compile Include="..\Services\DetectedGame.cs"              Link="Services\DetectedGame.cs" />
-    <Compile Include="..\Services\DllInjectionResult.cs"        Link="Services\DllInjectionResult.cs" />
-    <Compile Include="..\Services\DllInjectionState.cs"         Link="Services\DllInjectionState.cs" />
-    <Compile Include="..\Services\DllInjector.cs"               Link="Services\DllInjector.cs" />
-    <Compile Include="..\Services\DetectedGameChangedEventArgs.cs" Link="Services\DetectedGameChangedEventArgs.cs" />
-    <Compile Include="..\Services\IGameProcessDetector.cs"      Link="Services\IGameProcessDetector.cs" />
-    <Compile Include="..\Services\IProcessLifecycleEventSource.cs" Link="Services\IProcessLifecycleEventSource.cs" />
-    <Compile Include="..\Services\ProcessLifecycleEventArgs.cs" Link="Services\ProcessLifecycleEventArgs.cs" />
-    <Compile Include="..\Services\GameProcessDefinition.cs"     Link="Services\GameProcessDefinition.cs" />
-    <Compile Include="..\Services\GameProcessDetectionService.cs" Link="Services\GameProcessDetectionService.cs" />
-    <Compile Include="..\Services\GameVariant.cs"               Link="Services\GameVariant.cs" />
-    <Compile Include="..\Services\GameCompatibilityState.cs"    Link="Services\GameCompatibilityState.cs" />
-    <Compile Include="..\Services\DisplayText.cs"               Link="Services\DisplayText.cs" />
-    <Compile Include="..\Services\GameEvent.cs"                 Link="Services\GameEvent.cs" />
-    <Compile Include="..\Services\GameEventFormatter.cs"        Link="Services\GameEventFormatter.cs" />
-    <Compile Include="..\Services\GameEventMonitor.cs"          Link="Services\GameEventMonitor.cs" />
-    <Compile Include="..\Services\GameEventMonitorStatus.cs"    Link="Services\GameEventMonitorStatus.cs" />
-    <Compile Include="..\Services\GameEventType.cs"             Link="Services\GameEventType.cs" />
-    <Compile Include="..\Services\WeaponDisplayNameResolver.cs" Link="Services\WeaponDisplayNameResolver.cs" />
-    <Compile Include="..\Services\WidgetColorSerializer.cs"     Link="Services\WidgetColorSerializer.cs" />
-    <Compile Include="..\Services\WidgetKind.cs"                Link="Services\WidgetKind.cs" />
-    <Compile Include="..\Services\WidgetSettings.cs"            Link="Services\WidgetSettings.cs" />
-    <Compile Include="..\Services\WidgetSettingsDocument.cs"    Link="Services\WidgetSettingsDocument.cs" />
-    <Compile Include="..\Services\WidgetSettingsStore.cs"       Link="Services\WidgetSettingsStore.cs" />
-    <Compile Include="..\Services\SettingsJsonSerializerContext.cs" Link="Services\SettingsJsonSerializerContext.cs" />
-    <Compile Include="..\Services\IGameEventMonitor.cs"         Link="Services\IGameEventMonitor.cs" />
-    <Compile Include="..\Services\RefreshDiagnostics.cs"        Link="Services\RefreshDiagnostics.cs" />
-    <Compile Include="..\Services\IProcessInfoProvider.cs"      Link="Services\IProcessInfoProvider.cs" />
-    <Compile Include="..\Services\IProcessMemoryAccessor.cs"    Link="Services\IProcessMemoryAccessor.cs" />
-    <Compile Include="..\Services\GameMemoryReader.cs"          Link="Services\GameMemoryReader.cs" />
-    <Compile Include="..\Services\GameProcessDetector.cs"       Link="Services\GameProcessDetector.cs" />
-    <Compile Include="..\Services\WindowsProcessLifecycleEventSource.cs" Link="Services\WindowsProcessLifecycleEventSource.cs" />
-    <Compile Include="..\Services\WindowsProcessInfoProvider.cs" Link="Services\WindowsProcessInfoProvider.cs" />
-    <Compile Include="..\Services\WindowsProcessMemoryAccessor.cs" Link="Services\WindowsProcessMemoryAccessor.cs" />
-    <Compile Include="..\Services\PlayerStatAddressMap.cs"      Link="Services\PlayerStatAddressMap.cs" />
-    <Compile Include="..\Services\PlayerStats.cs"               Link="Services\PlayerStats.cs" />
-    <Compile Include="..\Services\PlayerStatsReadResult.cs"     Link="Services\PlayerStatsReadResult.cs" />
-    <Compile Include="..\Services\GameConnectionPhase.cs"       Link="Services\GameConnectionPhase.cs" />
-    <Compile Include="..\Services\GameConnectionEventMonitorSummary.cs" Link="Services\GameConnectionEventMonitorSummary.cs" />
-    <Compile Include="..\Services\GameConnectionSessionLifecycle.cs" Link="Services\GameConnectionSessionLifecycle.cs" />
-    <Compile Include="..\Services\GameConnectionSession.cs"     Link="Services\GameConnectionSession.cs" />
-    <Compile Include="..\Services\DisplayTextRenderer.cs" Link="Services\DisplayTextRenderer.cs" />
-    <Compile Include="..\Services\GameConnectionDisplayTextProjector.cs" Link="Services\GameConnectionDisplayTextProjector.cs" />
-    <Compile Include="..\Services\CurrentGamePageDisplayProjector.cs" Link="Services\CurrentGamePageDisplayProjector.cs" />
-    <Compile Include="..\Services\ShellConnectionDisplayProjector.cs" Link="Services\ShellConnectionDisplayProjector.cs" />
-    <Compile Include="..\Services\StatFormatter.cs"             Link="Services\StatFormatter.cs" />
-    <Compile Include="..\Widgets\IBoxTrackerWidgetNativeAdapter.cs" Link="Widgets\IBoxTrackerWidgetNativeAdapter.cs" />
-    <Compile Include="..\Widgets\BoxTrackerWidgetRuntime.cs"    Link="Widgets\BoxTrackerWidgetRuntime.cs" />
-    <Compile Include="..\Widgets\WidgetWindowManager.cs"        Link="Widgets\WidgetWindowManager.cs" />
+    <Compile
+      Include="..\Services\*.cs"
+      Exclude="..\Services\AppStrings.cs"
+      Link="Services\%(Filename)%(Extension)" />
+    <Compile
+      Include="..\Widgets\*.cs"
+      Exclude="..\Widgets\BoxTrackerWidgetNativeAdapter.cs;..\Widgets\BoxTrackerWidgetSettingsDialog.cs;..\Widgets\BoxTrackerWidgetWindow.cs"
+      Link="Widgets\%(Filename)%(Extension)" />
     <Compile Include="..\ViewModels\CurrentGamePageViewModel.cs" Link="ViewModels\CurrentGamePageViewModel.cs" />
   </ItemGroup>
 
