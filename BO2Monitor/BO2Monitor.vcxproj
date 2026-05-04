@@ -129,6 +129,7 @@
     <ClInclude Include="NotifyLog.h" />
     <ClInclude Include="NotifyPublication.h" />
     <ClInclude Include="PollingFallback.h" />
+    <ClInclude Include="Generated\EventMonitorSnapshotContract.g.h" />
     <ClInclude Include="SharedSnapshot.h" />
     <ClInclude Include="third_party\minhook\include\MinHook.h" />
     <ClInclude Include="third_party\minhook\src\buffer.h" />

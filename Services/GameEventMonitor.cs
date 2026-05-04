@@ -5,17 +5,18 @@ using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Text;
 using System.Threading;
+using BO2.Services.Generated;
 
 namespace BO2.Services
 {
     public sealed class GameEventMonitor : IGameEventMonitor
     {
-        public const string SharedMemoryNamePrefix = "BO2MonitorSharedMem-";
-        public const string EventHandleNamePrefix = "BO2MonitorEvent-";
-        public const string StopEventHandleNamePrefix = "BO2MonitorStopEvent-";
+        public const string SharedMemoryNamePrefix = EventMonitorSnapshotContract.SharedMemoryNamePrefix;
+        public const string EventHandleNamePrefix = EventMonitorSnapshotContract.UpdateEventNamePrefix;
+        public const string StopEventHandleNamePrefix = EventMonitorSnapshotContract.StopEventNamePrefix;
 
-        internal const uint SnapshotMagic = 0x45324F42; // BO2E
-        internal const uint SnapshotVersion = 6;
+        internal const uint SnapshotMagic = EventMonitorSnapshotContract.SnapshotMagic;
+        internal const uint SnapshotVersion = EventMonitorSnapshotContract.SnapshotVersion;
         internal const int MaxEventCount = 128;
         internal const int MaxEventNameBytes = 64;
         internal const int MaxWeaponNameBytes = 64;

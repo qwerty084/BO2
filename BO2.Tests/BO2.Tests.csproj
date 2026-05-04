@@ -35,6 +35,7 @@
       Include="..\Services\*.cs"
       Exclude="..\Services\AppStrings.cs"
       Link="Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Generated\*.cs" Link="Services\Generated\%(Filename)%(Extension)" />
     <Compile
       Include="..\Widgets\*.cs"
       Exclude="..\Widgets\BoxTrackerWidgetNativeAdapter.cs;..\Widgets\BoxTrackerWidgetSettingsDialog.cs;..\Widgets\BoxTrackerWidgetWindow.cs"

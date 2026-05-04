@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "snapshot": {
+    "magicHex": "0x45324F42",
+    "version": 6
+  },
+  "objectNamePrefixes": {
+    "sharedMemory": "BO2MonitorSharedMem-",
+    "updateEvent": "BO2MonitorEvent-",
+    "stopEvent": "BO2MonitorStopEvent-"
+  }
+}

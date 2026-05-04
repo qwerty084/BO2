@@ -138,6 +138,7 @@
     <ClInclude Include="..\BO2Monitor\NotifyLog.h" />
     <ClInclude Include="..\BO2Monitor\NotifyPublication.h" />
     <ClInclude Include="..\BO2Monitor\PollingFallback.h" />
+    <ClInclude Include="..\BO2Monitor\Generated\EventMonitorSnapshotContract.g.h" />
     <ClInclude Include="..\BO2Monitor\SharedSnapshot.h" />
   </ItemGroup>
   <ItemGroup>

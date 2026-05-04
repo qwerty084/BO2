@@ -5,13 +5,15 @@
 #include <cstdint>
 #include <string>
 
+#include "Generated/EventMonitorSnapshotContract.g.h"
+
 namespace BO2Monitor
 {
-    constexpr wchar_t SharedMemoryNamePrefix[] = L"BO2MonitorSharedMem-";
-    constexpr wchar_t EventHandleNamePrefix[] = L"BO2MonitorEvent-";
-    constexpr wchar_t StopEventHandleNamePrefix[] = L"BO2MonitorStopEvent-";
-    constexpr std::uint32_t SnapshotMagic = 0x45324F42; // BO2E
-    constexpr std::uint32_t SnapshotVersion = 6;
+    constexpr const wchar_t* SharedMemoryNamePrefix = Generated::SharedMemoryNamePrefix;
+    constexpr const wchar_t* EventHandleNamePrefix = Generated::UpdateEventNamePrefix;
+    constexpr const wchar_t* StopEventHandleNamePrefix = Generated::StopEventNamePrefix;
+    constexpr std::uint32_t SnapshotMagic = Generated::SnapshotMagic;
+    constexpr std::uint32_t SnapshotVersion = Generated::SnapshotVersion;
     constexpr std::size_t MaxEventCount = 128;
     constexpr std::size_t MaxEventNameBytes = 64;
     constexpr std::size_t MaxWeaponNameBytes = 64;
