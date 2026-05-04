@@ -514,8 +514,7 @@ namespace BO2.Services
             GameConnectionSessionLifecycleSnapshot lifecycleSnapshot)
         {
             return detectedGame?.AddressMap is not null
-                && (lifecycleSnapshot.IsMonitorConnectedForCurrentGame
-                    || lifecycleSnapshot.HasInjectionAttemptForCurrentGame);
+                && lifecycleSnapshot.IsMonitorConnectedForCurrentGame;
         }
 
         private PlayerStatsReadResult? ReadPlayerStats(DetectedGame? detectedGame)

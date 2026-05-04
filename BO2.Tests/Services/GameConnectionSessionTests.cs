@@ -705,32 +705,36 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void Connect_WhenMonitorLoadingFails_ExposesLoadingFailedSummary()
+        public void Connect_WhenMonitorLoadingFails_ReturnsDetectedStatusOnlyWithLoadingFailedSummary()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
             FakeGameEventMonitor eventMonitor = new()
             {
                 Status = CreateCompatibleStatus()
             };
+            FakeProcessMemoryAccessor memoryAccessor = new();
             DllInjector dllInjector = CreateDllInjector(fileExists: _ => false);
             GameConnectionSession session = CreateStartedSession(
                 eventMonitor,
                 detectedGame,
+                memoryAccessor: memoryAccessor,
                 dllInjector: dllInjector);
 
             GameConnectionSnapshot snapshot = session.Connect();
 
-            Assert.Equal(GameConnectionPhase.StatsOnlyDetected, snapshot.ConnectionPhase);
+            Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
             Assert.Equal(GameConnectionEventMonitorState.LoadingFailed, snapshot.EventMonitorSummary.State);
             Assert.Equal(
                 AppStrings.Format("DllInjectionMissingDllFormat", string.Empty),
                 snapshot.EventMonitorSummary.FailureMessage);
+            Assert.Null(snapshot.ReadResult);
             AssertCommandAvailability(
                 snapshot,
                 connectEnabled: true,
                 connectVisible: true,
                 disconnectEnabled: false,
                 disconnectVisible: false);
+            Assert.Equal(0, memoryAccessor.AttachCallCount);
             Assert.Equal(0, eventMonitor.ReadStatusCallCount);
         }
 
