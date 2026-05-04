@@ -480,7 +480,6 @@ namespace BO2.Services
                 ownedMonitorProcessId = detectedGame is not null
                     && _lifecycle.IsMonitorConnectedFor(
                         GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame))
-                    && readResult?.DetectedGame.ProcessId == detectedGame.ProcessId
                         ? detectedGame.ProcessId
                         : null;
             }
