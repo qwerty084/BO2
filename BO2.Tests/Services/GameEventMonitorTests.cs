@@ -15,7 +15,7 @@ namespace BO2.Tests.Services
         private static int _nextMonitorTestProcessId = 1_400_000_000;
 
         [Fact]
-        public void DecodeSnapshot_WhenSnapshotIsValid_MapsKnownNotifyNames()
+        public void DecodeSnapshot_WhenEventTypeIsUnknownAndNameIsKnown_MapsLegacyEventName()
         {
             byte[] snapshot = CreateSnapshot(
                 GameCompatibilityState.Compatible,
@@ -41,6 +41,42 @@ namespace BO2.Tests.Services
             Assert.Equal(1149u, gameEvent.StringValue);
             Assert.Equal(receivedAt, gameEvent.ReceivedAt);
             Assert.Null(gameEvent.WeaponName);
+        }
+
+        [Fact]
+        public void DecodeSnapshot_WhenEventTypeIsUnknownAndNameIsUnknown_KeepsUnknownEventType()
+        {
+            byte[] snapshot = CreateSnapshot(
+                GameCompatibilityState.Compatible,
+                droppedEventCount: 0,
+                droppedNotifyCount: 0,
+                publishedNotifyCount: 1,
+                eventCount: 1);
+            WriteEvent(snapshot, 0, GameEventType.Unknown, 12345, "future_event");
+
+            GameEventMonitorStatus status = GameEventMonitor.DecodeSnapshot(snapshot, DateTimeOffset.UtcNow);
+
+            GameEvent gameEvent = Assert.Single(status.RecentEvents);
+            Assert.Equal(GameEventType.Unknown, gameEvent.EventType);
+            Assert.Equal("future_event", gameEvent.EventName);
+        }
+
+        [Fact]
+        public void DecodeSnapshot_WhenEventTypeIsExplicit_IgnoresLegacyEventNameMapping()
+        {
+            byte[] snapshot = CreateSnapshot(
+                GameCompatibilityState.Compatible,
+                droppedEventCount: 0,
+                droppedNotifyCount: 0,
+                publishedNotifyCount: 1,
+                eventCount: 1);
+            WriteEvent(snapshot, 0, GameEventType.EndGame, 12345, "start_of_round");
+
+            GameEventMonitorStatus status = GameEventMonitor.DecodeSnapshot(snapshot, DateTimeOffset.UtcNow);
+
+            GameEvent gameEvent = Assert.Single(status.RecentEvents);
+            Assert.Equal(GameEventType.EndGame, gameEvent.EventType);
+            Assert.Equal("start_of_round", gameEvent.EventName);
         }
 
         [Fact]

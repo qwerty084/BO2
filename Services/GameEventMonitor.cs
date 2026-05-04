@@ -246,6 +246,7 @@ namespace BO2.Services
 
         internal static GameEventType MapEventName(string eventName)
         {
+            // Reader compatibility only: explicit EventType values remain authoritative.
             return eventName switch
             {
                 "start_of_round" => GameEventType.StartOfRound,
