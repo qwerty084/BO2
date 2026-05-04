@@ -36,6 +36,13 @@ namespace BO2.Services
         private EventWaitHandle? _stopEventHandle;
         private bool _readinessSignalObserved;
 
+        internal interface IStableSnapshotReader
+        {
+            void ReadWriteSequence(out uint sequence);
+
+            void ReadSnapshot(byte[] snapshot);
+        }
+
         public GameEventMonitorStatus ReadStatus(DateTimeOffset receivedAt, int? targetProcessId)
         {
             if (targetProcessId is null or <= 0)
@@ -76,7 +83,7 @@ namespace BO2.Services
                     0,
                     SharedMemorySize,
                     MemoryMappedFileAccess.Read);
-                if (!TryReadStableSnapshot(accessor, snapshot))
+                if (!TryReadStableSnapshot(new MemoryMappedStableSnapshotReader(accessor), snapshot))
                 {
                     return GameEventMonitorStatus.WaitingForMonitor;
                 }
@@ -324,19 +331,19 @@ namespace BO2.Services
             return StopEventHandleNamePrefix + processId.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        private static bool TryReadStableSnapshot(MemoryMappedViewAccessor accessor, byte[] snapshot)
+        internal static bool TryReadStableSnapshot(IStableSnapshotReader reader, byte[] snapshot)
         {
             for (int attempt = 0; attempt < StableReadAttempts; attempt++)
             {
-                accessor.Read(WriteSequenceOffset, out uint beforeSequence);
+                reader.ReadWriteSequence(out uint beforeSequence);
                 if ((beforeSequence & 1) != 0)
                 {
                     Thread.Sleep(1);
                     continue;
                 }
 
-                accessor.ReadArray(0, snapshot, 0, snapshot.Length);
-                accessor.Read(WriteSequenceOffset, out uint afterSequence);
+                reader.ReadSnapshot(snapshot);
+                reader.ReadWriteSequence(out uint afterSequence);
                 if (beforeSequence == afterSequence && (afterSequence & 1) == 0)
                 {
                     return true;
@@ -346,6 +353,19 @@ namespace BO2.Services
             }
 
             return false;
+        }
+
+        private sealed class MemoryMappedStableSnapshotReader(MemoryMappedViewAccessor accessor) : IStableSnapshotReader
+        {
+            public void ReadWriteSequence(out uint sequence)
+            {
+                accessor.Read(WriteSequenceOffset, out sequence);
+            }
+
+            public void ReadSnapshot(byte[] snapshot)
+            {
+                accessor.ReadArray(0, snapshot, 0, snapshot.Length);
+            }
         }
 
         private bool TryEnsureSharedMemory(int targetProcessId)

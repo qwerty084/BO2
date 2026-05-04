@@ -18,6 +18,22 @@
     "updateEvent": "BO2MonitorEvent-",
     "stopEvent": "BO2MonitorStopEvent-"
   },
+  "readerRules": {
+    "eventOrdering": [
+      "Events is a ring containing snapshot.maxEventCount GameEventRecord slots.",
+      "EventWriteIndex is the slot where the next event will be written.",
+      "EventCount is the number of valid recent events and must be capped to MaxEventCount by readers.",
+      "When EventCount is less than MaxEventCount, valid events are read from slot 0 through EventCount - 1.",
+      "When EventCount is MaxEventCount, the ring has wrapped; the oldest event is at EventWriteIndex % MaxEventCount, and readers continue modulo MaxEventCount to decode events oldest-to-newest."
+    ],
+    "stableRead": [
+      "WriteSequence is incremented before and after each native snapshot mutation.",
+      "Odd WriteSequence values mean a write is in progress; even values mean no writer is in the write critical section.",
+      "Readers must read WriteSequence, copy the full shared memory snapshot, then read WriteSequence again.",
+      "A copied snapshot is stable only when the before and after WriteSequence values are equal and even.",
+      "Readers must retry when the first WriteSequence value is odd or when the sequence changes during the copy; if all retry attempts fail, readers must refuse the snapshot."
+    ]
+  },
   "layout": {
     "headerFields": [
       {

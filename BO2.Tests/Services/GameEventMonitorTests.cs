@@ -141,6 +141,96 @@ namespace BO2.Tests.Services
             Assert.Equal(GameEventType.EndGame, status.RecentEvents[^1].EventType);
         }
 
+        [Fact]
+        public void DecodeSnapshot_WhenRingHasNotWrapped_ReturnsEventsOldestToNewest()
+        {
+            byte[] snapshot = CreateSnapshot(
+                GameCompatibilityState.Compatible,
+                droppedEventCount: 0,
+                droppedNotifyCount: 0,
+                publishedNotifyCount: 3,
+                eventCount: 3,
+                eventWriteIndex: 3);
+            WriteEvent(snapshot, 0, GameEventType.NotifyObserved, 10, "first");
+            WriteEvent(snapshot, 1, GameEventType.NotifyObserved, 20, "second");
+            WriteEvent(snapshot, 2, GameEventType.NotifyObserved, 30, "third");
+
+            GameEventMonitorStatus status = GameEventMonitor.DecodeSnapshot(snapshot, DateTimeOffset.UtcNow);
+
+            Assert.Equal(3, status.RecentEvents.Count);
+            Assert.Equal("first", status.RecentEvents[0].EventName);
+            Assert.Equal("second", status.RecentEvents[1].EventName);
+            Assert.Equal("third", status.RecentEvents[2].EventName);
+        }
+
+        [Fact]
+        public void DecodeSnapshot_WhenRingHasWrapped_ReturnsEventsOldestToNewestFromWriteIndex()
+        {
+            byte[] snapshot = CreateSnapshot(
+                GameCompatibilityState.Compatible,
+                droppedEventCount: 2,
+                droppedNotifyCount: 0,
+                publishedNotifyCount: 0,
+                eventCount: GameEventMonitor.MaxEventCount,
+                eventWriteIndex: 2);
+            for (int eventNumber = 2; eventNumber < GameEventMonitor.MaxEventCount; eventNumber++)
+            {
+                WriteEvent(
+                    snapshot,
+                    eventNumber,
+                    GameEventType.NotifyObserved,
+                    eventNumber,
+                    $"event_{eventNumber}");
+            }
+
+            WriteEvent(
+                snapshot,
+                0,
+                GameEventType.NotifyObserved,
+                GameEventMonitor.MaxEventCount,
+                $"event_{GameEventMonitor.MaxEventCount}");
+            WriteEvent(
+                snapshot,
+                1,
+                GameEventType.NotifyObserved,
+                GameEventMonitor.MaxEventCount + 1,
+                $"event_{GameEventMonitor.MaxEventCount + 1}");
+
+            GameEventMonitorStatus status = GameEventMonitor.DecodeSnapshot(snapshot, DateTimeOffset.UtcNow);
+
+            Assert.Equal(GameEventMonitor.MaxEventCount, status.RecentEvents.Count);
+            for (int index = 0; index < status.RecentEvents.Count; index++)
+            {
+                int expectedEventNumber = index + 2;
+                Assert.Equal(expectedEventNumber, status.RecentEvents[index].LevelTime);
+                Assert.Equal($"event_{expectedEventNumber}", status.RecentEvents[index].EventName);
+            }
+        }
+
+        [Fact]
+        public void TryReadStableSnapshot_WhenWriteSequenceStaysOdd_RefusesSnapshot()
+        {
+            var reader = new ScriptedStableSnapshotReader([1, 3, 5, 7]);
+            byte[] snapshot = new byte[GameEventMonitor.SharedMemorySize];
+
+            bool wasStable = GameEventMonitor.TryReadStableSnapshot(reader, snapshot);
+
+            Assert.False(wasStable);
+            Assert.Equal(0, reader.SnapshotReadCount);
+        }
+
+        [Fact]
+        public void TryReadStableSnapshot_WhenWriteSequenceChangesDuringRead_RefusesSnapshot()
+        {
+            var reader = new ScriptedStableSnapshotReader([2, 4, 6, 8, 10, 12, 14, 16]);
+            byte[] snapshot = new byte[GameEventMonitor.SharedMemorySize];
+
+            bool wasStable = GameEventMonitor.TryReadStableSnapshot(reader, snapshot);
+
+            Assert.False(wasStable);
+            Assert.Equal(4, reader.SnapshotReadCount);
+        }
+
         [Theory]
         [InlineData("start_of_round", GameEventType.StartOfRound)]
         [InlineData("end_of_round", GameEventType.EndOfRound)]
@@ -331,7 +421,9 @@ namespace BO2.Tests.Services
             uint droppedEventCount,
             uint droppedNotifyCount,
             uint publishedNotifyCount,
-            uint eventCount)
+            uint eventCount,
+            uint eventWriteIndex = 0,
+            uint writeSequence = 0)
         {
             byte[] snapshot = new byte[GameEventMonitor.SharedMemorySize];
             BinaryPrimitives.WriteUInt32LittleEndian(
@@ -353,7 +445,7 @@ namespace BO2.Tests.Services
                 snapshot.AsSpan(
                     EventMonitorSnapshotContract.SharedSnapshotEventWriteIndexOffset,
                     EventMonitorSnapshotContract.SharedSnapshotEventWriteIndexSize),
-                0);
+                eventWriteIndex);
             BinaryPrimitives.WriteUInt32LittleEndian(
                 snapshot.AsSpan(
                     EventMonitorSnapshotContract.SharedSnapshotDroppedEventCountOffset,
@@ -374,6 +466,11 @@ namespace BO2.Tests.Services
                     EventMonitorSnapshotContract.SharedSnapshotPublishedNotifyCountOffset,
                     EventMonitorSnapshotContract.SharedSnapshotPublishedNotifyCountSize),
                 publishedNotifyCount);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                snapshot.AsSpan(
+                    EventMonitorSnapshotContract.SharedSnapshotWriteSequenceOffset,
+                    EventMonitorSnapshotContract.SharedSnapshotWriteSequenceSize),
+                writeSequence);
             return snapshot;
         }
 
@@ -436,6 +533,23 @@ namespace BO2.Tests.Services
         private static int NextMonitorTestProcessId()
         {
             return Interlocked.Increment(ref _nextMonitorTestProcessId);
+        }
+
+        private sealed class ScriptedStableSnapshotReader(uint[] sequences) : GameEventMonitor.IStableSnapshotReader
+        {
+            private int _sequenceIndex;
+
+            public int SnapshotReadCount { get; private set; }
+
+            public void ReadWriteSequence(out uint sequence)
+            {
+                sequence = sequences[_sequenceIndex++];
+            }
+
+            public void ReadSnapshot(byte[] snapshot)
+            {
+                SnapshotReadCount++;
+            }
         }
     }
 }
