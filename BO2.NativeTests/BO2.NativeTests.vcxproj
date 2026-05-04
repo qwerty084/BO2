@@ -132,6 +132,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\BO2InjectorHelper\InjectorArguments.h" />
+    <ClInclude Include="..\BO2Monitor\HookCompatibility.h" />
     <ClInclude Include="..\BO2Monitor\HookPure.h" />
     <ClInclude Include="..\BO2Monitor\NotifyLog.h" />
     <ClInclude Include="..\BO2Monitor\NotifyPublication.h" />
@@ -142,6 +143,9 @@
     <ClCompile Include="*.cpp" />
     <ClCompile Include="..\BO2InjectorHelper\InjectorArguments.cpp">
       <ObjectFileName>$(IntDir)InjectorArguments.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\BO2Monitor\HookCompatibility.cpp">
+      <ObjectFileName>$(IntDir)HookCompatibility.obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="..\BO2Monitor\HookPure.cpp">
       <ObjectFileName>$(IntDir)HookPure.obj</ObjectFileName>

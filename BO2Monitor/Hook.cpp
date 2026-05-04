@@ -1,4 +1,5 @@
 #include "Hook.h"
+#include "HookCompatibility.h"
 #include "HookPure.h"
 #include "NotifyLog.h"
 #include "NotifyPublication.h"
@@ -100,48 +101,22 @@ namespace BO2Monitor
             Found
         };
 
-        struct ProductionNotifyTarget
-        {
-            const char* Name;
-            GameEventType EventType;
-            unsigned int StringValue;
-            bool Resolved;
-            bool ReadRoundValue;
-        };
-
-        std::array<ProductionNotifyTarget, 12> productionNotifyTargets =
-        {
-            ProductionNotifyTarget{ "start_of_round", GameEventType::StartOfRound, 0, false, true },
-            ProductionNotifyTarget{ "end_of_round", GameEventType::EndOfRound, 0, false, true },
-            ProductionNotifyTarget{ "end_game", GameEventType::EndGame, 0, false, false },
-            ProductionNotifyTarget{ "randomization_done", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "user_grabbed_weapon", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "chest_accessed", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "box_moving", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "weapon_fly_away_start", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "weapon_fly_away_end", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "arrived", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "left", GameEventType::BoxEvent, 0, false, false },
-            ProductionNotifyTarget{ "closed", GameEventType::BoxEvent, 0, false, false }
-        };
+        std::array<ResolvedNotifyHookTarget, NotifyHookTargetCount> productionNotifyTargets =
+            CreateUnresolvedNotifyHookTargets();
 
         VmNotifyFunction originalVmNotify = nullptr;
         bool minHookInitialized = false;
         bool vmNotifyHookCreated = false;
+        std::uintptr_t installedVmNotifyHookAddress = 0;
 
         bool BytesMatch(const std::uint8_t* address, const std::uint8_t* expected, std::size_t expectedLength);
-        bool IsExecutableAddress(const void* address);
+        bool IsExecutableMemoryAddress(const void* address);
         bool CanReadAddress(const void* address);
         ScriptFieldReadStatus TryReadBoxWeaponName(
             std::int32_t inst,
-            const ProductionNotifyTarget& target,
+            const ResolvedNotifyHookTarget& target,
             unsigned int ownerId,
             char (&weaponName)[MaxWeaponNameBytes]);
-
-        bool HasValidatedVmNotifyAddress()
-        {
-            return VmNotifyAddress != 0;
-        }
 
         bool IsVmNotifyHookEnabled()
         {
@@ -152,9 +127,9 @@ namespace BO2Monitor
 #endif
         }
 
-        const ProductionNotifyTarget* FindProductionNotifyTarget(unsigned int stringValue)
+        const ResolvedNotifyHookTarget* FindProductionNotifyTarget(unsigned int stringValue)
         {
-            for (const ProductionNotifyTarget& target : productionNotifyTargets)
+            for (const ResolvedNotifyHookTarget& target : productionNotifyTargets)
             {
                 if (target.Resolved && target.StringValue == stringValue)
                 {
@@ -167,14 +142,14 @@ namespace BO2Monitor
 
         bool SlGetStringOfSizePrologueMatches()
         {
-            return IsExecutableAddress(reinterpret_cast<const void*>(SlGetStringOfSizeCandidate))
+            return IsExecutableMemoryAddress(reinterpret_cast<const void*>(SlGetStringOfSizeCandidate))
                 && BytesMatch(
                     reinterpret_cast<const std::uint8_t*>(SlGetStringOfSizeCandidate),
                     ExpectedSlGetStringOfSizePrologue.data(),
                     ExpectedSlGetStringOfSizePrologue.size());
         }
 
-        bool TryResolveStringId(const char* name, unsigned int& stringValue)
+        bool TryResolveLiveStringId(const char* name, unsigned int& stringValue)
         {
             if (!SlGetStringOfSizePrologueMatches())
             {
@@ -200,28 +175,6 @@ namespace BO2Monitor
 
             stringValue = resolvedValue;
             return true;
-        }
-
-        bool ResolveProductionNotifyTargets()
-        {
-            bool resolvedAnyTarget = false;
-            for (ProductionNotifyTarget& target : productionNotifyTargets)
-            {
-                target.StringValue = 0;
-                target.Resolved = false;
-
-                unsigned int stringValue = 0;
-                if (!TryResolveStringId(target.Name, stringValue))
-                {
-                    continue;
-                }
-
-                target.StringValue = stringValue;
-                target.Resolved = true;
-                resolvedAnyTarget = true;
-            }
-
-            return resolvedAnyTarget;
         }
 
         bool AreScriptAliasTablesAvailable()
@@ -378,7 +331,7 @@ namespace BO2Monitor
 
         ScriptFieldReadStatus TryReadBoxWeaponName(
             std::int32_t inst,
-            const ProductionNotifyTarget& target,
+            const ResolvedNotifyHookTarget& target,
             unsigned int ownerId,
             char (&weaponName)[MaxWeaponNameBytes])
         {
@@ -504,7 +457,7 @@ namespace BO2Monitor
             unsigned int stringValue,
             void* top)
         {
-            const ProductionNotifyTarget* target = FindProductionNotifyTarget(stringValue);
+            const ResolvedNotifyHookTarget* target = FindProductionNotifyTarget(stringValue);
             if (target == nullptr)
             {
                 originalVmNotify(inst, notifyListOwnerId, stringValue, top);
@@ -561,7 +514,7 @@ namespace BO2Monitor
             return true;
         }
 
-        bool IsExecutableAddress(const void* address)
+        bool IsExecutableMemoryAddress(const void* address)
         {
             MEMORY_BASIC_INFORMATION memoryInfo{};
             if (VirtualQuery(address, &memoryInfo, sizeof(memoryInfo)) == 0)
@@ -576,38 +529,18 @@ namespace BO2Monitor
                 || protection == PAGE_EXECUTE_WRITECOPY;
         }
 
-        bool PrologueMatches(const std::uint8_t* address)
-        {
-            if constexpr (ExpectedVmNotifyPrologue.empty())
-            {
-                return false;
-            }
-            else
-            {
-                for (std::size_t index = 0; index < ExpectedVmNotifyPrologue.size(); ++index)
-                {
-                    if (address[index] != ExpectedVmNotifyPrologue[index])
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-        }
-
         bool LocalVmNotifyEntryPrologueMatches()
         {
-            return IsExecutableAddress(reinterpret_cast<const void*>(LocalVmNotifyEntryCandidate))
+            return IsExecutableMemoryAddress(reinterpret_cast<const void*>(LocalVmNotifyEntryCandidate))
                 && BytesMatch(
                     reinterpret_cast<const std::uint8_t*>(LocalVmNotifyEntryCandidate),
                     ExpectedLocalVmNotifyEntryPrologue.data(),
                     ExpectedLocalVmNotifyEntryPrologue.size());
         }
 
-        bool InstallVmNotifyHook()
+        bool InstallVmNotifyHook(std::uintptr_t hookTargetAddress)
         {
-            auto* targetAddress = reinterpret_cast<std::uint8_t*>(VmNotifyAddress);
+            auto* targetAddress = reinterpret_cast<std::uint8_t*>(hookTargetAddress);
             MH_STATUS initializeStatus = MH_Initialize();
             if (initializeStatus != MH_OK && initializeStatus != MH_ERROR_ALREADY_INITIALIZED)
             {
@@ -621,15 +554,18 @@ namespace BO2Monitor
                 reinterpret_cast<LPVOID*>(&originalVmNotify));
             if (createStatus != MH_OK)
             {
+                installedVmNotifyHookAddress = 0;
                 return false;
             }
 
             vmNotifyHookCreated = true;
+            installedVmNotifyHookAddress = hookTargetAddress;
             MH_STATUS enableStatus = MH_EnableHook(targetAddress);
             if (enableStatus != MH_OK)
             {
                 MH_RemoveHook(targetAddress);
                 vmNotifyHookCreated = false;
+                installedVmNotifyHookAddress = 0;
                 originalVmNotify = nullptr;
                 return false;
             }
@@ -641,10 +577,11 @@ namespace BO2Monitor
         {
             if (vmNotifyHookCreated)
             {
-                auto* targetAddress = reinterpret_cast<std::uint8_t*>(VmNotifyAddress);
+                auto* targetAddress = reinterpret_cast<std::uint8_t*>(installedVmNotifyHookAddress);
                 MH_DisableHook(targetAddress);
                 MH_RemoveHook(targetAddress);
                 vmNotifyHookCreated = false;
+                installedVmNotifyHookAddress = 0;
                 originalVmNotify = nullptr;
             }
 
@@ -654,6 +591,37 @@ namespace BO2Monitor
                 minHookInitialized = false;
             }
         }
+
+        class LiveHookCompatibilityProbe final : public IHookCompatibilityProbe
+        {
+        public:
+            bool IsExecutableAddress(std::uintptr_t address) override
+            {
+                return IsExecutableMemoryAddress(reinterpret_cast<const void*>(address));
+            }
+
+            bool PrologueMatches(
+                std::uintptr_t address,
+                const std::uint8_t* expected,
+                std::size_t expectedLength) override
+            {
+                return BytesMatch(
+                    reinterpret_cast<const std::uint8_t*>(address),
+                    expected,
+                    expectedLength);
+            }
+
+            bool TryResolveStringId(const char* name, unsigned int& stringValue) override
+            {
+                return TryResolveLiveStringId(name, stringValue);
+            }
+
+            bool TryInstallHook(std::uintptr_t address) override
+            {
+                ResetNotifyEventQueue();
+                return InstallVmNotifyHook(address);
+            }
+        };
 
         bool CanReadAddress(const void* address)
         {
@@ -711,40 +679,19 @@ namespace BO2Monitor
     {
         PublishDiscoveryEvidence(snapshotWriter);
 
-        if (!HasValidatedVmNotifyAddress())
+        LiveHookCompatibilityProbe probe;
+        const HookCompatibilityRequest request
         {
-            snapshotWriter.SetCompatibility(GameCompatibilityState::UnsupportedVersion);
-            return GameCompatibilityState::UnsupportedVersion;
-        }
+            IsVmNotifyHookEnabled(),
+            VmNotifyAddress,
+            ExpectedVmNotifyPrologue.data(),
+            ExpectedVmNotifyPrologue.size()
+        };
 
-        const auto* targetAddress = reinterpret_cast<const std::uint8_t*>(VmNotifyAddress);
-        if (!IsExecutableAddress(targetAddress) || !PrologueMatches(targetAddress))
-        {
-            snapshotWriter.SetCompatibility(GameCompatibilityState::UnsupportedVersion);
-            return GameCompatibilityState::UnsupportedVersion;
-        }
-
-        if (!IsVmNotifyHookEnabled())
-        {
-            snapshotWriter.SetCompatibility(GameCompatibilityState::CaptureDisabled);
-            return GameCompatibilityState::CaptureDisabled;
-        }
-
-        ResetNotifyEventQueue();
-        if (!ResolveProductionNotifyTargets())
-        {
-            snapshotWriter.SetCompatibility(GameCompatibilityState::UnsupportedVersion);
-            return GameCompatibilityState::UnsupportedVersion;
-        }
-
-        if (!InstallVmNotifyHook())
-        {
-            snapshotWriter.SetCompatibility(GameCompatibilityState::UnsupportedVersion);
-            return GameCompatibilityState::UnsupportedVersion;
-        }
-
-        snapshotWriter.SetCompatibility(GameCompatibilityState::Compatible);
-        return GameCompatibilityState::Compatible;
+        const GameCompatibilityState compatibilityState =
+            DetermineHookCompatibility(request, probe, productionNotifyTargets);
+        snapshotWriter.SetCompatibility(compatibilityState);
+        return compatibilityState;
     }
 
     void RunNotifyEventWorker(SharedSnapshotWriter& snapshotWriter)

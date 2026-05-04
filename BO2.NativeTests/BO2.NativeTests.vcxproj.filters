@@ -14,6 +14,9 @@
     <ClInclude Include="..\BO2InjectorHelper\InjectorArguments.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\BO2Monitor\HookCompatibility.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\BO2Monitor\HookPure.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -35,6 +38,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\BO2InjectorHelper\InjectorArguments.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\BO2Monitor\HookCompatibility.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\BO2Monitor\HookPure.cpp">

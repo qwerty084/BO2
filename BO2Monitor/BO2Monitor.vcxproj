@@ -124,6 +124,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Hook.h" />
+    <ClInclude Include="HookCompatibility.h" />
     <ClInclude Include="HookPure.h" />
     <ClInclude Include="NotifyLog.h" />
     <ClInclude Include="NotifyPublication.h" />
@@ -143,6 +144,7 @@
     <ClCompile Include="Hook.cpp">
       <ObjectFileName>$(IntDir)BO2MonitorHook.obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="HookCompatibility.cpp" />
     <ClCompile Include="HookPure.cpp" />
     <ClCompile Include="NotifyLog.cpp" />
     <ClCompile Include="NotifyPublication.cpp" />
