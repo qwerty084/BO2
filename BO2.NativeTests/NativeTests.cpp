@@ -57,16 +57,20 @@ namespace BO2NativeTests
     public:
         TEST_METHOD(ConstantsMatchManagedSnapshotReaderContract)
         {
-            Assert::AreEqual(0x45324F42u, BO2Monitor::SnapshotMagic);
-            Assert::AreEqual(6u, BO2Monitor::SnapshotVersion);
-            Assert::AreEqual(static_cast<std::size_t>(128), BO2Monitor::MaxEventCount);
-            Assert::AreEqual(static_cast<std::size_t>(64), BO2Monitor::MaxEventNameBytes);
-            Assert::AreEqual(static_cast<std::size_t>(64), BO2Monitor::MaxWeaponNameBytes);
-            Assert::AreEqual(static_cast<std::size_t>(148), sizeof(BO2Monitor::GameEventRecord));
-            Assert::AreEqual(static_cast<std::size_t>(18980), sizeof(BO2Monitor::SharedSnapshot));
-            Assert::AreEqual(L"BO2MonitorSharedMem-", BO2Monitor::SharedMemoryNamePrefix);
-            Assert::AreEqual(L"BO2MonitorEvent-", BO2Monitor::EventHandleNamePrefix);
-            Assert::AreEqual(L"BO2MonitorStopEvent-", BO2Monitor::StopEventHandleNamePrefix);
+            Assert::AreEqual(BO2Monitor::Generated::SnapshotMagic, BO2Monitor::SnapshotMagic);
+            Assert::AreEqual(BO2Monitor::Generated::SnapshotVersion, BO2Monitor::SnapshotVersion);
+            Assert::AreEqual(BO2Monitor::Generated::MaxEventCount, BO2Monitor::MaxEventCount);
+            Assert::AreEqual(BO2Monitor::Generated::MaxEventNameBytes, BO2Monitor::MaxEventNameBytes);
+            Assert::AreEqual(BO2Monitor::Generated::MaxWeaponNameBytes, BO2Monitor::MaxWeaponNameBytes);
+            Assert::AreEqual(BO2Monitor::Generated::HeaderSize, BO2Monitor::HeaderSize);
+            Assert::AreEqual(BO2Monitor::Generated::EventRecordSize, BO2Monitor::EventRecordSize);
+            Assert::AreEqual(BO2Monitor::Generated::SharedMemorySize, BO2Monitor::SharedMemorySize);
+            Assert::AreEqual(BO2Monitor::Generated::EventRecordSize, sizeof(BO2Monitor::GameEventRecord));
+            Assert::AreEqual(BO2Monitor::Generated::SharedMemorySize, sizeof(BO2Monitor::SharedSnapshot));
+            Assert::AreEqual(BO2Monitor::Generated::SharedMemoryNamePrefix, BO2Monitor::SharedMemoryNamePrefix);
+            Assert::AreEqual(BO2Monitor::Generated::UpdateEventNamePrefix, BO2Monitor::EventHandleNamePrefix);
+            Assert::AreEqual(BO2Monitor::Generated::StopEventNamePrefix, BO2Monitor::StopEventHandleNamePrefix);
+            Assert::IsTrue(BO2Monitor::SharedSnapshotLayoutMatchesContract);
         }
     };
 

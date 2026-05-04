@@ -28,6 +28,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Verify snapshot contract generation
+        shell: pwsh
+        run: .\tools\Generate-EventMonitorSnapshotContract.ps1 -Check
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:

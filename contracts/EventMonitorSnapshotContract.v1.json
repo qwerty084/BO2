@@ -1,0 +1,418 @@
+{
+  "schemaVersion": 1,
+  "snapshot": {
+    "magicHex": "0x45324F42",
+    "version": 6,
+    "supportedVersions": [
+      6
+    ],
+    "maxEventCount": 128,
+    "maxEventNameBytes": 64,
+    "maxWeaponNameBytes": 64,
+    "headerSize": 36,
+    "eventRecordSize": 148,
+    "sharedMemorySize": 18980
+  },
+  "objectNamePrefixes": {
+    "sharedMemory": "BO2MonitorSharedMem-",
+    "updateEvent": "BO2MonitorEvent-",
+    "stopEvent": "BO2MonitorStopEvent-"
+  },
+  "readerRules": {
+    "eventOrdering": [
+      "Events is a ring containing snapshot.maxEventCount GameEventRecord slots.",
+      "EventWriteIndex is the slot where the next event will be written.",
+      "EventCount is the number of valid recent events and must be capped to MaxEventCount by readers.",
+      "When EventCount is less than MaxEventCount, valid events are read from slot 0 through EventCount - 1.",
+      "When EventCount is MaxEventCount, the ring has wrapped; the oldest event is at EventWriteIndex % MaxEventCount, and readers continue modulo MaxEventCount to decode events oldest-to-newest."
+    ],
+    "stableRead": [
+      "WriteSequence is incremented before and after each native snapshot mutation.",
+      "Odd WriteSequence values mean a write is in progress; even values mean no writer is in the write critical section.",
+      "Readers must read WriteSequence, copy the full shared memory snapshot, then read WriteSequence again.",
+      "A copied snapshot is stable only when the before and after WriteSequence values are equal and even.",
+      "Readers must retry when the first WriteSequence value is odd or when the sequence changes during the copy; if all retry attempts fail, readers must refuse the snapshot."
+    ]
+  },
+  "eventNameCompatibility": {
+    "decision": [
+      "For v6, GameEventRecord.EventType is authoritative when it contains a known non-Unknown GameEventType value.",
+      "Managed readers may map known EventName values to GameEventType only when EventType decodes as Unknown.",
+      "Unknown EventName values stay Unknown.",
+      "Legacy-only EventName mappings are reader compatibility behavior for snapshots that publish Unknown event type with a known name; they are not native publishing requirements.",
+      "When adding v7 or another future snapshot version to supportedVersions, keep this reader mapping for that version unless the new version policy explicitly removes or scopes it. If the mapping changes, gate the reader behavior by snapshot version and keep v6 behavior unchanged."
+    ],
+    "scope": [
+      "This section records managed reader compatibility behavior. It does not define hook target discovery, hook probing order, candidate validation, MinHook behavior, polling fallback thresholds, stat address reads, or polling change filters.",
+      "The gameEventType numeric values and current published EventName strings below describe shared-memory records only.",
+      "The pollingFallbackPublishedNames list identifies EventName strings that polling fallback may publish; fallback sampling thresholds and stat-read behavior remain Event Monitor implementation details outside this contract."
+    ],
+    "currentPublishedNames": [
+      {
+        "eventType": "StartOfRound",
+        "names": [
+          "start_of_round"
+        ]
+      },
+      {
+        "eventType": "EndOfRound",
+        "names": [
+          "end_of_round"
+        ]
+      },
+      {
+        "eventType": "EndGame",
+        "names": [
+          "end_game"
+        ]
+      },
+      {
+        "eventType": "BoxEvent",
+        "names": [
+          "randomization_done",
+          "user_grabbed_weapon",
+          "chest_accessed",
+          "box_moving",
+          "weapon_fly_away_start",
+          "weapon_fly_away_end",
+          "arrived",
+          "left",
+          "closed"
+        ]
+      },
+      {
+        "eventType": "RoundChanged",
+        "names": [
+          "round_changed"
+        ]
+      },
+      {
+        "eventType": "PointsChanged",
+        "names": [
+          "points_changed"
+        ]
+      },
+      {
+        "eventType": "KillsChanged",
+        "names": [
+          "kills_changed"
+        ]
+      },
+      {
+        "eventType": "DownsChanged",
+        "names": [
+          "downs_changed"
+        ]
+      },
+      {
+        "eventType": "NotifyCandidateRejected",
+        "names": [
+          "vm_notify_candidate_rejected"
+        ]
+      },
+      {
+        "eventType": "NotifyEntryCandidate",
+        "names": [
+          "vm_notify_entry_candidate"
+        ]
+      },
+      {
+        "eventType": "StringResolverCandidate",
+        "names": [
+          "sl_string_data_candidate",
+          "sl_get_string_of_size_candidate"
+        ]
+      }
+    ],
+    "pollingFallbackPublishedNames": [
+      "round_changed",
+      "points_changed",
+      "kills_changed",
+      "downs_changed"
+    ],
+    "legacyReaderMappings": [
+      {
+        "eventType": "StartOfRound",
+        "names": [
+          "start_of_round"
+        ]
+      },
+      {
+        "eventType": "EndOfRound",
+        "names": [
+          "end_of_round"
+        ]
+      },
+      {
+        "eventType": "EndGame",
+        "names": [
+          "end_game"
+        ]
+      },
+      {
+        "eventType": "RoundChanged",
+        "names": [
+          "round_changed"
+        ]
+      },
+      {
+        "eventType": "PointsChanged",
+        "names": [
+          "points_changed"
+        ]
+      },
+      {
+        "eventType": "KillsChanged",
+        "names": [
+          "kills_changed"
+        ]
+      },
+      {
+        "eventType": "DownsChanged",
+        "names": [
+          "downs_changed"
+        ]
+      },
+      {
+        "eventType": "NotifyCandidateRejected",
+        "names": [
+          "vm_notify_candidate_rejected"
+        ]
+      },
+      {
+        "eventType": "NotifyEntryCandidate",
+        "names": [
+          "vm_notify_entry_candidate"
+        ]
+      },
+      {
+        "eventType": "StringResolverCandidate",
+        "names": [
+          "sl_convert_candidate",
+          "sl_get_string_of_size_candidate"
+        ]
+      },
+      {
+        "eventType": "NotifyObserved",
+        "names": [
+          "vm_notify_observed",
+          "notify_log_opened"
+        ]
+      },
+      {
+        "eventType": "BoxEvent",
+        "names": [
+          "randomization_done",
+          "user_grabbed_weapon",
+          "chest_accessed",
+          "box_moving",
+          "weapon_fly_away_start",
+          "weapon_fly_away_end",
+          "arrived",
+          "left",
+          "closed"
+        ]
+      }
+    ]
+  },
+  "layout": {
+    "headerFields": [
+      {
+        "name": "Magic",
+        "type": "uint32",
+        "offset": 0,
+        "size": 4
+      },
+      {
+        "name": "Version",
+        "type": "uint32",
+        "offset": 4,
+        "size": 4
+      },
+      {
+        "name": "CompatibilityState",
+        "type": "GameCompatibilityState",
+        "offset": 8,
+        "size": 4
+      },
+      {
+        "name": "EventWriteIndex",
+        "type": "uint32",
+        "offset": 12,
+        "size": 4
+      },
+      {
+        "name": "DroppedEventCount",
+        "type": "uint32",
+        "offset": 16,
+        "size": 4
+      },
+      {
+        "name": "EventCount",
+        "type": "uint32",
+        "offset": 20,
+        "size": 4
+      },
+      {
+        "name": "DroppedNotifyCount",
+        "type": "uint32",
+        "offset": 24,
+        "size": 4
+      },
+      {
+        "name": "PublishedNotifyCount",
+        "type": "uint32",
+        "offset": 28,
+        "size": 4
+      },
+      {
+        "name": "WriteSequence",
+        "type": "uint32",
+        "offset": 32,
+        "size": 4
+      }
+    ],
+    "eventRecordFields": [
+      {
+        "name": "EventType",
+        "type": "GameEventType",
+        "offset": 0,
+        "size": 4
+      },
+      {
+        "name": "LevelTime",
+        "type": "int32",
+        "offset": 4,
+        "size": 4
+      },
+      {
+        "name": "OwnerId",
+        "type": "uint32",
+        "offset": 8,
+        "size": 4
+      },
+      {
+        "name": "StringValue",
+        "type": "uint32",
+        "offset": 12,
+        "size": 4
+      },
+      {
+        "name": "Tick",
+        "type": "uint32",
+        "offset": 16,
+        "size": 4
+      },
+      {
+        "name": "EventName",
+        "type": "char",
+        "offset": 20,
+        "size": 64
+      },
+      {
+        "name": "WeaponName",
+        "type": "char",
+        "offset": 84,
+        "size": 64
+      }
+    ]
+  },
+  "enums": {
+    "gameCompatibilityState": [
+      {
+        "name": "Unknown",
+        "value": 0
+      },
+      {
+        "name": "WaitingForMonitor",
+        "value": 1
+      },
+      {
+        "name": "Compatible",
+        "value": 2
+      },
+      {
+        "name": "UnsupportedVersion",
+        "value": 3
+      },
+      {
+        "name": "CaptureDisabled",
+        "value": 4
+      },
+      {
+        "name": "PollingFallback",
+        "value": 5
+      }
+    ],
+    "gameEventType": [
+      {
+        "name": "Unknown",
+        "value": 0
+      },
+      {
+        "name": "StartOfRound",
+        "value": 1
+      },
+      {
+        "name": "EndOfRound",
+        "value": 2
+      },
+      {
+        "name": "PowerUpGrabbed",
+        "value": 3
+      },
+      {
+        "name": "DogRoundStarting",
+        "value": 4
+      },
+      {
+        "name": "PowerOn",
+        "value": 5
+      },
+      {
+        "name": "EndGame",
+        "value": 6
+      },
+      {
+        "name": "PerkBought",
+        "value": 7
+      },
+      {
+        "name": "RoundChanged",
+        "value": 8
+      },
+      {
+        "name": "PointsChanged",
+        "value": 9
+      },
+      {
+        "name": "KillsChanged",
+        "value": 10
+      },
+      {
+        "name": "DownsChanged",
+        "value": 11
+      },
+      {
+        "name": "NotifyCandidateRejected",
+        "value": 12
+      },
+      {
+        "name": "NotifyEntryCandidate",
+        "value": 13
+      },
+      {
+        "name": "StringResolverCandidate",
+        "value": 14
+      },
+      {
+        "name": "NotifyObserved",
+        "value": 15
+      },
+      {
+        "name": "BoxEvent",
+        "value": 16
+      }
+    ]
+  }
+}

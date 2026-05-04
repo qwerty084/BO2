@@ -32,6 +32,9 @@
     <ClInclude Include="..\BO2Monitor\PollingFallback.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\BO2Monitor\Generated\EventMonitorSnapshotContract.g.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\BO2Monitor\SharedSnapshot.h">
       <Filter>Header Files</Filter>
     </ClInclude>

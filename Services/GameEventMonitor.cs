@@ -5,26 +5,29 @@ using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Text;
 using System.Threading;
+using BO2.Services.Generated;
 
 namespace BO2.Services
 {
     public sealed class GameEventMonitor : IGameEventMonitor
     {
-        public const string SharedMemoryNamePrefix = "BO2MonitorSharedMem-";
-        public const string EventHandleNamePrefix = "BO2MonitorEvent-";
-        public const string StopEventHandleNamePrefix = "BO2MonitorStopEvent-";
+        public const string SharedMemoryNamePrefix = EventMonitorSnapshotContract.SharedMemoryNamePrefix;
+        public const string EventHandleNamePrefix = EventMonitorSnapshotContract.UpdateEventNamePrefix;
+        public const string StopEventHandleNamePrefix = EventMonitorSnapshotContract.StopEventNamePrefix;
 
-        internal const uint SnapshotMagic = 0x45324F42; // BO2E
-        internal const uint SnapshotVersion = 6;
-        internal const int MaxEventCount = 128;
-        internal const int MaxEventNameBytes = 64;
-        internal const int MaxWeaponNameBytes = 64;
-        internal const int HeaderSize = 36;
-        internal const int EventRecordSize = 148;
-        internal const int EventNameOffset = 20;
-        internal const int WeaponNameOffset = EventNameOffset + MaxEventNameBytes;
-        internal const int SharedMemorySize = HeaderSize + (MaxEventCount * EventRecordSize);
-        internal const int WriteSequenceOffset = 32;
+        internal const uint SnapshotMagic = EventMonitorSnapshotContract.SnapshotMagic;
+        internal const uint SnapshotVersion = EventMonitorSnapshotContract.SnapshotVersion;
+        internal const uint MinimumSupportedSnapshotVersion = EventMonitorSnapshotContract.MinimumSupportedSnapshotVersion;
+        internal const uint MaximumSupportedSnapshotVersion = EventMonitorSnapshotContract.MaximumSupportedSnapshotVersion;
+        internal const int MaxEventCount = EventMonitorSnapshotContract.MaxEventCount;
+        internal const int MaxEventNameBytes = EventMonitorSnapshotContract.MaxEventNameBytes;
+        internal const int MaxWeaponNameBytes = EventMonitorSnapshotContract.MaxWeaponNameBytes;
+        internal const int HeaderSize = EventMonitorSnapshotContract.HeaderSize;
+        internal const int EventRecordSize = EventMonitorSnapshotContract.EventRecordSize;
+        internal const int EventNameOffset = EventMonitorSnapshotContract.GameEventRecordEventNameOffset;
+        internal const int WeaponNameOffset = EventMonitorSnapshotContract.GameEventRecordWeaponNameOffset;
+        internal const int SharedMemorySize = EventMonitorSnapshotContract.SharedMemorySize;
+        internal const int WriteSequenceOffset = EventMonitorSnapshotContract.SharedSnapshotWriteSequenceOffset;
         private const int StableReadAttempts = 4;
 
         private int? _targetProcessId;
@@ -32,6 +35,13 @@ namespace BO2.Services
         private EventWaitHandle? _eventHandle;
         private EventWaitHandle? _stopEventHandle;
         private bool _readinessSignalObserved;
+
+        internal interface IStableSnapshotReader
+        {
+            void ReadWriteSequence(out uint sequence);
+
+            void ReadSnapshot(byte[] snapshot);
+        }
 
         public GameEventMonitorStatus ReadStatus(DateTimeOffset receivedAt, int? targetProcessId)
         {
@@ -73,7 +83,7 @@ namespace BO2.Services
                     0,
                     SharedMemorySize,
                     MemoryMappedFileAccess.Read);
-                if (!TryReadStableSnapshot(accessor, snapshot))
+                if (!TryReadStableSnapshot(new MemoryMappedStableSnapshotReader(accessor), snapshot))
                 {
                     return GameEventMonitorStatus.WaitingForMonitor;
                 }
@@ -158,9 +168,9 @@ namespace BO2.Services
                     []);
             }
 
-            uint magic = BinaryPrimitives.ReadUInt32LittleEndian(snapshot[0..4]);
-            uint version = BinaryPrimitives.ReadUInt32LittleEndian(snapshot[4..8]);
-            if (magic != SnapshotMagic || version != SnapshotVersion)
+            uint magic = ReadUInt32(snapshot, EventMonitorSnapshotContract.SharedSnapshotMagicOffset);
+            uint version = ReadUInt32(snapshot, EventMonitorSnapshotContract.SharedSnapshotVersionOffset);
+            if (magic != SnapshotMagic || !EventMonitorSnapshotContract.IsSupportedSnapshotVersion(version))
             {
                 return new GameEventMonitorStatus(
                     GameCompatibilityState.UnsupportedVersion,
@@ -170,12 +180,15 @@ namespace BO2.Services
                     []);
             }
 
-            GameCompatibilityState compatibilityState = ReadCompatibilityState(snapshot[8..12]);
-            uint eventWriteIndex = BinaryPrimitives.ReadUInt32LittleEndian(snapshot[12..16]);
-            uint droppedEventCount = BinaryPrimitives.ReadUInt32LittleEndian(snapshot[16..20]);
-            uint eventCount = BinaryPrimitives.ReadUInt32LittleEndian(snapshot[20..24]);
-            uint droppedNotifyCount = BinaryPrimitives.ReadUInt32LittleEndian(snapshot[24..28]);
-            uint publishedNotifyCount = BinaryPrimitives.ReadUInt32LittleEndian(snapshot[28..32]);
+            GameCompatibilityState compatibilityState = ReadCompatibilityState(
+                snapshot.Slice(
+                    EventMonitorSnapshotContract.SharedSnapshotCompatibilityStateOffset,
+                    EventMonitorSnapshotContract.SharedSnapshotCompatibilityStateSize));
+            uint eventWriteIndex = ReadUInt32(snapshot, EventMonitorSnapshotContract.SharedSnapshotEventWriteIndexOffset);
+            uint droppedEventCount = ReadUInt32(snapshot, EventMonitorSnapshotContract.SharedSnapshotDroppedEventCountOffset);
+            uint eventCount = ReadUInt32(snapshot, EventMonitorSnapshotContract.SharedSnapshotEventCountOffset);
+            uint droppedNotifyCount = ReadUInt32(snapshot, EventMonitorSnapshotContract.SharedSnapshotDroppedNotifyCountOffset);
+            uint publishedNotifyCount = ReadUInt32(snapshot, EventMonitorSnapshotContract.SharedSnapshotPublishedNotifyCountOffset);
             int readableEventCount = (int)Math.Min(eventCount, MaxEventCount);
             var events = new List<GameEvent>(readableEventCount);
             int startSlot = readableEventCount == MaxEventCount
@@ -185,18 +198,21 @@ namespace BO2.Services
             for (int index = 0; index < readableEventCount; index++)
             {
                 int slot = (startSlot + index) % MaxEventCount;
-                int recordOffset = HeaderSize + (slot * EventRecordSize);
+                int recordOffset = EventMonitorSnapshotContract.SharedSnapshotEventsOffset + (slot * EventRecordSize);
                 if (recordOffset + EventRecordSize > snapshot.Length)
                 {
                     break;
                 }
 
                 ReadOnlySpan<byte> record = snapshot.Slice(recordOffset, EventRecordSize);
-                GameEventType eventType = ReadEventType(record[0..4]);
-                int levelTime = BinaryPrimitives.ReadInt32LittleEndian(record[4..8]);
-                uint ownerId = BinaryPrimitives.ReadUInt32LittleEndian(record[8..12]);
-                uint stringValue = BinaryPrimitives.ReadUInt32LittleEndian(record[12..16]);
-                uint eventTick = BinaryPrimitives.ReadUInt32LittleEndian(record[16..20]);
+                GameEventType eventType = ReadEventType(
+                    record[
+                        EventMonitorSnapshotContract.GameEventRecordEventTypeOffset..(EventMonitorSnapshotContract.GameEventRecordEventTypeOffset
+                            + EventMonitorSnapshotContract.GameEventRecordEventTypeSize)]);
+                int levelTime = ReadInt32(record, EventMonitorSnapshotContract.GameEventRecordLevelTimeOffset);
+                uint ownerId = ReadUInt32(record, EventMonitorSnapshotContract.GameEventRecordOwnerIdOffset);
+                uint stringValue = ReadUInt32(record, EventMonitorSnapshotContract.GameEventRecordStringValueOffset);
+                uint eventTick = ReadUInt32(record, EventMonitorSnapshotContract.GameEventRecordTickOffset);
                 string eventName = ReadEventName(record[EventNameOffset..(EventNameOffset + MaxEventNameBytes)]);
                 string weaponName = ReadEventName(record[WeaponNameOffset..(WeaponNameOffset + MaxWeaponNameBytes)]);
                 if (string.IsNullOrWhiteSpace(eventName))
@@ -230,6 +246,7 @@ namespace BO2.Services
 
         internal static GameEventType MapEventName(string eventName)
         {
+            // Reader compatibility only: explicit EventType values remain authoritative.
             return eventName switch
             {
                 "start_of_round" => GameEventType.StartOfRound,
@@ -283,6 +300,16 @@ namespace BO2.Services
                 : GameEventType.Unknown;
         }
 
+        private static int ReadInt32(ReadOnlySpan<byte> value, int offset)
+        {
+            return BinaryPrimitives.ReadInt32LittleEndian(value.Slice(offset, sizeof(int)));
+        }
+
+        private static uint ReadUInt32(ReadOnlySpan<byte> value, int offset)
+        {
+            return BinaryPrimitives.ReadUInt32LittleEndian(value.Slice(offset, sizeof(uint)));
+        }
+
         private static string ReadEventName(ReadOnlySpan<byte> value)
         {
             int terminatorIndex = value.IndexOf((byte)0);
@@ -305,19 +332,19 @@ namespace BO2.Services
             return StopEventHandleNamePrefix + processId.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        private static bool TryReadStableSnapshot(MemoryMappedViewAccessor accessor, byte[] snapshot)
+        internal static bool TryReadStableSnapshot(IStableSnapshotReader reader, byte[] snapshot)
         {
             for (int attempt = 0; attempt < StableReadAttempts; attempt++)
             {
-                accessor.Read(WriteSequenceOffset, out uint beforeSequence);
+                reader.ReadWriteSequence(out uint beforeSequence);
                 if ((beforeSequence & 1) != 0)
                 {
                     Thread.Sleep(1);
                     continue;
                 }
 
-                accessor.ReadArray(0, snapshot, 0, snapshot.Length);
-                accessor.Read(WriteSequenceOffset, out uint afterSequence);
+                reader.ReadSnapshot(snapshot);
+                reader.ReadWriteSequence(out uint afterSequence);
                 if (beforeSequence == afterSequence && (afterSequence & 1) == 0)
                 {
                     return true;
@@ -327,6 +354,19 @@ namespace BO2.Services
             }
 
             return false;
+        }
+
+        private sealed class MemoryMappedStableSnapshotReader(MemoryMappedViewAccessor accessor) : IStableSnapshotReader
+        {
+            public void ReadWriteSequence(out uint sequence)
+            {
+                accessor.Read(WriteSequenceOffset, out sequence);
+            }
+
+            public void ReadSnapshot(byte[] snapshot)
+            {
+                accessor.ReadArray(0, snapshot, 0, snapshot.Length);
+            }
         }
 
         private bool TryEnsureSharedMemory(int targetProcessId)

@@ -35,11 +35,16 @@
       Include="..\Services\*.cs"
       Exclude="..\Services\AppStrings.cs"
       Link="Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Generated\*.cs" Link="Services\Generated\%(Filename)%(Extension)" />
     <Compile
       Include="..\Widgets\*.cs"
       Exclude="..\Widgets\BoxTrackerWidgetNativeAdapter.cs;..\Widgets\BoxTrackerWidgetSettingsDialog.cs;..\Widgets\BoxTrackerWidgetWindow.cs"
       Link="Widgets\%(Filename)%(Extension)" />
     <Compile Include="..\ViewModels\CurrentGamePageViewModel.cs" Link="ViewModels\CurrentGamePageViewModel.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Fixtures\*.bin" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

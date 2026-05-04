@@ -5,46 +5,51 @@
 #include <cstdint>
 #include <string>
 
+#include "Generated/EventMonitorSnapshotContract.g.h"
+
 namespace BO2Monitor
 {
-    constexpr wchar_t SharedMemoryNamePrefix[] = L"BO2MonitorSharedMem-";
-    constexpr wchar_t EventHandleNamePrefix[] = L"BO2MonitorEvent-";
-    constexpr wchar_t StopEventHandleNamePrefix[] = L"BO2MonitorStopEvent-";
-    constexpr std::uint32_t SnapshotMagic = 0x45324F42; // BO2E
-    constexpr std::uint32_t SnapshotVersion = 6;
-    constexpr std::size_t MaxEventCount = 128;
-    constexpr std::size_t MaxEventNameBytes = 64;
-    constexpr std::size_t MaxWeaponNameBytes = 64;
+    constexpr const wchar_t* SharedMemoryNamePrefix = Generated::SharedMemoryNamePrefix;
+    constexpr const wchar_t* EventHandleNamePrefix = Generated::UpdateEventNamePrefix;
+    constexpr const wchar_t* StopEventHandleNamePrefix = Generated::StopEventNamePrefix;
+    constexpr std::uint32_t SnapshotMagic = Generated::SnapshotMagic;
+    constexpr std::uint32_t SnapshotVersion = Generated::SnapshotVersion;
+    constexpr std::size_t MaxEventCount = Generated::MaxEventCount;
+    constexpr std::size_t MaxEventNameBytes = Generated::MaxEventNameBytes;
+    constexpr std::size_t MaxWeaponNameBytes = Generated::MaxWeaponNameBytes;
+    constexpr std::size_t HeaderSize = Generated::HeaderSize;
+    constexpr std::size_t EventRecordSize = Generated::EventRecordSize;
+    constexpr std::size_t SharedMemorySize = Generated::SharedMemorySize;
 
     enum class GameCompatibilityState : std::int32_t
     {
-        Unknown = 0,
-        WaitingForMonitor = 1,
-        Compatible = 2,
-        UnsupportedVersion = 3,
-        CaptureDisabled = 4,
-        PollingFallback = 5
+        Unknown = Generated::GameCompatibilityStateUnknown,
+        WaitingForMonitor = Generated::GameCompatibilityStateWaitingForMonitor,
+        Compatible = Generated::GameCompatibilityStateCompatible,
+        UnsupportedVersion = Generated::GameCompatibilityStateUnsupportedVersion,
+        CaptureDisabled = Generated::GameCompatibilityStateCaptureDisabled,
+        PollingFallback = Generated::GameCompatibilityStatePollingFallback
     };
 
     enum class GameEventType : std::int32_t
     {
-        Unknown = 0,
-        StartOfRound = 1,
-        EndOfRound = 2,
-        PowerUpGrabbed = 3,
-        DogRoundStarting = 4,
-        PowerOn = 5,
-        EndGame = 6,
-        PerkBought = 7,
-        RoundChanged = 8,
-        PointsChanged = 9,
-        KillsChanged = 10,
-        DownsChanged = 11,
-        NotifyCandidateRejected = 12,
-        NotifyEntryCandidate = 13,
-        StringResolverCandidate = 14,
-        NotifyObserved = 15,
-        BoxEvent = 16
+        Unknown = Generated::GameEventTypeUnknown,
+        StartOfRound = Generated::GameEventTypeStartOfRound,
+        EndOfRound = Generated::GameEventTypeEndOfRound,
+        PowerUpGrabbed = Generated::GameEventTypePowerUpGrabbed,
+        DogRoundStarting = Generated::GameEventTypeDogRoundStarting,
+        PowerOn = Generated::GameEventTypePowerOn,
+        EndGame = Generated::GameEventTypeEndGame,
+        PerkBought = Generated::GameEventTypePerkBought,
+        RoundChanged = Generated::GameEventTypeRoundChanged,
+        PointsChanged = Generated::GameEventTypePointsChanged,
+        KillsChanged = Generated::GameEventTypeKillsChanged,
+        DownsChanged = Generated::GameEventTypeDownsChanged,
+        NotifyCandidateRejected = Generated::GameEventTypeNotifyCandidateRejected,
+        NotifyEntryCandidate = Generated::GameEventTypeNotifyEntryCandidate,
+        StringResolverCandidate = Generated::GameEventTypeStringResolverCandidate,
+        NotifyObserved = Generated::GameEventTypeNotifyObserved,
+        BoxEvent = Generated::GameEventTypeBoxEvent
     };
 
 #pragma pack(push, 1)
@@ -74,8 +79,9 @@ namespace BO2Monitor
     };
 #pragma pack(pop)
 
-    static_assert(sizeof(GameEventRecord) == 148);
-    static_assert(sizeof(SharedSnapshot) == 18980);
+    inline constexpr bool SharedSnapshotLayoutMatchesContract =
+        (Generated::AssertSharedSnapshotLayout<SharedSnapshot, GameEventRecord>(), true);
+    static_assert(SharedSnapshotLayoutMatchesContract);
 
     std::wstring BuildSharedMemoryName(DWORD processId);
     std::wstring BuildEventHandleName(DWORD processId);
