@@ -220,32 +220,62 @@ namespace BO2.Tests.Services
                 .GetProperties(BindingFlags.Instance | BindingFlags.Public)
                 .Select(property => property.Name)
                 .ToArray();
-            string[] requiredProperties =
+            string[] lifecycleSummaryProperties =
             [
                 nameof(ShellConnectionDisplayState.DetectedGameText),
                 nameof(ShellConnectionDisplayState.EventMonitorStatusText),
                 nameof(ShellConnectionDisplayState.MainStatusText),
+                nameof(ShellConnectionDisplayState.ConnectionLastUpdateText)
+            ];
+            string[] footerProperties =
+            [
                 nameof(ShellConnectionDisplayState.FooterGameStatusText),
                 nameof(ShellConnectionDisplayState.FooterEventStatusText),
+                nameof(ShellConnectionDisplayState.IsFooterSuccessIndicatorVisible),
+                nameof(ShellConnectionDisplayState.IsFooterPendingIndicatorVisible),
+                nameof(ShellConnectionDisplayState.IsFooterDisconnectedIndicatorVisible),
+                nameof(ShellConnectionDisplayState.IsFooterErrorIndicatorVisible)
+            ];
+            string[] connectionCardProperties =
+            [
                 nameof(ShellConnectionDisplayState.ConnectionCardStatusText),
-                nameof(ShellConnectionDisplayState.ConnectionLastUpdateText),
+            ];
+            string[] commandProperties =
+            [
                 nameof(ShellConnectionDisplayState.ConnectButtonText),
                 nameof(ShellConnectionDisplayState.DisconnectButtonText),
                 nameof(ShellConnectionDisplayState.IsConnectCommandEnabled),
                 nameof(ShellConnectionDisplayState.IsConnectCommandVisible),
                 nameof(ShellConnectionDisplayState.IsDisconnectCommandEnabled),
-                nameof(ShellConnectionDisplayState.IsDisconnectCommandVisible),
-                nameof(ShellConnectionDisplayState.IsFooterSuccessIndicatorVisible),
-                nameof(ShellConnectionDisplayState.IsFooterPendingIndicatorVisible),
-                nameof(ShellConnectionDisplayState.IsFooterDisconnectedIndicatorVisible),
-                nameof(ShellConnectionDisplayState.IsFooterErrorIndicatorVisible),
+                nameof(ShellConnectionDisplayState.IsDisconnectCommandVisible)
+            ];
+            string[] latestEventStatusProperties =
+            [
                 nameof(ShellConnectionDisplayState.LatestEventStatus)
             ];
+            string[] requiredProperties = lifecycleSummaryProperties
+                .Concat(footerProperties)
+                .Concat(connectionCardProperties)
+                .Concat(commandProperties)
+                .Concat(latestEventStatusProperties)
+                .ToArray();
+            string[] excludedPageTerms =
+            [
+                "Point",
+                "Candidate",
+                "Round",
+                "Address",
+                "Raw",
+                "Debug",
+                "Diagnostic"
+            ];
 
-            Assert.Subset(propertyNames.ToHashSet(StringComparer.Ordinal), requiredProperties.ToHashSet(StringComparer.Ordinal));
-            Assert.DoesNotContain(propertyNames, property => property.Contains("Point", StringComparison.OrdinalIgnoreCase));
-            Assert.DoesNotContain(propertyNames, property => property.Contains("Candidate", StringComparison.OrdinalIgnoreCase));
-            Assert.DoesNotContain(propertyNames, property => property.Contains("Round", StringComparison.OrdinalIgnoreCase));
+            Assert.Equal(
+                requiredProperties.Order(StringComparer.Ordinal),
+                propertyNames.Order(StringComparer.Ordinal));
+            Assert.DoesNotContain(
+                propertyNames,
+                property => excludedPageTerms.Any(term => property.Contains(term, StringComparison.OrdinalIgnoreCase)));
         }
 
         private static ShellConnectionDisplayProjector CreateProjector()
