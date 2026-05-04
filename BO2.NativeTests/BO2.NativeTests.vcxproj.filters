@@ -25,7 +25,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="NativeTests.cpp">
+    <ClCompile Include="*.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\BO2InjectorHelper\InjectorArguments.cpp">

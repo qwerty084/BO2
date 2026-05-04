@@ -74,9 +74,13 @@ jobs:
             -- `
             DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
 
-      - name: Test native components
+      - name: Test native components (Release)
         shell: pwsh
         run: .\tools\Run-NativeTests.ps1 -Configuration Release
+
+      - name: Test native components (ReleaseWithVmNotifyHook)
+        shell: pwsh
+        run: .\tools\Run-NativeTests.ps1 -Configuration ReleaseWithVmNotifyHook
 
       - name: Upload test results artifact
         if: always()

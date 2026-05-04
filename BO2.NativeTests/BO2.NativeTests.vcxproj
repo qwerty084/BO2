@@ -9,6 +9,10 @@
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="ReleaseWithVmNotifyHook|Win32">
+      <Configuration>ReleaseWithVmNotifyHook</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -39,6 +43,13 @@
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithVmNotifyHook|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" Condition="'$(HasCppTargets)'=='true'" />
   <PropertyGroup>
     <NativeUnitTestRoot Condition="'$(NativeUnitTestRoot)'=='' and Exists('$(VCInstallDir)Auxiliary\VS\UnitTest\include\CppUnitTest.h')">$(VCInstallDir)Auxiliary\VS\UnitTest\</NativeUnitTestRoot>
@@ -55,6 +66,9 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='ReleaseWithVmNotifyHook|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -97,6 +111,25 @@
       <AdditionalLibraryDirectories>$(NativeUnitTestRoot)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithVmNotifyHook|Win32'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\..\BO2Monitor;$(MSBuildProjectDirectory)\..\BO2InjectorHelper;$(NativeUnitTestRoot)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>BO2MONITOR_ENABLE_VM_NOTIFY_HOOK;BO2_NATIVE_TESTS_EXPECT_VM_NOTIFY_HOOK;WIN32;NDEBUG;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(NativeUnitTestRoot)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\BO2InjectorHelper\InjectorArguments.h" />
     <ClInclude Include="..\BO2Monitor\HookPure.h" />
@@ -104,7 +137,7 @@
     <ClInclude Include="..\BO2Monitor\SharedSnapshot.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="NativeTests.cpp" />
+    <ClCompile Include="*.cpp" />
     <ClCompile Include="..\BO2InjectorHelper\InjectorArguments.cpp">
       <ObjectFileName>$(IntDir)InjectorArguments.obj</ObjectFileName>
     </ClCompile>

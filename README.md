@@ -44,6 +44,7 @@ Run native C++ unit tests for repo-owned monitor and injector-helper logic:
 
 ```powershell
 .\tools\Run-NativeTests.ps1 -Configuration Release
+.\tools\Run-NativeTests.ps1 -Configuration ReleaseWithVmNotifyHook
 ```
 
 `BO2.NativeTests` uses Microsoft Native Unit Test Framework through Visual Studio and keeps phase 1 deterministic: no live BO2 process, DLL injection automation, MinHook tests, or third-party source tests.

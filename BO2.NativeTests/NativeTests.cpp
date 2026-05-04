@@ -12,6 +12,10 @@
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
+#if defined(BO2_NATIVE_TESTS_EXPECT_VM_NOTIFY_HOOK) && !defined(BO2MONITOR_ENABLE_VM_NOTIFY_HOOK)
+#error BO2_NATIVE_TESTS_EXPECT_VM_NOTIFY_HOOK requires BO2MONITOR_ENABLE_VM_NOTIFY_HOOK.
+#endif
+
 namespace BO2NativeTests
 {
     namespace
@@ -26,6 +30,27 @@ namespace BO2NativeTests
             return value.empty() ? nullptr : &value[0];
         }
     }
+
+    TEST_CLASS(BuildConfigurationTests)
+    {
+    public:
+        TEST_METHOD(VmNotifyHookFlagMatchesBuildConfiguration)
+        {
+#if defined(BO2MONITOR_ENABLE_VM_NOTIFY_HOOK)
+            constexpr bool hookEnabled = true;
+#else
+            constexpr bool hookEnabled = false;
+#endif
+
+#if defined(BO2_NATIVE_TESTS_EXPECT_VM_NOTIFY_HOOK)
+            constexpr bool expectedHookEnabled = true;
+#else
+            constexpr bool expectedHookEnabled = false;
+#endif
+
+            Assert::IsTrue(hookEnabled == expectedHookEnabled);
+        }
+    };
 
     TEST_CLASS(SnapshotContractTests)
     {

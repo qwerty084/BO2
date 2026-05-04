@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Debug', 'Release')]
+    [ValidateSet('Debug', 'Release', 'ReleaseWithVmNotifyHook')]
     [string]$Configuration = 'Release'
 )
 
@@ -11,6 +11,9 @@ $testProject = Join-Path $repoRoot 'BO2.NativeTests\BO2.NativeTests.vcxproj'
 $testAssembly = Join-Path $repoRoot "BO2.NativeTests\bin\Win32\$Configuration\BO2.NativeTests.dll"
 $runSettings = Join-Path $repoRoot 'tools\NativeTests.runsettings'
 $resultsDirectory = Join-Path $repoRoot 'TestResults\Native'
+$buildLabel = "$Configuration|Win32"
+$trxLogFileName = "BO2.NativeTests.$Configuration.trx"
+$trxLogger = "trx;LogFileName=$trxLogFileName"
 
 function Find-FirstExistingFile {
     param([string[]]$Candidates)
@@ -93,26 +96,30 @@ function Find-VSTestConsole {
 $msbuild = Find-MSBuild
 $vstest = Find-VSTestConsole
 
-Write-Host "Building native tests with $msbuild"
+Write-Host "Native test configuration: $buildLabel"
+Write-Host "Native test project: $testProject"
+Write-Host "Native test assembly: $testAssembly"
+Write-Host "Native test results: $(Join-Path $resultsDirectory $trxLogFileName)"
+Write-Host "Building native tests ($buildLabel) with $msbuild"
 & $msbuild $testProject /t:Build /p:Configuration=$Configuration /p:Platform=Win32 /m /v:minimal
 if ($LASTEXITCODE -ne 0) {
-    throw "Native test build failed with exit code $LASTEXITCODE."
+    throw "Native test build failed for $buildLabel with exit code $LASTEXITCODE."
 }
 
 if (-not (Test-Path -LiteralPath $testAssembly -PathType Leaf)) {
-    throw "Native test assembly was not produced: $testAssembly"
+    throw "Native test assembly was not produced for $($buildLabel): $testAssembly. Ensure Visual C++ MSBuild targets and Microsoft Native Unit Test tools are installed."
 }
 
 New-Item -ItemType Directory -Path $resultsDirectory -Force | Out-Null
 
-Write-Host "Running native tests with $vstest"
+Write-Host "Running native tests ($buildLabel) with $vstest"
 & $vstest `
     $testAssembly `
     /Platform:x86 `
     /InIsolation `
     /Settings:$runSettings `
-    /Logger:'trx;LogFileName=BO2.NativeTests.trx' `
+    "/Logger:$trxLogger" `
     /ResultsDirectory:$resultsDirectory
 if ($LASTEXITCODE -ne 0) {
-    throw "Native tests failed with exit code $LASTEXITCODE."
+    throw "Native tests failed for $buildLabel with exit code $LASTEXITCODE."
 }
