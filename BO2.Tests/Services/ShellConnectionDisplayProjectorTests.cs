@@ -96,6 +96,41 @@ namespace BO2.Tests.Services
             Assert.False(state.IsFooterErrorIndicatorVisible);
         }
 
+        [Theory]
+        [InlineData((int)GameConnectionPhase.Detected)]
+        [InlineData((int)GameConnectionPhase.StatsOnlyDetected)]
+        public void Project_WhenDetectedNonConnectedSnapshotHasCurrentMonitorStatus_PublishesWaitingLatestEventStatus(
+            int connectionPhaseValue)
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+            GameConnectionPhase connectionPhase = (GameConnectionPhase)connectionPhaseValue;
+
+            ShellConnectionDisplayState state = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    connectionPhase: connectionPhase,
+                    eventMonitorSummary: CreateSummaryWithCurrentStatus(GameConnectionEventMonitorState.Ready)));
+
+            Assert.Same(GameEventMonitorStatus.WaitingForMonitor, state.LatestEventStatus);
+        }
+
+        [Theory]
+        [InlineData(GameConnectionEventMonitorState.ReadinessFailed)]
+        [InlineData(GameConnectionEventMonitorState.LoadingFailed)]
+        public void Project_WhenFailedConnectSnapshotHasCurrentMonitorStatus_PublishesWaitingLatestEventStatus(
+            GameConnectionEventMonitorState eventMonitorState)
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+
+            ShellConnectionDisplayState state = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    connectionPhase: GameConnectionPhase.Detected,
+                    eventMonitorSummary: CreateSummaryWithCurrentStatus(eventMonitorState)));
+
+            Assert.Same(GameEventMonitorStatus.WaitingForMonitor, state.LatestEventStatus);
+        }
+
         [Fact]
         public void Project_WhenConnecting_ReturnsConnectingShellState()
         {
@@ -192,6 +227,40 @@ namespace BO2.Tests.Services
             Assert.True(state.IsFooterPendingIndicatorVisible);
             Assert.False(state.IsFooterDisconnectedIndicatorVisible);
             Assert.False(state.IsFooterErrorIndicatorVisible);
+            Assert.Same(GameEventMonitorStatus.WaitingForMonitor, state.LatestEventStatus);
+        }
+
+        [Theory]
+        [InlineData(GameConnectionEventMonitorState.Disconnecting)]
+        [InlineData(GameConnectionEventMonitorState.StopPending)]
+        public void Project_WhenDisconnectingSnapshotHasCurrentMonitorStatus_PublishesWaitingLatestEventStatus(
+            GameConnectionEventMonitorState eventMonitorState)
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+
+            ShellConnectionDisplayState state = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    connectionPhase: GameConnectionPhase.Disconnecting,
+                    eventMonitorSummary: CreateSummaryWithCurrentStatus(eventMonitorState)));
+
+            Assert.Same(GameEventMonitorStatus.WaitingForMonitor, state.LatestEventStatus);
+        }
+
+        [Theory]
+        [InlineData(GameConnectionEventMonitorState.StopCompleted)]
+        [InlineData(GameConnectionEventMonitorState.StopTimedOut)]
+        public void Project_WhenStopFinishedSnapshotHasCurrentMonitorStatus_PublishesWaitingLatestEventStatus(
+            GameConnectionEventMonitorState eventMonitorState)
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+
+            ShellConnectionDisplayState state = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    connectionPhase: GameConnectionPhase.Detected,
+                    eventMonitorSummary: CreateSummaryWithCurrentStatus(eventMonitorState)));
+
             Assert.Same(GameEventMonitorStatus.WaitingForMonitor, state.LatestEventStatus);
         }
 
@@ -335,6 +404,35 @@ namespace BO2.Tests.Services
             return currentGame.IsStatsSupported
                 ? GameConnectionPhase.Detected
                 : GameConnectionPhase.UnsupportedGame;
+        }
+
+        private static GameConnectionEventMonitorSummary CreateSummaryWithCurrentStatus(
+            GameConnectionEventMonitorState state)
+        {
+            return new GameConnectionEventMonitorSummary(
+                state,
+                CreateCurrentEventStatus(),
+                FailureMessage: "failed");
+        }
+
+        private static GameEventMonitorStatus CreateCurrentEventStatus()
+        {
+            return new GameEventMonitorStatus(
+                GameCompatibilityState.Compatible,
+                DroppedEventCount: 1,
+                DroppedNotifyCount: 2,
+                PublishedNotifyCount: 3,
+                RecentEvents:
+                [
+                    new GameEvent(
+                        GameEventType.BoxEvent,
+                        "randomization_done",
+                        0,
+                        5,
+                        1000,
+                        new DateTimeOffset(2026, 4, 26, 12, 34, 56, TimeSpan.Zero),
+                        "galil_zm")
+                ]);
         }
 
         private static DetectedGame CreateSupportedGame(int processId)
