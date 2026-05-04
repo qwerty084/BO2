@@ -216,10 +216,12 @@ namespace BO2.Tests.Services
         [Fact]
         public void DisplayStateContract_IncludesShellFieldsOnly()
         {
-            string[] propertyNames = typeof(ShellConnectionDisplayState)
-                .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-                .Select(property => property.Name)
-                .ToArray();
+            string[] propertyNames =
+            [
+                .. typeof(ShellConnectionDisplayState)
+                    .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                    .Select(property => property.Name)
+            ];
             string[] lifecycleSummaryProperties =
             [
                 nameof(ShellConnectionDisplayState.DetectedGameText),
@@ -253,12 +255,14 @@ namespace BO2.Tests.Services
             [
                 nameof(ShellConnectionDisplayState.LatestEventStatus)
             ];
-            string[] requiredProperties = lifecycleSummaryProperties
-                .Concat(footerProperties)
-                .Concat(connectionCardProperties)
-                .Concat(commandProperties)
-                .Concat(latestEventStatusProperties)
-                .ToArray();
+            string[] requiredProperties =
+            [
+                .. lifecycleSummaryProperties,
+                .. footerProperties,
+                .. connectionCardProperties,
+                .. commandProperties,
+                .. latestEventStatusProperties
+            ];
             string[] excludedPageTerms =
             [
                 "Point",
