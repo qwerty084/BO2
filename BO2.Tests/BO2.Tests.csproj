@@ -43,4 +43,8 @@
     <Compile Include="..\ViewModels\CurrentGamePageViewModel.cs" Link="ViewModels\CurrentGamePageViewModel.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Fixtures\*.bin" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Text;
 using System.Threading;
@@ -40,6 +41,57 @@ namespace BO2.Tests.Services
             Assert.Equal(1149u, gameEvent.StringValue);
             Assert.Equal(receivedAt, gameEvent.ReceivedAt);
             Assert.Null(gameEvent.WeaponName);
+        }
+
+        [Fact]
+        public void DecodeSnapshot_WhenReadingNativeV6WrappedFixture_DecodesNativeContractBytes()
+        {
+            string fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "EventMonitorSnapshot.v6.wrapped.bin");
+            byte[] snapshot = File.ReadAllBytes(fixturePath);
+            DateTimeOffset receivedAt = new(2026, 4, 26, 1, 2, 3, TimeSpan.Zero);
+            const uint receivedAtTick = 100_000;
+
+            GameEventMonitorStatus status = GameEventMonitor.DecodeSnapshot(snapshot, receivedAt, receivedAtTick);
+
+            Assert.Equal(GameCompatibilityState.Compatible, status.CompatibilityState);
+            Assert.Equal(2u, status.DroppedEventCount);
+            Assert.Equal(7u, status.DroppedNotifyCount);
+            Assert.Equal(9u, status.PublishedNotifyCount);
+            Assert.Equal(GameEventMonitor.MaxEventCount, status.RecentEvents.Count);
+
+            Assert.Equal("fixture_filler_3", status.RecentEvents[0].EventName);
+            Assert.Equal(GameEventType.NotifyObserved, status.RecentEvents[0].EventType);
+            Assert.Equal(10_003, status.RecentEvents[0].LevelTime);
+            Assert.Equal(703u, status.RecentEvents[0].OwnerId);
+            Assert.Equal(1_103u, status.RecentEvents[0].StringValue);
+            Assert.Equal(receivedAt.AddMilliseconds(-49_700), status.RecentEvents[0].ReceivedAt);
+
+            GameEvent startOfRound = status.RecentEvents[123];
+            Assert.Equal(GameEventType.StartOfRound, startOfRound.EventType);
+            Assert.Equal("start_of_round", startOfRound.EventName);
+            Assert.Equal(10_126, startOfRound.LevelTime);
+            Assert.Null(startOfRound.WeaponName);
+            Assert.Equal(receivedAt.AddMilliseconds(-37_400), startOfRound.ReceivedAt);
+
+            GameEvent boxEvent = status.RecentEvents[124];
+            Assert.Equal(GameEventType.BoxEvent, boxEvent.EventType);
+            Assert.Equal("randomization_done", boxEvent.EventName);
+            Assert.Equal("ray_gun_zm", boxEvent.WeaponName);
+            Assert.Equal(10_127, boxEvent.LevelTime);
+            Assert.Equal(827u, boxEvent.OwnerId);
+            Assert.Equal(1_227u, boxEvent.StringValue);
+            Assert.Equal(receivedAt.AddMilliseconds(-37_300), boxEvent.ReceivedAt);
+
+            GameEvent endGame = status.RecentEvents[125];
+            Assert.Equal(GameEventType.EndGame, endGame.EventType);
+            Assert.Equal("end_game", endGame.EventName);
+            Assert.Equal(10_128, endGame.LevelTime);
+            Assert.Equal(receivedAt.AddMilliseconds(-37_200), endGame.ReceivedAt);
+
+            Assert.Equal("fixture_wrap_129", status.RecentEvents[126].EventName);
+            Assert.Equal("fixture_wrap_130", status.RecentEvents[127].EventName);
+            Assert.Equal(10_130, status.RecentEvents[127].LevelTime);
+            Assert.Equal(receivedAt.AddMilliseconds(-37_000), status.RecentEvents[127].ReceivedAt);
         }
 
         [Fact]
