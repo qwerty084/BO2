@@ -206,9 +206,9 @@ namespace BO2.Services
 
                 ReadOnlySpan<byte> record = snapshot.Slice(recordOffset, EventRecordSize);
                 GameEventType eventType = ReadEventType(
-                    record.Slice(
-                        EventMonitorSnapshotContract.GameEventRecordEventTypeOffset,
-                        EventMonitorSnapshotContract.GameEventRecordEventTypeSize));
+                    record[
+                        EventMonitorSnapshotContract.GameEventRecordEventTypeOffset..(EventMonitorSnapshotContract.GameEventRecordEventTypeOffset
+                            + EventMonitorSnapshotContract.GameEventRecordEventTypeSize)]);
                 int levelTime = ReadInt32(record, EventMonitorSnapshotContract.GameEventRecordLevelTimeOffset);
                 uint ownerId = ReadUInt32(record, EventMonitorSnapshotContract.GameEventRecordOwnerIdOffset);
                 uint stringValue = ReadUInt32(record, EventMonitorSnapshotContract.GameEventRecordStringValueOffset);
