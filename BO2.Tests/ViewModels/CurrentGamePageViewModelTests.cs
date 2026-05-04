@@ -1,5 +1,4 @@
 using System;
-using System.Globalization;
 using System.Reflection;
 using BO2.Services;
 using BO2.ViewModels;
@@ -7,12 +6,12 @@ using Xunit;
 
 namespace BO2.Tests.ViewModels
 {
-    public sealed class HomeStatsViewModelTests
+    public sealed class CurrentGamePageViewModelTests
     {
         [Fact]
-        public void ApplySnapshot_WhenSupportedStatsWithoutMonitor_ProjectsHomeDisplayState()
+        public void ApplySnapshot_WhenSupportedStatsWithoutMonitor_ProjectsInactiveCurrentGamePageDisplayState()
         {
-            HomeStatsViewModel viewModel = new();
+            CurrentGamePageViewModel viewModel = new();
             DetectedGame detectedGame = CreateSupportedGame(1001);
             var readResult = new PlayerStatsReadResult(
                 detectedGame,
@@ -26,25 +25,36 @@ namespace BO2.Tests.ViewModels
                 ConnectCommandAvailability: GameConnectionCommandAvailability.VisibleEnabled,
                 DisconnectCommandAvailability: GameConnectionCommandAvailability.Hidden));
 
-            Assert.Equal("Steam Zombies", viewModel.DetectedGameText);
-            Assert.Equal(1234.ToString("N0", CultureInfo.CurrentCulture), viewModel.PointsText);
-            Assert.Equal(12.345f.ToString("N2", CultureInfo.CurrentCulture), viewModel.PositionXText);
-            Assert.Equal("GameProcessDetectorDisplayNameSteamZombies", viewModel.EventCompatibilityText);
-            Assert.Equal("DllInjectionWaitingForConnect", viewModel.InjectionStatusText);
-            Assert.Equal("EventMonitorWaitingForConnect", viewModel.EventMonitorStatusText);
+            Assert.Equal("CurrentGamePageStatusNotConnected", viewModel.PageStatusText);
+            Assert.Equal("--", viewModel.PointsText);
+            Assert.Equal("--", viewModel.KillsText);
+            Assert.Equal("--", viewModel.DownsText);
+            Assert.Equal("--", viewModel.RevivesText);
+            Assert.Equal("--", viewModel.HeadshotsText);
+            Assert.Equal("--", viewModel.CurrentRoundText);
             Assert.Equal("RecentEventsEmpty", viewModel.BoxEventsText);
+            Assert.Equal("RecentEventsEmpty", viewModel.RecentGameEventsText);
         }
 
         [Fact]
         public void PresentationStateContract_ExposesReadOnlyStateWithoutConnectionCommands()
         {
-            PropertyInfo[] properties = typeof(HomeStatsViewModel)
+            PropertyInfo[] properties = typeof(CurrentGamePageViewModel)
                 .GetProperties(BindingFlags.Instance | BindingFlags.Public);
-            MethodInfo[] publicMethods = typeof(HomeStatsViewModel)
+            MethodInfo[] publicMethods = typeof(CurrentGamePageViewModel)
                 .GetMethods(BindingFlags.Instance | BindingFlags.Public);
 
             Assert.All(properties, property => Assert.Null(property.GetSetMethod()));
             Assert.DoesNotContain(publicMethods, IsConnectionCommand);
+        }
+
+        [Fact]
+        public void PresentationStateContract_DoesNotExposeCandidateAddressOrDebugProperties()
+        {
+            PropertyInfo[] properties = typeof(CurrentGamePageViewModel)
+                .GetProperties(BindingFlags.Instance | BindingFlags.Public);
+
+            Assert.DoesNotContain(properties, property => ContainsPresentationDetail(property.Name));
         }
 
         private static bool IsConnectionCommand(MethodInfo method)
@@ -52,6 +62,18 @@ namespace BO2.Tests.ViewModels
             return method.Name.Contains("Connect", StringComparison.OrdinalIgnoreCase)
                 || method.Name.Contains("Disconnect", StringComparison.OrdinalIgnoreCase)
                 || method.Name.Contains("Refresh", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool ContainsPresentationDetail(string memberName)
+        {
+            return memberName.Contains("Candidate", StringComparison.OrdinalIgnoreCase)
+                || memberName.Contains("Address", StringComparison.OrdinalIgnoreCase)
+                || memberName.Contains("Debug", StringComparison.OrdinalIgnoreCase)
+                || memberName.Contains("Diagnostic", StringComparison.OrdinalIgnoreCase)
+                || memberName.Contains("Injection", StringComparison.OrdinalIgnoreCase)
+                || memberName.Contains("LowLevel", StringComparison.OrdinalIgnoreCase)
+                || memberName.Contains("Monitor", StringComparison.OrdinalIgnoreCase)
+                || memberName.Contains("Position", StringComparison.OrdinalIgnoreCase);
         }
 
         private static PlayerStats CreateStats()

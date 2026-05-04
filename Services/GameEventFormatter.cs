@@ -5,7 +5,7 @@ namespace BO2.Services
 {
     internal static class GameEventFormatter
     {
-        private static readonly GameConnectionSessionDisplayRenderer Renderer = new();
+        private static readonly DisplayTextRenderer Renderer = new();
 
         public static string FormatRecentBoxEvents(GameEventMonitorStatus eventStatus)
         {

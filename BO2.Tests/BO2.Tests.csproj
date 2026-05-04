@@ -39,7 +39,7 @@
       Include="..\Widgets\*.cs"
       Exclude="..\Widgets\BoxTrackerWidgetNativeAdapter.cs;..\Widgets\BoxTrackerWidgetSettingsDialog.cs;..\Widgets\BoxTrackerWidgetWindow.cs"
       Link="Widgets\%(Filename)%(Extension)" />
-    <Compile Include="..\ViewModels\HomeStatsViewModel.cs"      Link="ViewModels\HomeStatsViewModel.cs" />
+    <Compile Include="..\ViewModels\CurrentGamePageViewModel.cs" Link="ViewModels\CurrentGamePageViewModel.cs" />
   </ItemGroup>
 
 </Project>

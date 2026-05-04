@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="BO2.Views.CurrentGamePageView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <StackPanel
+        HorizontalAlignment="Stretch"
+        Spacing="12">
+        <TextBlock
+            Style="{StaticResource BO2CaptionTextBlockStyle}"
+            Text="{Binding PageStatusText, Mode=OneWay}"
+            TextWrapping="Wrap" />
+
+        <Border Style="{StaticResource BO2CardBorderStyle}">
+            <StackPanel Spacing="12">
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon
+                        FontSize="16"
+                        Foreground="{ThemeResource BO2TextSecondaryBrush}"
+                        Glyph="&#xE121;" />
+                    <TextBlock
+                        x:Uid="TimersTitle"
+                        Grid.Column="1"
+                        Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                </Grid>
+                <Grid ColumnSpacing="64">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock
+                            x:Uid="GameTimeLabel"
+                            Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                        <TextBlock
+                            x:Uid="GameTimePlaceholder"
+                            Style="{StaticResource BO2BodyTextBlockStyle}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="4">
+                        <TextBlock
+                            x:Uid="RoundTimeLabel"
+                            Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                        <TextBlock
+                            x:Uid="RoundTimePlaceholder"
+                            Style="{StaticResource BO2BodyTextBlockStyle}" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource BO2CardBorderStyle}">
+            <StackPanel Spacing="12">
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon
+                        FontSize="16"
+                        Foreground="{ThemeResource BO2TextSecondaryBrush}"
+                        Glyph="&#xE77B;" />
+                    <TextBlock
+                        x:Uid="PlayerStatsTitle"
+                        Grid.Column="1"
+                        Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                </Grid>
+                <Grid ColumnSpacing="20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock x:Uid="PointsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding PointsText, Mode=OneWay}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="4">
+                        <TextBlock x:Uid="KillsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding KillsText, Mode=OneWay}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock x:Uid="DownsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding DownsText, Mode=OneWay}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Spacing="4">
+                        <TextBlock x:Uid="RevivesLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding RevivesText, Mode=OneWay}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="4" Spacing="4">
+                        <TextBlock x:Uid="HeadshotsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding HeadshotsText, Mode=OneWay}" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource BO2CardBorderStyle}">
+            <StackPanel Spacing="12">
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon
+                        FontSize="16"
+                        Foreground="{ThemeResource BO2TextSecondaryBrush}"
+                        Glyph="&#xE787;" />
+                    <TextBlock
+                        x:Uid="GameEventsTitle"
+                        Grid.Column="1"
+                        Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                </Grid>
+                <Grid
+                    ColumnSpacing="24"
+                    RowSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock x:Uid="CurrentRoundLabel" Grid.Row="0" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding CurrentRoundText, Mode=OneWay}" TextWrapping="Wrap" />
+                    <TextBlock x:Uid="BoxEventsLabel" Grid.Row="1" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding BoxEventsText, Mode=OneWay}" TextWrapping="Wrap" />
+                    <TextBlock x:Uid="RecentEventsLabel" Grid.Row="2" Grid.Column="0" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding RecentGameEventsText, Mode=OneWay}" TextWrapping="Wrap" />
+                </Grid>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

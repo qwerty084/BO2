@@ -50,8 +50,8 @@ namespace BO2
             _refreshTimer.Tick += OnRefreshTimerTick;
             _refreshTimer.Start();
             Closed += OnClosed;
-            RootNavigationView.SelectedItem = HomeNavigationItem;
-            ShowHome();
+            RootNavigationView.SelectedItem = CurrentGamePageNavigationItem;
+            ShowCurrentGamePage();
             RefreshPaneFooterVisibility();
             RefreshThemeControls();
             RefreshWidgetSettingsRecoveryMessage();
@@ -192,9 +192,9 @@ namespace BO2
                 return;
             }
 
-            if (ReferenceEquals(sender.SelectedItem, HomeNavigationItem))
+            if (ReferenceEquals(sender.SelectedItem, CurrentGamePageNavigationItem))
             {
-                ShowHome();
+                ShowCurrentGamePage();
                 return;
             }
 
@@ -204,15 +204,15 @@ namespace BO2
             }
         }
 
-        private void ShowHome()
+        private void ShowCurrentGamePage()
         {
-            PageTitle.Text = AppStrings.Get("NavigationHome");
-            HomeContent.Visibility = Visibility.Visible;
+            PageTitle.Text = AppStrings.Get("NavigationCurrentGame");
+            CurrentGamePageContent.Visibility = Visibility.Visible;
             SettingsContent.Visibility = Visibility.Collapsed;
 
-            if (!ReferenceEquals(RootNavigationView.SelectedItem, HomeNavigationItem))
+            if (!ReferenceEquals(RootNavigationView.SelectedItem, CurrentGamePageNavigationItem))
             {
-                RootNavigationView.SelectedItem = HomeNavigationItem;
+                RootNavigationView.SelectedItem = CurrentGamePageNavigationItem;
             }
         }
 
@@ -224,7 +224,7 @@ namespace BO2
             }
 
             PageTitle.Text = AppStrings.Get("NavigationSettings");
-            HomeContent.Visibility = Visibility.Collapsed;
+            CurrentGamePageContent.Visibility = Visibility.Collapsed;
             SettingsContent.Visibility = Visibility.Visible;
         }
 

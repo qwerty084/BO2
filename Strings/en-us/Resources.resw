@@ -60,15 +60,6 @@
   <data name="ConnectionStatusDisconnecting" xml:space="preserve">
     <value>Disconnecting...</value>
   </data>
-  <data name="AdvancedCandidateDetailsExpander.AutomationProperties.Name" xml:space="preserve">
-    <value>Advanced candidate details</value>
-  </data>
-  <data name="AdvancedCandidateDetailsExpander.Header" xml:space="preserve">
-    <value>Advanced candidate details</value>
-  </data>
-  <data name="AddressCandidateDetailsTitle.Text" xml:space="preserve">
-    <value>Address candidates</value>
-  </data>
   <data name="AdsAmountLabel" xml:space="preserve">
     <value>ADS amount</value>
   </data>
@@ -77,9 +68,6 @@
   </data>
   <data name="AlternateKillsLabel" xml:space="preserve">
     <value>Alternate kills</value>
-  </data>
-  <data name="AmmoCandidateDetailsTitle.Text" xml:space="preserve">
-    <value>Ammo candidates</value>
   </data>
   <data name="AmmoSlot0Label" xml:space="preserve">
     <value>Ammo slot 0</value>
@@ -95,12 +83,6 @@
   </data>
   <data name="AmmoSlot4Label" xml:space="preserve">
     <value>Ammo slot 4</value>
-  </data>
-  <data name="CounterCandidateDetailsTitle.Text" xml:space="preserve">
-    <value>Counter candidates</value>
-  </data>
-  <data name="CandidateDetailsDescription.Text" xml:space="preserve">
-    <value>These values are Steam-derived candidates from older public offsets. Treat unavailable or unexpected values as validation signals, not read failures for confirmed stats.</value>
   </data>
   <data name="DispatcherQueueFailed" xml:space="preserve">
     <value>Unable to queue UI update.</value>
@@ -300,9 +282,6 @@
   <data name="EventMonitorWaitingForMonitor" xml:space="preserve">
     <value>Waiting for BO2Monitor shared memory</value>
   </data>
-  <data name="GameEventsDescription.Text" xml:space="preserve">
-    <value>Event capture is inactive until a validated BO2 monitor publishes read-only event snapshots.</value>
-  </data>
   <data name="GameEventsTitle.Text" xml:space="preserve">
     <value>Game events</value>
   </data>
@@ -375,8 +354,20 @@
   <data name="HeightIntLabel" xml:space="preserve">
     <value>Height integer</value>
   </data>
-  <data name="HomeNavigationItem.Content" xml:space="preserve">
-    <value>Home</value>
+  <data name="CurrentGamePageNavigationItem.Content" xml:space="preserve">
+    <value>Current Game Page</value>
+  </data>
+  <data name="CurrentGamePageStatusConnected" xml:space="preserve">
+    <value>Live current game stats and events are active.</value>
+  </data>
+  <data name="CurrentGamePageStatusConnecting" xml:space="preserve">
+    <value>Connecting to the game monitor...</value>
+  </data>
+  <data name="CurrentGamePageStatusDisconnecting" xml:space="preserve">
+    <value>Disconnecting from the game monitor...</value>
+  </data>
+  <data name="CurrentGamePageStatusNotConnected" xml:space="preserve">
+    <value>Not connected. Current game stats and events are inactive.</value>
   </data>
   <data name="SettingsNavigationItem.Content" xml:space="preserve">
     <value>Settings</value>
@@ -399,8 +390,8 @@
   <data name="LocalPlayerBaseLabel" xml:space="preserve">
     <value>Local player base</value>
   </data>
-  <data name="NavigationHome" xml:space="preserve">
-    <value>Home</value>
+  <data name="NavigationCurrentGame" xml:space="preserve">
+    <value>Current Game Page</value>
   </data>
   <data name="NavigationSettings" xml:space="preserve">
     <value>Settings</value>
@@ -412,28 +403,13 @@
     <value>Unable to open {0}.exe for read-only memory access.</value>
   </data>
   <data name="PageTitle.Text" xml:space="preserve">
-    <value>Home</value>
+    <value>Current Game Page</value>
   </data>
   <data name="PlayerStatsTitle.Text" xml:space="preserve">
     <value>Player stats</value>
   </data>
-  <data name="PlayerCandidateDetailsTitle.Text" xml:space="preserve">
-    <value>Player candidates</value>
-  </data>
   <data name="PlayerInfoHealthLabel" xml:space="preserve">
     <value>Player info health</value>
-  </data>
-  <data name="PlayerStateTitle.Text" xml:space="preserve">
-    <value>Derived player state candidates</value>
-  </data>
-  <data name="PositionXLabel.Text" xml:space="preserve">
-    <value>Position X candidate</value>
-  </data>
-  <data name="PositionYLabel.Text" xml:space="preserve">
-    <value>Position Y candidate</value>
-  </data>
-  <data name="PositionZLabel.Text" xml:space="preserve">
-    <value>Position Z candidate</value>
   </data>
   <data name="PointsLabel.Text" xml:space="preserve">
     <value>Points</value>
