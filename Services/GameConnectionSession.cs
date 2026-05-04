@@ -434,6 +434,40 @@ namespace BO2.Services
             DateTimeOffset receivedAt,
             GameConnectionEventMonitorSummary? eventMonitorSummaryOverride = null)
         {
+            GameConnectionRefreshResult? statusOnlyResult = null;
+            bool shouldReadPlayerStats;
+            bool shouldClearAttachedGame;
+            lock (_syncRoot)
+            {
+                if (!Equals(_currentGame, detectedGame))
+                {
+                    return CreateStatusSnapshotLocked(_currentGame);
+                }
+
+                GameConnectionSessionLifecycleSnapshot lifecycleSnapshot = _lifecycle.CreateSnapshot(
+                    GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
+                shouldReadPlayerStats = ShouldReadPlayerStats(detectedGame, lifecycleSnapshot);
+                shouldClearAttachedGame = detectedGame?.AddressMap is null;
+                if (!shouldReadPlayerStats)
+                {
+                    statusOnlyResult = CreateRefreshResultLocked(
+                        detectedGame,
+                        null,
+                        GameEventMonitorStatus.WaitingForMonitor,
+                        eventMonitorSummaryOverride);
+                }
+            }
+
+            if (!shouldReadPlayerStats)
+            {
+                if (shouldClearAttachedGame)
+                {
+                    _memoryReader.ClearAttachedGame();
+                }
+
+                return statusOnlyResult!.Value;
+            }
+
             PlayerStatsReadResult? readResult = ReadPlayerStats(detectedGame);
             int? ownedMonitorProcessId;
             lock (_syncRoot)
@@ -474,6 +508,15 @@ namespace BO2.Services
             }
 
             return result;
+        }
+
+        private static bool ShouldReadPlayerStats(
+            DetectedGame? detectedGame,
+            GameConnectionSessionLifecycleSnapshot lifecycleSnapshot)
+        {
+            return detectedGame?.AddressMap is not null
+                && (lifecycleSnapshot.IsMonitorConnectedForCurrentGame
+                    || lifecycleSnapshot.HasInjectionAttemptForCurrentGame);
         }
 
         private PlayerStatsReadResult? ReadPlayerStats(DetectedGame? detectedGame)
