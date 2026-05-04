@@ -33,7 +33,7 @@ A user-enabled overlay window that displays recent box events from the current *
 _Avoid_: overlay, native widget window
 
 **Box Tracker Widget Runtime**:
-The app-owned widget module that reconciles **Box Tracker Widget** settings, current **Event Monitor** state, settings persistence, and the native widget adapter.
+The app-owned widget module that reconciles **Box Tracker Widget** settings, current **Event Monitor** state, settings persistence, and the native widget adapter. The app shell coordinates it through the widget window manager.
 _Avoid_: widget manager, overlay service
 
 ## Relationships
@@ -43,7 +43,7 @@ _Avoid_: widget manager, overlay service
 - A **Game Connection Session** exposes one current **Game Connection Snapshot** at a time.
 - A **Current Game Page** displays round-focused state from the current **Game Connection Snapshot**.
 - A **Current Game Page** does not own **Game Connection Session** commands; connect and disconnect controls live in the app shell footer/sidebar.
-- A **Current Game Page** is the planned default first page, replacing the current home stats surface rather than duplicating it.
+- A **Current Game Page** is the app's default first page; the old home stats surface no longer exists as a separate page.
 - A **Player Stats Read** belongs to exactly one **Detected Game** when Steam Zombies is supported.
 - An **Event Monitor** can provide event data only after the **Game Connection Session** connects to Steam Zombies.
 - A **Box Tracker Widget** displays recent box events from the current **Event Monitor**.
