@@ -2,6 +2,7 @@
 #include "HookPure.h"
 #include "NotifyLog.h"
 #include "NotifyPublication.h"
+#include "PollingFallback.h"
 #include "MinHook.h"
 
 #include <Windows.h>
@@ -456,6 +457,47 @@ namespace BO2Monitor
             }
         };
 
+        std::uintptr_t PollingAddressFor(PollingFallbackStat stat)
+        {
+            switch (stat)
+            {
+            case PollingFallbackStat::Round:
+                return RoundAddress;
+            case PollingFallbackStat::Points:
+                return PointsAddress;
+            case PollingFallbackStat::Kills:
+                return KillsAddress;
+            case PollingFallbackStat::Downs:
+                return DownsAddress;
+            }
+
+            return 0;
+        }
+
+        class LivePollingFallbackReader final : public IPollingFallbackReader
+        {
+        public:
+            bool TryReadStat(PollingFallbackStat stat, std::int32_t& value) override
+            {
+                const std::uintptr_t address = PollingAddressFor(stat);
+                if (address == 0 || !CanReadAddress(reinterpret_cast<const void*>(address)))
+                {
+                    return false;
+                }
+
+                __try
+                {
+                    value = *reinterpret_cast<volatile const std::int32_t*>(address);
+                }
+                __except (EXCEPTION_EXECUTE_HANDLER)
+                {
+                    return false;
+                }
+
+                return true;
+            }
+        };
+
         void __cdecl VmNotifyDetour(
             std::int32_t inst,
             unsigned int notifyListOwnerId,
@@ -630,44 +672,6 @@ namespace BO2Monitor
                 || protection == PAGE_EXECUTE_WRITECOPY;
         }
 
-        bool ArePollingAddressesReadable()
-        {
-            return CanReadAddress(reinterpret_cast<const void*>(RoundAddress))
-                && CanReadAddress(reinterpret_cast<const void*>(PointsAddress))
-                && CanReadAddress(reinterpret_cast<const void*>(KillsAddress))
-                && CanReadAddress(reinterpret_cast<const void*>(DownsAddress));
-        }
-
-        void PublishIfChanged(
-            SharedSnapshotWriter& snapshotWriter,
-            volatile std::int32_t* valueAddress,
-            std::int32_t& previousValue,
-            GameEventType eventType,
-            const char* eventName,
-            bool onlyIncreasing,
-            std::int32_t minValue,
-            std::int32_t maxValue)
-        {
-            const std::int32_t currentValue = *valueAddress;
-            if (currentValue < minValue || currentValue > maxValue)
-            {
-                return;
-            }
-
-            if (onlyIncreasing && currentValue <= previousValue)
-            {
-                return;
-            }
-
-            if (!onlyIncreasing && currentValue == previousValue)
-            {
-                return;
-            }
-
-            previousValue = currentValue;
-            snapshotWriter.PublishEvent(eventType, eventName, currentValue);
-        }
-
         void PublishDiscoveryEvidence(SharedSnapshotWriter& snapshotWriter)
         {
             // Public T6 source hooks 0x008F3620, but this Steam build decodes that
@@ -790,30 +794,23 @@ namespace BO2Monitor
 
     void RunPollingFallback(SharedSnapshotWriter& snapshotWriter)
     {
-        if (!ArePollingAddressesReadable())
+        LivePollingFallbackReader reader;
+        PollingFallbackState pollingState;
+        const GameCompatibilityState compatibilityState = pollingState.Initialize(reader);
+        if (compatibilityState != GameCompatibilityState::PollingFallback)
         {
-            snapshotWriter.SetCompatibility(GameCompatibilityState::UnsupportedVersion);
+            snapshotWriter.SetCompatibility(compatibilityState);
             snapshotWriter.WaitForStop(INFINITE);
             return;
         }
 
         PublishDiscoveryEvidence(snapshotWriter);
-        snapshotWriter.SetCompatibility(GameCompatibilityState::PollingFallback);
-        auto* roundValue = reinterpret_cast<volatile std::int32_t*>(RoundAddress);
-        auto* pointsValue = reinterpret_cast<volatile std::int32_t*>(PointsAddress);
-        auto* killsValue = reinterpret_cast<volatile std::int32_t*>(KillsAddress);
-        auto* downsValue = reinterpret_cast<volatile std::int32_t*>(DownsAddress);
-        std::int32_t previousRound = *roundValue;
-        std::int32_t previousPoints = *pointsValue;
-        std::int32_t previousKills = *killsValue;
-        std::int32_t previousDowns = *downsValue;
+        snapshotWriter.SetCompatibility(compatibilityState);
+        SharedSnapshotNotifyPublicationWriter publicationWriter(snapshotWriter);
 
         while (!snapshotWriter.WaitForStop(250))
         {
-            PublishIfChanged(snapshotWriter, roundValue, previousRound, GameEventType::RoundChanged, "round_changed", true, 2, 255);
-            PublishIfChanged(snapshotWriter, pointsValue, previousPoints, GameEventType::PointsChanged, "points_changed", false, 0, 2000000);
-            PublishIfChanged(snapshotWriter, killsValue, previousKills, GameEventType::KillsChanged, "kills_changed", true, 0, 100000);
-            PublishIfChanged(snapshotWriter, downsValue, previousDowns, GameEventType::DownsChanged, "downs_changed", true, 0, 1000);
+            pollingState.PublishChanges(reader, publicationWriter);
         }
     }
 }

@@ -135,6 +135,7 @@
     <ClInclude Include="..\BO2Monitor\HookPure.h" />
     <ClInclude Include="..\BO2Monitor\NotifyLog.h" />
     <ClInclude Include="..\BO2Monitor\NotifyPublication.h" />
+    <ClInclude Include="..\BO2Monitor\PollingFallback.h" />
     <ClInclude Include="..\BO2Monitor\SharedSnapshot.h" />
   </ItemGroup>
   <ItemGroup>
@@ -150,6 +151,9 @@
     </ClCompile>
     <ClCompile Include="..\BO2Monitor\NotifyPublication.cpp">
       <ObjectFileName>$(IntDir)NotifyPublication.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\BO2Monitor\PollingFallback.cpp">
+      <ObjectFileName>$(IntDir)PollingFallback.obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="..\BO2Monitor\SharedSnapshot.cpp">
       <ObjectFileName>$(IntDir)SharedSnapshot.obj</ObjectFileName>

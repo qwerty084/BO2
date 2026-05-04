@@ -127,6 +127,7 @@
     <ClInclude Include="HookPure.h" />
     <ClInclude Include="NotifyLog.h" />
     <ClInclude Include="NotifyPublication.h" />
+    <ClInclude Include="PollingFallback.h" />
     <ClInclude Include="SharedSnapshot.h" />
     <ClInclude Include="third_party\minhook\include\MinHook.h" />
     <ClInclude Include="third_party\minhook\src\buffer.h" />
@@ -145,6 +146,7 @@
     <ClCompile Include="HookPure.cpp" />
     <ClCompile Include="NotifyLog.cpp" />
     <ClCompile Include="NotifyPublication.cpp" />
+    <ClCompile Include="PollingFallback.cpp" />
     <ClCompile Include="SharedSnapshot.cpp" />
     <ClCompile Include="third_party\minhook\src\buffer.c" />
     <ClCompile Include="third_party\minhook\src\hde\hde32.c" />
