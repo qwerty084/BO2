@@ -134,6 +134,7 @@
     <ClInclude Include="..\BO2InjectorHelper\InjectorArguments.h" />
     <ClInclude Include="..\BO2Monitor\HookPure.h" />
     <ClInclude Include="..\BO2Monitor\NotifyLog.h" />
+    <ClInclude Include="..\BO2Monitor\NotifyPublication.h" />
     <ClInclude Include="..\BO2Monitor\SharedSnapshot.h" />
   </ItemGroup>
   <ItemGroup>
@@ -146,6 +147,9 @@
     </ClCompile>
     <ClCompile Include="..\BO2Monitor\NotifyLog.cpp">
       <ObjectFileName>$(IntDir)NotifyLog.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\BO2Monitor\NotifyPublication.cpp">
+      <ObjectFileName>$(IntDir)NotifyPublication.obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="..\BO2Monitor\SharedSnapshot.cpp">
       <ObjectFileName>$(IntDir)SharedSnapshot.obj</ObjectFileName>

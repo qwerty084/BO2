@@ -1,6 +1,7 @@
 #include "Hook.h"
 #include "HookPure.h"
 #include "NotifyLog.h"
+#include "NotifyPublication.h"
 #include "MinHook.h"
 
 #include <Windows.h>
@@ -390,7 +391,7 @@ namespace BO2Monitor
             return ScriptFieldReadStatus::NotFound;
         }
 
-        bool TryReadRoundValue(std::int32_t& roundValue)
+        bool TryReadLiveRoundValue(std::int32_t& roundValue)
         {
             auto* roundAddress = reinterpret_cast<volatile std::int32_t*>(RoundAddress);
             if (!CanReadAddress(reinterpret_cast<const void*>(RoundAddress)))
@@ -408,29 +409,52 @@ namespace BO2Monitor
             return true;
         }
 
-        void PublishMatchedNotify(
-            SharedSnapshotWriter& snapshotWriter,
-            const RawNotifyRecord& record)
+        class SharedSnapshotNotifyPublicationWriter final : public INotifyPublicationWriter
         {
-            std::int32_t eventValue = static_cast<std::int32_t>(record.StringValue);
-            if (record.ReadRoundValue)
+        public:
+            explicit SharedSnapshotNotifyPublicationWriter(SharedSnapshotWriter& snapshotWriter) :
+                snapshotWriter_(snapshotWriter)
             {
-                std::int32_t roundValue = 0;
-                if (TryReadRoundValue(roundValue))
-                {
-                    eventValue = roundValue;
-                }
             }
 
-            snapshotWriter.PublishEvent(
-                record.EventType,
-                record.EventName,
-                eventValue,
-                record.OwnerId,
-                record.StringValue,
-                record.Tick,
-                record.WeaponName[0] == '\0' ? nullptr : record.WeaponName);
-        }
+            void PublishEvent(
+                GameEventType eventType,
+                const char* eventName,
+                std::int32_t levelTime,
+                std::uint32_t ownerId,
+                std::uint32_t stringValue,
+                std::uint32_t tick,
+                const char* weaponName) override
+            {
+                snapshotWriter_.PublishEvent(
+                    eventType,
+                    eventName,
+                    levelTime,
+                    ownerId,
+                    stringValue,
+                    tick,
+                    weaponName);
+            }
+
+            void SetNotifyEventCounters(
+                std::uint32_t droppedNotifyCount,
+                std::uint32_t publishedNotifyCount) override
+            {
+                snapshotWriter_.SetNotifyEventCounters(droppedNotifyCount, publishedNotifyCount);
+            }
+
+        private:
+            SharedSnapshotWriter& snapshotWriter_;
+        };
+
+        class LiveNotifyRoundReader final : public INotifyRoundReader
+        {
+        public:
+            bool TryReadRoundValue(std::int32_t& roundValue) override
+            {
+                return TryReadLiveRoundValue(roundValue);
+            }
+        };
 
         void __cdecl VmNotifyDetour(
             std::int32_t inst,
@@ -722,6 +746,8 @@ namespace BO2Monitor
     void RunNotifyEventWorker(SharedSnapshotWriter& snapshotWriter)
     {
         std::uint64_t publishedNotifyCount = 0;
+        SharedSnapshotNotifyPublicationWriter publicationWriter(snapshotWriter);
+        LiveNotifyRoundReader roundReader;
 
         while (!snapshotWriter.WaitForStop(0))
         {
@@ -735,13 +761,14 @@ namespace BO2Monitor
                     break;
                 }
 
-                PublishMatchedNotify(snapshotWriter, record);
+                PublishMatchedNotify(publicationWriter, roundReader, record);
                 ++publishedNotifyCount;
             }
 
-            snapshotWriter.SetNotifyEventCounters(
-                SaturateCounter(GetDroppedNotifyEventCount()),
-                SaturateCounter(publishedNotifyCount));
+            PublishNotifyEventCounters(
+                publicationWriter,
+                GetDroppedNotifyEventCount(),
+                publishedNotifyCount);
 
             if (processedCount == 0)
             {

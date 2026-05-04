@@ -20,6 +20,9 @@
     <ClInclude Include="..\BO2Monitor\NotifyLog.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\BO2Monitor\NotifyPublication.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\BO2Monitor\SharedSnapshot.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -35,6 +38,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\BO2Monitor\NotifyLog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\BO2Monitor\NotifyPublication.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\BO2Monitor\SharedSnapshot.cpp">
