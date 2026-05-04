@@ -141,7 +141,7 @@ namespace BO2Monitor
             nullptr,
             PAGE_READWRITE,
             0,
-            static_cast<DWORD>(sizeof(SharedSnapshot)),
+            static_cast<DWORD>(SharedMemorySize),
             sharedMemoryName.c_str());
         if (mappingHandle_ == nullptr)
         {
@@ -153,7 +153,7 @@ namespace BO2Monitor
             FILE_MAP_WRITE,
             0,
             0,
-            sizeof(SharedSnapshot)));
+            SharedMemorySize));
         if (snapshot_ == nullptr)
         {
             return false;

@@ -4,6 +4,7 @@ using System.IO.MemoryMappedFiles;
 using System.Text;
 using System.Threading;
 using BO2.Services;
+using BO2.Services.Generated;
 using Xunit;
 
 namespace BO2.Tests.Services
@@ -67,7 +68,11 @@ namespace BO2.Tests.Services
                 droppedNotifyCount: 0,
                 publishedNotifyCount: 0,
                 eventCount: 0);
-            BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(0, 4), 0);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                snapshot.AsSpan(
+                    EventMonitorSnapshotContract.SharedSnapshotMagicOffset,
+                    EventMonitorSnapshotContract.SharedSnapshotMagicSize),
+                0);
 
             GameEventMonitorStatus status = GameEventMonitor.DecodeSnapshot(snapshot, DateTimeOffset.UtcNow);
 
@@ -84,7 +89,11 @@ namespace BO2.Tests.Services
                 droppedNotifyCount: 0,
                 publishedNotifyCount: 0,
                 eventCount: 0);
-            BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(4, 4), 3);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                snapshot.AsSpan(
+                    EventMonitorSnapshotContract.SharedSnapshotVersionOffset,
+                    EventMonitorSnapshotContract.SharedSnapshotVersionSize),
+                3);
 
             GameEventMonitorStatus status = GameEventMonitor.DecodeSnapshot(snapshot, DateTimeOffset.UtcNow);
 
@@ -101,7 +110,11 @@ namespace BO2.Tests.Services
                 droppedNotifyCount: 0,
                 publishedNotifyCount: 0,
                 eventCount: 0);
-            BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(4, 4), 5);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                snapshot.AsSpan(
+                    EventMonitorSnapshotContract.SharedSnapshotVersionOffset,
+                    EventMonitorSnapshotContract.SharedSnapshotVersionSize),
+                5);
 
             GameEventMonitorStatus status = GameEventMonitor.DecodeSnapshot(snapshot, DateTimeOffset.UtcNow);
 
@@ -188,19 +201,19 @@ namespace BO2.Tests.Services
         [Fact]
         public void BuildSharedMemoryName_UsesTargetProcessId()
         {
-            Assert.Equal("BO2MonitorSharedMem-1234", GameEventMonitor.BuildSharedMemoryName(1234));
+            Assert.Equal(EventMonitorSnapshotContract.SharedMemoryNamePrefix + "1234", GameEventMonitor.BuildSharedMemoryName(1234));
         }
 
         [Fact]
         public void BuildEventHandleName_UsesTargetProcessId()
         {
-            Assert.Equal("BO2MonitorEvent-1234", GameEventMonitor.BuildEventHandleName(1234));
+            Assert.Equal(EventMonitorSnapshotContract.UpdateEventNamePrefix + "1234", GameEventMonitor.BuildEventHandleName(1234));
         }
 
         [Fact]
         public void BuildStopEventHandleName_UsesTargetProcessId()
         {
-            Assert.Equal("BO2MonitorStopEvent-1234", GameEventMonitor.BuildStopEventHandleName(1234));
+            Assert.Equal(EventMonitorSnapshotContract.StopEventNamePrefix + "1234", GameEventMonitor.BuildStopEventHandleName(1234));
         }
 
         [Fact]
@@ -321,14 +334,46 @@ namespace BO2.Tests.Services
             uint eventCount)
         {
             byte[] snapshot = new byte[GameEventMonitor.SharedMemorySize];
-            BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(0, 4), GameEventMonitor.SnapshotMagic);
-            BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(4, 4), GameEventMonitor.SnapshotVersion);
-            BinaryPrimitives.WriteInt32LittleEndian(snapshot.AsSpan(8, 4), (int)compatibilityState);
-            BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(12, 4), 0);
-            BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(16, 4), droppedEventCount);
-            BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(20, 4), eventCount);
-            BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(24, 4), droppedNotifyCount);
-            BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(28, 4), publishedNotifyCount);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                snapshot.AsSpan(
+                    EventMonitorSnapshotContract.SharedSnapshotMagicOffset,
+                    EventMonitorSnapshotContract.SharedSnapshotMagicSize),
+                GameEventMonitor.SnapshotMagic);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                snapshot.AsSpan(
+                    EventMonitorSnapshotContract.SharedSnapshotVersionOffset,
+                    EventMonitorSnapshotContract.SharedSnapshotVersionSize),
+                GameEventMonitor.SnapshotVersion);
+            BinaryPrimitives.WriteInt32LittleEndian(
+                snapshot.AsSpan(
+                    EventMonitorSnapshotContract.SharedSnapshotCompatibilityStateOffset,
+                    EventMonitorSnapshotContract.SharedSnapshotCompatibilityStateSize),
+                (int)compatibilityState);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                snapshot.AsSpan(
+                    EventMonitorSnapshotContract.SharedSnapshotEventWriteIndexOffset,
+                    EventMonitorSnapshotContract.SharedSnapshotEventWriteIndexSize),
+                0);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                snapshot.AsSpan(
+                    EventMonitorSnapshotContract.SharedSnapshotDroppedEventCountOffset,
+                    EventMonitorSnapshotContract.SharedSnapshotDroppedEventCountSize),
+                droppedEventCount);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                snapshot.AsSpan(
+                    EventMonitorSnapshotContract.SharedSnapshotEventCountOffset,
+                    EventMonitorSnapshotContract.SharedSnapshotEventCountSize),
+                eventCount);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                snapshot.AsSpan(
+                    EventMonitorSnapshotContract.SharedSnapshotDroppedNotifyCountOffset,
+                    EventMonitorSnapshotContract.SharedSnapshotDroppedNotifyCountSize),
+                droppedNotifyCount);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                snapshot.AsSpan(
+                    EventMonitorSnapshotContract.SharedSnapshotPublishedNotifyCountOffset,
+                    EventMonitorSnapshotContract.SharedSnapshotPublishedNotifyCountSize),
+                publishedNotifyCount);
             return snapshot;
         }
 
@@ -341,12 +386,32 @@ namespace BO2.Tests.Services
             uint tick = 1000,
             string? weaponName = null)
         {
-            int offset = GameEventMonitor.HeaderSize + (index * GameEventMonitor.EventRecordSize);
-            BinaryPrimitives.WriteInt32LittleEndian(snapshot.AsSpan(offset, 4), (int)eventType);
-            BinaryPrimitives.WriteInt32LittleEndian(snapshot.AsSpan(offset + 4, 4), levelTime);
-            BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(offset + 8, 4), 7);
-            BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(offset + 12, 4), 1149);
-            BinaryPrimitives.WriteUInt32LittleEndian(snapshot.AsSpan(offset + 16, 4), tick);
+            int offset = EventMonitorSnapshotContract.SharedSnapshotEventsOffset + (index * GameEventMonitor.EventRecordSize);
+            BinaryPrimitives.WriteInt32LittleEndian(
+                snapshot.AsSpan(
+                    offset + EventMonitorSnapshotContract.GameEventRecordEventTypeOffset,
+                    EventMonitorSnapshotContract.GameEventRecordEventTypeSize),
+                (int)eventType);
+            BinaryPrimitives.WriteInt32LittleEndian(
+                snapshot.AsSpan(
+                    offset + EventMonitorSnapshotContract.GameEventRecordLevelTimeOffset,
+                    EventMonitorSnapshotContract.GameEventRecordLevelTimeSize),
+                levelTime);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                snapshot.AsSpan(
+                    offset + EventMonitorSnapshotContract.GameEventRecordOwnerIdOffset,
+                    EventMonitorSnapshotContract.GameEventRecordOwnerIdSize),
+                7);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                snapshot.AsSpan(
+                    offset + EventMonitorSnapshotContract.GameEventRecordStringValueOffset,
+                    EventMonitorSnapshotContract.GameEventRecordStringValueSize),
+                1149);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                snapshot.AsSpan(
+                    offset + EventMonitorSnapshotContract.GameEventRecordTickOffset,
+                    EventMonitorSnapshotContract.GameEventRecordTickSize),
+                tick);
             byte[] nameBytes = Encoding.UTF8.GetBytes(eventName);
             nameBytes.AsSpan(0, Math.Min(nameBytes.Length, GameEventMonitor.MaxEventNameBytes))
                 .CopyTo(snapshot.AsSpan(offset + GameEventMonitor.EventNameOffset, GameEventMonitor.MaxEventNameBytes));

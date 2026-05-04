@@ -2,11 +2,220 @@
   "schemaVersion": 1,
   "snapshot": {
     "magicHex": "0x45324F42",
-    "version": 6
+    "version": 6,
+    "supportedVersions": [
+      6
+    ],
+    "maxEventCount": 128,
+    "maxEventNameBytes": 64,
+    "maxWeaponNameBytes": 64,
+    "headerSize": 36,
+    "eventRecordSize": 148,
+    "sharedMemorySize": 18980
   },
   "objectNamePrefixes": {
     "sharedMemory": "BO2MonitorSharedMem-",
     "updateEvent": "BO2MonitorEvent-",
     "stopEvent": "BO2MonitorStopEvent-"
+  },
+  "layout": {
+    "headerFields": [
+      {
+        "name": "Magic",
+        "type": "uint32",
+        "offset": 0,
+        "size": 4
+      },
+      {
+        "name": "Version",
+        "type": "uint32",
+        "offset": 4,
+        "size": 4
+      },
+      {
+        "name": "CompatibilityState",
+        "type": "GameCompatibilityState",
+        "offset": 8,
+        "size": 4
+      },
+      {
+        "name": "EventWriteIndex",
+        "type": "uint32",
+        "offset": 12,
+        "size": 4
+      },
+      {
+        "name": "DroppedEventCount",
+        "type": "uint32",
+        "offset": 16,
+        "size": 4
+      },
+      {
+        "name": "EventCount",
+        "type": "uint32",
+        "offset": 20,
+        "size": 4
+      },
+      {
+        "name": "DroppedNotifyCount",
+        "type": "uint32",
+        "offset": 24,
+        "size": 4
+      },
+      {
+        "name": "PublishedNotifyCount",
+        "type": "uint32",
+        "offset": 28,
+        "size": 4
+      },
+      {
+        "name": "WriteSequence",
+        "type": "uint32",
+        "offset": 32,
+        "size": 4
+      }
+    ],
+    "eventRecordFields": [
+      {
+        "name": "EventType",
+        "type": "GameEventType",
+        "offset": 0,
+        "size": 4
+      },
+      {
+        "name": "LevelTime",
+        "type": "int32",
+        "offset": 4,
+        "size": 4
+      },
+      {
+        "name": "OwnerId",
+        "type": "uint32",
+        "offset": 8,
+        "size": 4
+      },
+      {
+        "name": "StringValue",
+        "type": "uint32",
+        "offset": 12,
+        "size": 4
+      },
+      {
+        "name": "Tick",
+        "type": "uint32",
+        "offset": 16,
+        "size": 4
+      },
+      {
+        "name": "EventName",
+        "type": "char",
+        "offset": 20,
+        "size": 64
+      },
+      {
+        "name": "WeaponName",
+        "type": "char",
+        "offset": 84,
+        "size": 64
+      }
+    ]
+  },
+  "enums": {
+    "gameCompatibilityState": [
+      {
+        "name": "Unknown",
+        "value": 0
+      },
+      {
+        "name": "WaitingForMonitor",
+        "value": 1
+      },
+      {
+        "name": "Compatible",
+        "value": 2
+      },
+      {
+        "name": "UnsupportedVersion",
+        "value": 3
+      },
+      {
+        "name": "CaptureDisabled",
+        "value": 4
+      },
+      {
+        "name": "PollingFallback",
+        "value": 5
+      }
+    ],
+    "gameEventType": [
+      {
+        "name": "Unknown",
+        "value": 0
+      },
+      {
+        "name": "StartOfRound",
+        "value": 1
+      },
+      {
+        "name": "EndOfRound",
+        "value": 2
+      },
+      {
+        "name": "PowerUpGrabbed",
+        "value": 3
+      },
+      {
+        "name": "DogRoundStarting",
+        "value": 4
+      },
+      {
+        "name": "PowerOn",
+        "value": 5
+      },
+      {
+        "name": "EndGame",
+        "value": 6
+      },
+      {
+        "name": "PerkBought",
+        "value": 7
+      },
+      {
+        "name": "RoundChanged",
+        "value": 8
+      },
+      {
+        "name": "PointsChanged",
+        "value": 9
+      },
+      {
+        "name": "KillsChanged",
+        "value": 10
+      },
+      {
+        "name": "DownsChanged",
+        "value": 11
+      },
+      {
+        "name": "NotifyCandidateRejected",
+        "value": 12
+      },
+      {
+        "name": "NotifyEntryCandidate",
+        "value": 13
+      },
+      {
+        "name": "StringResolverCandidate",
+        "value": 14
+      },
+      {
+        "name": "NotifyObserved",
+        "value": 15
+      },
+      {
+        "name": "BoxEvent",
+        "value": 16
+      }
+    ]
   }
 }
