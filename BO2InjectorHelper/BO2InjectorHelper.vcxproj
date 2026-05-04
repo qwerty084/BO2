@@ -116,6 +116,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="InjectorOrchestration.h" />
+    <ClInclude Include="InjectorArguments.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="InjectorOrchestration.cpp" />
+    <ClCompile Include="InjectorArguments.cpp" />
     <ClCompile Include="Program.cpp" />
   </ItemGroup>
   <Target Name="Build" Condition="'$(HasCppTargets)'!='true'">

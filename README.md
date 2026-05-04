@@ -19,10 +19,10 @@ The solution is Windows-only. The app project defaults to `Platform=x86` and rej
 dotnet build .\BO2.slnx
 ```
 
-Build only the 32-bit app project:
+Build the production 32-bit app payload:
 
 ```powershell
-dotnet build .\BO2.csproj -p:Platform=x86
+dotnet build .\BO2.csproj --configuration Release -p:Platform=x86
 ```
 
 The managed project builds and copies these native payloads into the app output:
@@ -39,6 +39,15 @@ dotnet test .\BO2.Tests\BO2.Tests.csproj
 ```
 
 `BO2.Tests` is a non-UI xUnit project. It links testable service source files directly and uses fakes for process discovery, memory reads, and resource strings so tests stay deterministic and do not require WinAppSDK runtime startup or a live game process.
+
+Run native C++ unit tests for repo-owned **Event Monitor** and injector-helper logic:
+
+```powershell
+.\tools\Run-NativeTests.ps1 -Configuration Release
+.\tools\Run-NativeTests.ps1 -Configuration ReleaseWithVmNotifyHook
+```
+
+`BO2.NativeTests` uses Microsoft Native Unit Test Framework through Visual Studio and covers deterministic native behavior for notify publication, shared snapshot writer OS contracts, polling fallback decisions, hook compatibility decisions, and injector helper export-resolution/orchestration logic. It does not require a live BO2 process and does not automate live DLL injection, validate MinHook internals, test third-party source, or write Detected Game memory.
 
 Live Steam Zombies verification is covered by the [native smoke test](docs/native-smoke-test.md).
 

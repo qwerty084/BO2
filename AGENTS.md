@@ -5,6 +5,7 @@
 - Build solution: `dotnet build .\BO2.slnx`.
 - Build 32-bit Windows app: `dotnet build .\BO2.csproj -p:Platform=x86`.
 - Run non-UI unit tests: `dotnet test BO2.Tests\BO2.Tests.csproj`.
+- Run native C++ unit tests: `.\tools\Run-NativeTests.ps1 -Configuration Release`.
 - Create the standard .NET editor configuration with `dotnet new editorconfig` when adopting or refreshing the formatter baseline.
 - Apply C# formatter fixes with `dotnet format .\BO2.slnx -v detailed --severity info`.
 - Check C# formatting without editing files with `dotnet format .\BO2.slnx -v detailed --verify-no-changes --severity info`.

@@ -20,6 +20,89 @@ namespace BO2Monitor
         return std::wstring(StopEventHandleNamePrefix) + std::to_wstring(processId);
     }
 
+    void InitializeSharedSnapshot(SharedSnapshot& snapshot)
+    {
+        std::memset(&snapshot, 0, sizeof(SharedSnapshot));
+        snapshot.Magic = SnapshotMagic;
+        snapshot.Version = SnapshotVersion;
+        snapshot.CompatibilityState = GameCompatibilityState::WaitingForMonitor;
+        snapshot.WriteSequence = 0;
+    }
+
+    void SetSharedSnapshotCompatibility(SharedSnapshot& snapshot, GameCompatibilityState compatibilityState)
+    {
+        ++snapshot.WriteSequence;
+        MemoryBarrier();
+        snapshot.CompatibilityState = compatibilityState;
+        MemoryBarrier();
+        ++snapshot.WriteSequence;
+    }
+
+    void SetSharedSnapshotNotifyEventCounters(
+        SharedSnapshot& snapshot,
+        std::uint32_t droppedNotifyCount,
+        std::uint32_t publishedNotifyCount)
+    {
+        ++snapshot.WriteSequence;
+        MemoryBarrier();
+        snapshot.DroppedNotifyCount = droppedNotifyCount;
+        snapshot.PublishedNotifyCount = publishedNotifyCount;
+        MemoryBarrier();
+        ++snapshot.WriteSequence;
+    }
+
+    void AppendSharedSnapshotEvent(
+        SharedSnapshot& snapshot,
+        GameEventType eventType,
+        const char* eventName,
+        std::int32_t levelTime,
+        std::uint32_t ownerId,
+        std::uint32_t stringValue,
+        std::uint32_t tick,
+        const char* weaponName)
+    {
+        if (eventName == nullptr)
+        {
+            return;
+        }
+
+        ++snapshot.WriteSequence;
+        MemoryBarrier();
+        std::uint32_t slot = snapshot.EventWriteIndex;
+
+        GameEventRecord& record = snapshot.Events[slot];
+        record.EventType = eventType;
+        record.LevelTime = levelTime;
+        record.OwnerId = ownerId;
+        record.StringValue = stringValue;
+        record.Tick = tick == 0 ? GetTickCount() : tick;
+        std::memset(record.EventName, 0, sizeof(record.EventName));
+        const std::size_t sourceLength = std::strlen(eventName);
+        const std::size_t copyLength = std::min(sourceLength, MaxEventNameBytes - 1);
+        std::memcpy(record.EventName, eventName, copyLength);
+        std::memset(record.WeaponName, 0, sizeof(record.WeaponName));
+        if (weaponName != nullptr)
+        {
+            const std::size_t weaponNameLength = std::strlen(weaponName);
+            const std::size_t weaponNameCopyLength = std::min(weaponNameLength, MaxWeaponNameBytes - 1);
+            std::memcpy(record.WeaponName, weaponName, weaponNameCopyLength);
+        }
+
+        snapshot.EventWriteIndex = (snapshot.EventWriteIndex + 1) % MaxEventCount;
+
+        if (snapshot.EventCount < MaxEventCount)
+        {
+            ++snapshot.EventCount;
+        }
+        else
+        {
+            ++snapshot.DroppedEventCount;
+        }
+
+        MemoryBarrier();
+        ++snapshot.WriteSequence;
+    }
+
     SharedSnapshotWriter::~SharedSnapshotWriter()
     {
         if (snapshot_ != nullptr)
@@ -88,7 +171,7 @@ namespace BO2Monitor
             return false;
         }
 
-        InitializeSnapshot();
+        InitializeSharedSnapshot(*snapshot_);
         return true;
     }
 
@@ -99,9 +182,7 @@ namespace BO2Monitor
             return;
         }
 
-        BeginSnapshotWrite();
-        snapshot_->CompatibilityState = compatibilityState;
-        EndSnapshotWrite();
+        SetSharedSnapshotCompatibility(*snapshot_, compatibilityState);
         if (eventHandle_ != nullptr)
         {
             SetEvent(eventHandle_);
@@ -115,10 +196,7 @@ namespace BO2Monitor
             return;
         }
 
-        BeginSnapshotWrite();
-        snapshot_->DroppedNotifyCount = droppedNotifyCount;
-        snapshot_->PublishedNotifyCount = publishedNotifyCount;
-        EndSnapshotWrite();
+        SetSharedSnapshotNotifyEventCounters(*snapshot_, droppedNotifyCount, publishedNotifyCount);
     }
 
     void SharedSnapshotWriter::PublishEvent(
@@ -135,39 +213,7 @@ namespace BO2Monitor
             return;
         }
 
-        BeginSnapshotWrite();
-        std::uint32_t slot = snapshot_->EventWriteIndex;
-
-        GameEventRecord& record = snapshot_->Events[slot];
-        record.EventType = eventType;
-        record.LevelTime = levelTime;
-        record.OwnerId = ownerId;
-        record.StringValue = stringValue;
-        record.Tick = tick == 0 ? GetTickCount() : tick;
-        std::memset(record.EventName, 0, sizeof(record.EventName));
-        const std::size_t sourceLength = std::strlen(eventName);
-        const std::size_t copyLength = std::min(sourceLength, MaxEventNameBytes - 1);
-        std::memcpy(record.EventName, eventName, copyLength);
-        std::memset(record.WeaponName, 0, sizeof(record.WeaponName));
-        if (weaponName != nullptr)
-        {
-            const std::size_t weaponNameLength = std::strlen(weaponName);
-            const std::size_t weaponNameCopyLength = std::min(weaponNameLength, MaxWeaponNameBytes - 1);
-            std::memcpy(record.WeaponName, weaponName, weaponNameCopyLength);
-        }
-
-        snapshot_->EventWriteIndex = (snapshot_->EventWriteIndex + 1) % MaxEventCount;
-
-        if (snapshot_->EventCount < MaxEventCount)
-        {
-            ++snapshot_->EventCount;
-        }
-        else
-        {
-            ++snapshot_->DroppedEventCount;
-        }
-
-        EndSnapshotWrite();
+        AppendSharedSnapshotEvent(*snapshot_, eventType, eventName, levelTime, ownerId, stringValue, tick, weaponName);
         if (eventHandle_ != nullptr)
         {
             SetEvent(eventHandle_);
@@ -180,24 +226,4 @@ namespace BO2Monitor
             && WaitForSingleObject(stopEventHandle_, milliseconds) == WAIT_OBJECT_0;
     }
 
-    void SharedSnapshotWriter::InitializeSnapshot()
-    {
-        std::memset(snapshot_, 0, sizeof(SharedSnapshot));
-        snapshot_->Magic = SnapshotMagic;
-        snapshot_->Version = SnapshotVersion;
-        snapshot_->CompatibilityState = GameCompatibilityState::WaitingForMonitor;
-        snapshot_->WriteSequence = 0;
-    }
-
-    void SharedSnapshotWriter::BeginSnapshotWrite()
-    {
-        ++snapshot_->WriteSequence;
-        MemoryBarrier();
-    }
-
-    void SharedSnapshotWriter::EndSnapshotWrite()
-    {
-        MemoryBarrier();
-        ++snapshot_->WriteSequence;
-    }
 }

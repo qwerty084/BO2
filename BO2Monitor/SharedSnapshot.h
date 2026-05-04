@@ -80,6 +80,21 @@ namespace BO2Monitor
     std::wstring BuildSharedMemoryName(DWORD processId);
     std::wstring BuildEventHandleName(DWORD processId);
     std::wstring BuildStopEventHandleName(DWORD processId);
+    void InitializeSharedSnapshot(SharedSnapshot& snapshot);
+    void SetSharedSnapshotCompatibility(SharedSnapshot& snapshot, GameCompatibilityState compatibilityState);
+    void SetSharedSnapshotNotifyEventCounters(
+        SharedSnapshot& snapshot,
+        std::uint32_t droppedNotifyCount,
+        std::uint32_t publishedNotifyCount);
+    void AppendSharedSnapshotEvent(
+        SharedSnapshot& snapshot,
+        GameEventType eventType,
+        const char* eventName,
+        std::int32_t levelTime,
+        std::uint32_t ownerId = 0,
+        std::uint32_t stringValue = 0,
+        std::uint32_t tick = 0,
+        const char* weaponName = nullptr);
 
     class SharedSnapshotWriter
     {
@@ -103,10 +118,6 @@ namespace BO2Monitor
         bool WaitForStop(DWORD milliseconds) const;
 
     private:
-        void InitializeSnapshot();
-        void BeginSnapshotWrite();
-        void EndSnapshotWrite();
-
         HANDLE mappingHandle_ = nullptr;
         HANDLE eventHandle_ = nullptr;
         HANDLE stopEventHandle_ = nullptr;

@@ -14,7 +14,19 @@
     <ClInclude Include="Hook.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="HookCompatibility.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="HookPure.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="NotifyLog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NotifyPublication.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PollingFallback.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="SharedSnapshot.h">
@@ -52,7 +64,19 @@
     <ClCompile Include="Hook.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="HookCompatibility.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="HookPure.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="NotifyLog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="NotifyPublication.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PollingFallback.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="SharedSnapshot.cpp">

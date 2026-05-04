@@ -9,16 +9,16 @@
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Production|Win32">
-      <Configuration>Production</Configuration>
+    <ProjectConfiguration Include="ReleaseWithVmNotifyHook|Win32">
+      <Configuration>ReleaseWithVmNotifyHook</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{C5E69CA8-8E73-4B60-B3D2-293990B3B682}</ProjectGuid>
-    <RootNamespace>BO2Monitor</RootNamespace>
+    <ProjectGuid>{77D8C568-CC7C-45C4-89DD-77915A1D5688}</ProjectGuid>
+    <RootNamespace>BO2NativeTests</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <RestoreProjectStyle>None</RestoreProjectStyle>
   </PropertyGroup>
@@ -43,7 +43,7 @@
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Production|Win32'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithVmNotifyHook|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
@@ -51,6 +51,15 @@
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" Condition="'$(HasCppTargets)'=='true'" />
+  <PropertyGroup>
+    <NativeUnitTestRoot Condition="'$(NativeUnitTestRoot)'=='' and Exists('$(VCInstallDir)Auxiliary\VS\UnitTest\include\CppUnitTest.h')">$(VCInstallDir)Auxiliary\VS\UnitTest\</NativeUnitTestRoot>
+    <NativeUnitTestRoot Condition="'$(NativeUnitTestRoot)'=='' and Exists('$(ProgramW6432)\Microsoft Visual Studio\18\Community\VC\Auxiliary\VS\UnitTest\include\CppUnitTest.h')">$(ProgramW6432)\Microsoft Visual Studio\18\Community\VC\Auxiliary\VS\UnitTest\</NativeUnitTestRoot>
+    <NativeUnitTestRoot Condition="'$(NativeUnitTestRoot)'=='' and Exists('$(ProgramW6432)\Microsoft Visual Studio\18\Professional\VC\Auxiliary\VS\UnitTest\include\CppUnitTest.h')">$(ProgramW6432)\Microsoft Visual Studio\18\Professional\VC\Auxiliary\VS\UnitTest\</NativeUnitTestRoot>
+    <NativeUnitTestRoot Condition="'$(NativeUnitTestRoot)'=='' and Exists('$(ProgramW6432)\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\VS\UnitTest\include\CppUnitTest.h')">$(ProgramW6432)\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\VS\UnitTest\</NativeUnitTestRoot>
+    <NativeUnitTestRoot Condition="'$(NativeUnitTestRoot)'=='' and Exists('$(ProgramW6432)\Microsoft Visual Studio\2022\Community\VC\Auxiliary\VS\UnitTest\include\CppUnitTest.h')">$(ProgramW6432)\Microsoft Visual Studio\2022\Community\VC\Auxiliary\VS\UnitTest\</NativeUnitTestRoot>
+    <NativeUnitTestRoot Condition="'$(NativeUnitTestRoot)'=='' and Exists('$(ProgramW6432)\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\VS\UnitTest\include\CppUnitTest.h')">$(ProgramW6432)\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\VS\UnitTest\</NativeUnitTestRoot>
+    <NativeUnitTestRoot Condition="'$(NativeUnitTestRoot)'=='' and Exists('$(ProgramW6432)\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\VS\UnitTest\include\CppUnitTest.h')">$(ProgramW6432)\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\VS\UnitTest\</NativeUnitTestRoot>
+  </PropertyGroup>
   <ImportGroup Label="ExtensionSettings" />
   <ImportGroup Label="Shared" />
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -59,30 +68,28 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Production|Win32'">
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='ReleaseWithVmNotifyHook|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <OutDir>$(MSBuildProjectDirectory)\bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(MSBuildProjectDirectory)\obj\$(Platform)\$(Configuration)\</IntDir>
-    <TargetName>BO2Monitor</TargetName>
-    <EnableVmNotifyHook Condition="'$(EnableVmNotifyHook)'==''">false</EnableVmNotifyHook>
-    <EnableVmNotifyHook Condition="'$(Configuration)'=='Production'">true</EnableVmNotifyHook>
+    <TargetName>BO2.NativeTests</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\third_party\minhook\include;$(MSBuildProjectDirectory)\third_party\minhook\src\hde;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;NOMINMAX;BO2MONITOR_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <PreprocessorDefinitions Condition="'$(EnableVmNotifyHook)'=='true'">BO2MONITOR_ENABLE_VM_NOTIFY_HOOK;WIN32;_DEBUG;NOMINMAX;BO2MONITOR_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\..\BO2Monitor;$(MSBuildProjectDirectory)\..\BO2InjectorHelper;$(NativeUnitTestRoot)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(NativeUnitTestRoot)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -91,9 +98,8 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\third_party\minhook\include;$(MSBuildProjectDirectory)\third_party\minhook\src\hde;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;NDEBUG;NOMINMAX;BO2MONITOR_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <PreprocessorDefinitions Condition="'$(EnableVmNotifyHook)'=='true'">BO2MONITOR_ENABLE_VM_NOTIFY_HOOK;WIN32;NDEBUG;NOMINMAX;BO2MONITOR_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\..\BO2Monitor;$(MSBuildProjectDirectory)\..\BO2InjectorHelper;$(NativeUnitTestRoot)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
@@ -102,16 +108,17 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(NativeUnitTestRoot)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Production|Win32'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithVmNotifyHook|Win32'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\third_party\minhook\include;$(MSBuildProjectDirectory)\third_party\minhook\src\hde;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>BO2MONITOR_ENABLE_VM_NOTIFY_HOOK;WIN32;NDEBUG;NOMINMAX;BO2MONITOR_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\..\BO2Monitor;$(MSBuildProjectDirectory)\..\BO2InjectorHelper;$(NativeUnitTestRoot)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>BO2MONITOR_ENABLE_VM_NOTIFY_HOOK;BO2_NATIVE_TESTS_EXPECT_VM_NOTIFY_HOOK;WIN32;NDEBUG;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
@@ -120,46 +127,48 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(NativeUnitTestRoot)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Hook.h" />
-    <ClInclude Include="HookCompatibility.h" />
-    <ClInclude Include="HookPure.h" />
-    <ClInclude Include="NotifyLog.h" />
-    <ClInclude Include="NotifyPublication.h" />
-    <ClInclude Include="PollingFallback.h" />
-    <ClInclude Include="SharedSnapshot.h" />
-    <ClInclude Include="third_party\minhook\include\MinHook.h" />
-    <ClInclude Include="third_party\minhook\src\buffer.h" />
-    <ClInclude Include="third_party\minhook\src\hde\hde32.h" />
-    <ClInclude Include="third_party\minhook\src\hde\hde64.h" />
-    <ClInclude Include="third_party\minhook\src\hde\pstdint.h" />
-    <ClInclude Include="third_party\minhook\src\hde\table32.h" />
-    <ClInclude Include="third_party\minhook\src\hde\table64.h" />
-    <ClInclude Include="third_party\minhook\src\trampoline.h" />
+    <ClInclude Include="..\BO2InjectorHelper\InjectorArguments.h" />
+    <ClInclude Include="..\BO2InjectorHelper\InjectorOrchestration.h" />
+    <ClInclude Include="..\BO2Monitor\HookCompatibility.h" />
+    <ClInclude Include="..\BO2Monitor\HookPure.h" />
+    <ClInclude Include="..\BO2Monitor\NotifyLog.h" />
+    <ClInclude Include="..\BO2Monitor\NotifyPublication.h" />
+    <ClInclude Include="..\BO2Monitor\PollingFallback.h" />
+    <ClInclude Include="..\BO2Monitor\SharedSnapshot.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="Hook.cpp">
-      <ObjectFileName>$(IntDir)BO2MonitorHook.obj</ObjectFileName>
+    <ClCompile Include="*.cpp" />
+    <ClCompile Include="..\BO2InjectorHelper\InjectorArguments.cpp">
+      <ObjectFileName>$(IntDir)InjectorArguments.obj</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="HookCompatibility.cpp" />
-    <ClCompile Include="HookPure.cpp" />
-    <ClCompile Include="NotifyLog.cpp" />
-    <ClCompile Include="NotifyPublication.cpp" />
-    <ClCompile Include="PollingFallback.cpp" />
-    <ClCompile Include="SharedSnapshot.cpp" />
-    <ClCompile Include="third_party\minhook\src\buffer.c" />
-    <ClCompile Include="third_party\minhook\src\hde\hde32.c" />
-    <ClCompile Include="third_party\minhook\src\hde\hde64.c" />
-    <ClCompile Include="third_party\minhook\src\hook.c">
-      <ObjectFileName>$(IntDir)minhook_hook.obj</ObjectFileName>
+    <ClCompile Include="..\BO2InjectorHelper\InjectorOrchestration.cpp">
+      <ObjectFileName>$(IntDir)InjectorOrchestration.obj</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="third_party\minhook\src\trampoline.c" />
+    <ClCompile Include="..\BO2Monitor\HookCompatibility.cpp">
+      <ObjectFileName>$(IntDir)HookCompatibility.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\BO2Monitor\HookPure.cpp">
+      <ObjectFileName>$(IntDir)HookPure.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\BO2Monitor\NotifyLog.cpp">
+      <ObjectFileName>$(IntDir)NotifyLog.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\BO2Monitor\NotifyPublication.cpp">
+      <ObjectFileName>$(IntDir)NotifyPublication.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\BO2Monitor\PollingFallback.cpp">
+      <ObjectFileName>$(IntDir)PollingFallback.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\BO2Monitor\SharedSnapshot.cpp">
+      <ObjectFileName>$(IntDir)SharedSnapshot.obj</ObjectFileName>
+    </ClCompile>
   </ItemGroup>
   <Target Name="Build" Condition="'$(HasCppTargets)'!='true'">
-    <Message Importance="high" Text="Skipping BO2Monitor native build because Visual C++ MSBuild targets are unavailable." />
+    <Message Importance="high" Text="Skipping BO2.NativeTests native build because Visual C++ MSBuild targets are unavailable." />
   </Target>
   <Target Name="Clean" Condition="'$(HasCppTargets)'!='true'" />
   <Target Name="Rebuild" DependsOnTargets="Clean;Build" Condition="'$(HasCppTargets)'!='true'" />
