@@ -1044,6 +1044,107 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void Read_WhenMonitorReadinessTimesOutAndStatsReadFails_RequestsStopAndMarksInjectionFailed()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = GameEventMonitorStatus.WaitingForMonitor
+            };
+            var timeProvider = new FakeTimeProvider();
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timeProvider,
+                memoryAccessor);
+            CompleteConnectWithLoadedMonitor(session);
+            memoryAccessor.AttachException = new InvalidOperationException("stats unavailable");
+            eventMonitor.ResetCalls();
+
+            timeProvider.Advance(TimeSpan.FromSeconds(16));
+            Assert.Throws<InvalidOperationException>(() => session.Read());
+
+            GameConnectionSnapshot snapshot = session.Snapshot;
+            Assert.Equal(GameConnectionEventMonitorState.ReadinessFailed, snapshot.EventMonitorSummary.State);
+            Assert.Equal(AppStrings.Get("DllInjectionReadinessTimedOut"), snapshot.EventMonitorSummary.FailureMessage);
+            Assert.Null(snapshot.ReadResult);
+            AssertCommandAvailability(
+                snapshot,
+                connectEnabled: true,
+                connectVisible: true,
+                disconnectEnabled: false,
+                disconnectVisible: false);
+            Assert.Equal(1, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(1001, eventMonitor.LastTargetProcessId);
+            Assert.Equal(1, eventMonitor.RequestStopCallCount);
+            Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);
+
+            eventMonitor.ResetCalls();
+            GameConnectionSnapshot statusSnapshot = session.GetStatusSnapshot();
+
+            Assert.Equal(GameConnectionPhase.Detected, statusSnapshot.ConnectionPhase);
+            Assert.Equal(GameConnectionEventMonitorState.ReadinessFailed, statusSnapshot.EventMonitorSummary.State);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(0, eventMonitor.RequestStopCallCount);
+        }
+
+        [Fact]
+        public void Read_WhenMonitorReadinessTimeoutElapsedForDifferentCurrentGame_DoesNotFireTimeout()
+        {
+            DetectedGame connectedGame = CreateSupportedGame(processId: 1001);
+            DetectedGame detectedGame = CreateSupportedGame(processId: 2002);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = GameEventMonitorStatus.WaitingForMonitor
+            };
+            var timeProvider = new FakeTimeProvider();
+            SessionContext context = CreateSessionContext(
+                eventMonitor,
+                timeProvider,
+                detectedGame: connectedGame);
+            context.Session.Start();
+            CompleteConnectWithLoadedMonitor(context.Session);
+
+            timeProvider.Advance(TimeSpan.FromSeconds(16));
+            context.EventDetector.Result = detectedGame;
+            context.LifecycleEventSource.RaiseStarted(detectedGame.ProcessName, detectedGame.ProcessId);
+            eventMonitor.ResetCalls();
+            GameConnectionSnapshot snapshot = context.Session.Read();
+
+            Assert.Same(detectedGame, snapshot.CurrentGame);
+            Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
+            Assert.Equal(GameConnectionEventMonitorState.Waiting, snapshot.EventMonitorSummary.State);
+            Assert.Null(snapshot.ReadResult);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(0, eventMonitor.RequestStopCallCount);
+        }
+
+        [Fact]
+        public void Read_WhenMonitorIsReadyPastReadinessTimeout_DoesNotRequestStop()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            GameEventMonitorStatus compatibleStatus = CreateCompatibleStatus();
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = compatibleStatus
+            };
+            var timeProvider = new FakeTimeProvider();
+            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, timeProvider);
+            CompleteConnectWithLoadedMonitor(session);
+            eventMonitor.ResetCalls();
+
+            timeProvider.Advance(TimeSpan.FromSeconds(16));
+            GameConnectionSnapshot snapshot = session.Read();
+
+            Assert.Equal(GameConnectionPhase.Connected, snapshot.ConnectionPhase);
+            Assert.Equal(GameConnectionEventMonitorState.Ready, snapshot.EventMonitorSummary.State);
+            Assert.Same(compatibleStatus, snapshot.EventMonitorSummary.Status);
+            Assert.Equal(1, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(0, eventMonitor.RequestStopCallCount);
+        }
+
+        [Fact]
         public void Disconnect_WhenMonitorIsConnected_RequestsStopAndReturnsDisconnectingSnapshot()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);

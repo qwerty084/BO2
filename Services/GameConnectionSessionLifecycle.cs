@@ -246,6 +246,18 @@ namespace BO2.Services
             return new GameConnectionSessionMonitorStopRequest(monitorProcessId, ShouldRequestStop: true);
         }
 
+        public bool IsMonitorReadinessTimeoutDue(
+            GameConnectionSessionLifecycleGame? detectedGame,
+            DateTimeOffset now,
+            TimeSpan retryTimeout)
+        {
+            return detectedGame is GameConnectionSessionLifecycleGame game
+                && _lastInjectionProcessId == game.ProcessId
+                && IsMonitorLoaded
+                && _lastInjectionAttemptedAt is DateTimeOffset attemptedAt
+                && now - attemptedAt >= retryTimeout;
+        }
+
         public GameConnectionSessionLifecycleSnapshot CreateSnapshot(
             GameConnectionSessionLifecycleGame? detectedGame)
         {
