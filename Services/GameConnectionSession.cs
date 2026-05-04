@@ -527,7 +527,7 @@ namespace BO2.Services
                 ? _eventMonitor.ReadStatus(receivedAt, processId)
                 : GameEventMonitorStatus.WaitingForMonitor;
 
-            GameConnectionRefreshResult result;
+            GameConnectionRefreshResult? result = null;
             GameConnectionSessionMonitorStopRequest stopRequest;
             lock (_syncRoot)
             {
@@ -537,15 +537,28 @@ namespace BO2.Services
                 }
 
                 stopRequest = ApplyMonitorReadinessTimeoutLocked(detectedGame, eventStatus, receivedAt);
-                result = CreateRefreshResultLocked(detectedGame, readResult, eventStatus, eventMonitorSummaryOverride);
+                if (!stopRequest.ShouldRequestStop)
+                {
+                    result = CreateRefreshResultLocked(detectedGame, readResult, eventStatus, eventMonitorSummaryOverride);
+                }
             }
 
             if (stopRequest.ShouldRequestStop)
             {
+                _memoryReader.ClearAttachedGame();
                 _eventMonitor.RequestStop(stopRequest.MonitorProcessId);
+                lock (_syncRoot)
+                {
+                    if (!Equals(_currentGame, detectedGame))
+                    {
+                        return CreateStatusSnapshotLocked(_currentGame);
+                    }
+
+                    result = CreateRefreshResultLocked(detectedGame, null, eventStatus, eventMonitorSummaryOverride);
+                }
             }
 
-            return result;
+            return result!.Value;
         }
 
         private void ApplyMonitorReadinessTimeoutAfterStatsReadFailure(

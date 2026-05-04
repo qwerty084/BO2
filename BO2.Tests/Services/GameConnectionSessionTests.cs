@@ -1089,13 +1089,21 @@ namespace BO2.Tests.Services
                 Status = GameEventMonitorStatus.WaitingForMonitor
             };
             var timeProvider = new FakeTimeProvider();
-            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, timeProvider);
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timeProvider,
+                memoryAccessor);
             CompleteConnectWithLoadedMonitor(session);
+            int closeCallCount = memoryAccessor.CloseCallCount;
             eventMonitor.ResetCalls();
 
             timeProvider.Advance(TimeSpan.FromSeconds(16));
             GameConnectionSnapshot snapshot = session.Read();
 
+            Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
+            Assert.Null(snapshot.ReadResult);
             Assert.Equal(GameConnectionEventMonitorState.ReadinessFailed, snapshot.EventMonitorSummary.State);
             Assert.Equal(AppStrings.Get("DllInjectionReadinessTimedOut"), snapshot.EventMonitorSummary.FailureMessage);
             AssertCommandAvailability(
@@ -1106,6 +1114,7 @@ namespace BO2.Tests.Services
                 disconnectVisible: false);
             Assert.Equal(1, eventMonitor.RequestStopCallCount);
             Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);
+            Assert.Equal(closeCallCount + 1, memoryAccessor.CloseCallCount);
         }
 
         [Fact]
