@@ -991,6 +991,150 @@ namespace BO2.Tests.Services
             Assert.Equal(1001, eventMonitor.LastTargetProcessId);
         }
 
+        [Fact]
+        public void Read_WhenLifecycleEventsRepeat_AppliesEachLifecycleSequenceOnce()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            DateTimeOffset receivedAt = new(2026, 5, 5, 12, 0, 0, TimeSpan.Zero);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus(
+                    new GameEvent(
+                        GameEventType.StartOfRound,
+                        "start_of_round",
+                        1,
+                        0,
+                        0,
+                        receivedAt,
+                        Sequence: 1))
+            };
+            FakeGameTimerState timerState = new();
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timerState: timerState);
+            CompleteConnectWithLoadedMonitor(session);
+
+            session.Read();
+            eventMonitor.Status = CreateCompatibleStatus(
+                new GameEvent(
+                    GameEventType.StartOfRound,
+                    "start_of_round",
+                    1,
+                    0,
+                    0,
+                    receivedAt,
+                    Sequence: 1),
+                new GameEvent(
+                    GameEventType.EndOfRound,
+                    "end_of_round",
+                    1,
+                    0,
+                    0,
+                    receivedAt.AddSeconds(30),
+                    Sequence: 2));
+            session.Read();
+
+            Assert.Equal(2, timerState.AppliedBatches.Count);
+            Assert.False(timerState.AppliedBatches[0].HasSequenceGap);
+            Assert.False(timerState.AppliedBatches[1].HasSequenceGap);
+            GameTimerLifecycleEvent firstEvent = Assert.Single(timerState.AppliedBatches[0].Events);
+            GameTimerLifecycleEvent secondEvent = Assert.Single(timerState.AppliedBatches[1].Events);
+            Assert.Equal(1UL, firstEvent.Sequence);
+            Assert.Equal(GameEventType.StartOfRound, firstEvent.EventType);
+            Assert.Equal(2UL, secondEvent.Sequence);
+            Assert.Equal(GameEventType.EndOfRound, secondEvent.EventType);
+        }
+
+        [Fact]
+        public void Read_WhenLifecycleEventSequenceGapIsObserved_SurfacesFailClosedBatch()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            DateTimeOffset receivedAt = new(2026, 5, 5, 12, 0, 0, TimeSpan.Zero);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus(
+                    new GameEvent(
+                        GameEventType.StartOfRound,
+                        "start_of_round",
+                        1,
+                        0,
+                        0,
+                        receivedAt,
+                        Sequence: 1))
+            };
+            FakeGameTimerState timerState = new();
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timerState: timerState);
+            CompleteConnectWithLoadedMonitor(session);
+            eventMonitor.Status = CreateCompatibleStatus(
+                new GameEvent(
+                    GameEventType.EndGame,
+                    "end_game",
+                    5,
+                    0,
+                    0,
+                    receivedAt.AddMinutes(5),
+                    Sequence: 4));
+
+            session.Read();
+
+            Assert.Equal(2, timerState.AppliedBatches.Count);
+            GameTimerLifecycleEventBatch gappedBatch = timerState.AppliedBatches[1];
+            Assert.True(gappedBatch.HasSequenceGap);
+            GameTimerLifecycleEvent gameOverEvent = Assert.Single(gappedBatch.Events);
+            Assert.Equal(4UL, gameOverEvent.Sequence);
+            Assert.Equal(GameEventType.EndGame, gameOverEvent.EventType);
+            Assert.Equal(1, timerState.FailClosedBatchCount);
+        }
+
+        [Fact]
+        public void Connect_WhenDetectedGameChanges_ResetsLifecycleSequenceCursorForNewGame()
+        {
+            DetectedGame originalGame = CreateSupportedGame(processId: 1001);
+            DetectedGame changedGame = CreateSupportedGame(processId: 2002);
+            DateTimeOffset receivedAt = new(2026, 5, 5, 12, 0, 0, TimeSpan.Zero);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus(
+                    new GameEvent(
+                        GameEventType.StartOfRound,
+                        "start_of_round",
+                        1,
+                        0,
+                        0,
+                        receivedAt,
+                        Sequence: 1))
+            };
+            FakeGameTimerState timerState = new();
+            SessionContext context = CreateSessionContext(
+                eventMonitor,
+                detectedGame: originalGame,
+                timerState: timerState);
+            context.Session.Start();
+            CompleteConnectWithLoadedMonitor(context.Session);
+            context.EventDetector.Result = changedGame;
+            context.LifecycleEventSource.RaiseStarted(changedGame.ProcessName, changedGame.ProcessId);
+            eventMonitor.Status = CreateCompatibleStatus(
+                new GameEvent(
+                    GameEventType.EndGame,
+                    "end_game",
+                    1,
+                    0,
+                    0,
+                    receivedAt,
+                    Sequence: 1));
+
+            CompleteConnectWithLoadedMonitor(context.Session);
+
+            Assert.Equal(2, timerState.AppliedBatches.Count);
+            Assert.Equal(GameEventType.StartOfRound, timerState.AppliedBatches[0].Events[0].EventType);
+            Assert.Equal(GameEventType.EndGame, timerState.AppliedBatches[1].Events[0].EventType);
+            Assert.All(timerState.AppliedBatches, batch => Assert.False(batch.HasSequenceGap));
+        }
+
         [Theory]
         [InlineData(GameCompatibilityState.UnsupportedVersion, GameConnectionEventMonitorState.UnsupportedVersion)]
         [InlineData(GameCompatibilityState.CaptureDisabled, GameConnectionEventMonitorState.CaptureDisabled)]
@@ -1561,14 +1705,16 @@ namespace BO2.Tests.Services
             DetectedGame? detectedGame = null,
             TimeProvider? timeProvider = null,
             FakeProcessMemoryAccessor? memoryAccessor = null,
-            DllInjector? dllInjector = null)
+            DllInjector? dllInjector = null,
+            IGameTimerState? timerState = null)
         {
             SessionContext context = CreateSessionContext(
                 eventMonitor,
                 timeProvider,
                 detectedGame,
                 memoryAccessor: memoryAccessor,
-                dllInjector: dllInjector);
+                dllInjector: dllInjector,
+                timerState: timerState);
             context.Session.Start();
             return context.Session;
         }
@@ -1580,7 +1726,8 @@ namespace BO2.Tests.Services
             DetectedGame? pollingDetectedGame = null,
             FakeProcessMemoryAccessor? memoryAccessor = null,
             FakeProcessLifecycleEventSource? lifecycleEventSource = null,
-            DllInjector? dllInjector = null)
+            DllInjector? dllInjector = null,
+            IGameTimerState? timerState = null)
         {
             FakeGameProcessDetector eventDetector = new()
             {
@@ -1599,7 +1746,8 @@ namespace BO2.Tests.Services
                 pollingProcessDetector,
                 dllInjector ?? CreateDllInjector(),
                 eventMonitor,
-                timeProvider ?? TimeProvider.System);
+                timeProvider ?? TimeProvider.System,
+                timerState ?? new GameTimerState());
             return new SessionContext(
                 session,
                 eventDetector,
@@ -1650,14 +1798,14 @@ namespace BO2.Tests.Services
             return connectedSnapshot;
         }
 
-        private static GameEventMonitorStatus CreateCompatibleStatus()
+        private static GameEventMonitorStatus CreateCompatibleStatus(params GameEvent[] recentEvents)
         {
             return new GameEventMonitorStatus(
                 GameCompatibilityState.Compatible,
                 0,
                 0,
                 1,
-                []);
+                recentEvents);
         }
 
         private static void AssertCommandAvailability(
@@ -1701,6 +1849,32 @@ namespace BO2.Tests.Services
             public FakeGameProcessDetector PollingProcessDetector { get; } = pollingProcessDetector;
 
             public FakeProcessLifecycleEventSource LifecycleEventSource { get; } = lifecycleEventSource;
+        }
+
+        private sealed class FakeGameTimerState : IGameTimerState
+        {
+            public List<GameTimerLifecycleEventBatch> AppliedBatches { get; } = [];
+
+            public int FailClosedBatchCount { get; private set; }
+
+            public int ResetCallCount { get; private set; }
+
+            public GameConnectionTimerDisplayState DisplayState { get; set; } =
+                GameConnectionTimerDisplayState.Placeholder;
+
+            public void ApplyLifecycleEvents(GameTimerLifecycleEventBatch lifecycleEvents)
+            {
+                AppliedBatches.Add(lifecycleEvents);
+                if (lifecycleEvents.HasSequenceGap)
+                {
+                    FailClosedBatchCount++;
+                }
+            }
+
+            public void Reset()
+            {
+                ResetCallCount++;
+            }
         }
 
         private sealed class FakeGameEventMonitor : IGameEventMonitor

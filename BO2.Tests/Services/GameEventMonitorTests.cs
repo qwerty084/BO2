@@ -249,6 +249,9 @@ namespace BO2.Tests.Services
             Assert.Equal("first", status.RecentEvents[0].EventName);
             Assert.Equal("second", status.RecentEvents[1].EventName);
             Assert.Equal("third", status.RecentEvents[2].EventName);
+            Assert.Equal(1UL, status.RecentEvents[0].Sequence);
+            Assert.Equal(2UL, status.RecentEvents[1].Sequence);
+            Assert.Equal(3UL, status.RecentEvents[2].Sequence);
         }
 
         [Fact]
@@ -292,7 +295,41 @@ namespace BO2.Tests.Services
                 int expectedEventNumber = index + 2;
                 Assert.Equal(expectedEventNumber, status.RecentEvents[index].LevelTime);
                 Assert.Equal($"event_{expectedEventNumber}", status.RecentEvents[index].EventName);
+                Assert.Equal((ulong)expectedEventNumber + 1UL, status.RecentEvents[index].Sequence);
             }
+        }
+
+        [Fact]
+        public void DecodeSnapshot_WhenSnapshotIsReadAgain_PreservesExistingEventSequencesAndAssignsNewerSequences()
+        {
+            byte[] firstSnapshot = CreateSnapshot(
+                GameCompatibilityState.Compatible,
+                droppedEventCount: 0,
+                droppedNotifyCount: 0,
+                publishedNotifyCount: 2,
+                eventCount: 2,
+                eventWriteIndex: 2);
+            WriteEvent(firstSnapshot, 0, GameEventType.StartOfRound, 1, "start_of_round");
+            WriteEvent(firstSnapshot, 1, GameEventType.EndOfRound, 2, "end_of_round");
+            byte[] secondSnapshot = CreateSnapshot(
+                GameCompatibilityState.Compatible,
+                droppedEventCount: 0,
+                droppedNotifyCount: 0,
+                publishedNotifyCount: 3,
+                eventCount: 3,
+                eventWriteIndex: 3);
+            WriteEvent(secondSnapshot, 0, GameEventType.StartOfRound, 1, "start_of_round");
+            WriteEvent(secondSnapshot, 1, GameEventType.EndOfRound, 2, "end_of_round");
+            WriteEvent(secondSnapshot, 2, GameEventType.EndGame, 3, "end_game");
+
+            GameEventMonitorStatus firstStatus = GameEventMonitor.DecodeSnapshot(firstSnapshot, DateTimeOffset.UtcNow);
+            GameEventMonitorStatus secondStatus = GameEventMonitor.DecodeSnapshot(secondSnapshot, DateTimeOffset.UtcNow);
+
+            Assert.Equal(firstStatus.RecentEvents[0].Sequence, secondStatus.RecentEvents[0].Sequence);
+            Assert.Equal(firstStatus.RecentEvents[1].Sequence, secondStatus.RecentEvents[1].Sequence);
+            Assert.Equal(3UL, secondStatus.RecentEvents[2].Sequence);
+            Assert.True(secondStatus.RecentEvents[0].Sequence < secondStatus.RecentEvents[1].Sequence);
+            Assert.True(secondStatus.RecentEvents[1].Sequence < secondStatus.RecentEvents[2].Sequence);
         }
 
         [Fact]

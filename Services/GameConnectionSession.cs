@@ -17,8 +17,10 @@ namespace BO2.Services
         private readonly IGameProcessDetector _pollingProcessDetector;
         private readonly DllInjector _dllInjector;
         private readonly IGameEventMonitor _eventMonitor;
+        private readonly IGameTimerState _timerState;
         private readonly TimeProvider _timeProvider;
         private readonly GameConnectionSessionLifecycle _lifecycle = new();
+        private readonly GameLifecycleEventSequencer _lifecycleEventSequencer = new();
         private GameConnectionSnapshot _snapshot;
         private DetectedGame? _currentGame;
         private bool _usesPollingProcessDetection;
@@ -57,6 +59,25 @@ namespace BO2.Services
             DllInjector dllInjector,
             IGameEventMonitor eventMonitor,
             TimeProvider timeProvider)
+            : this(
+                memoryReader,
+                processDetectionService,
+                pollingProcessDetector,
+                dllInjector,
+                eventMonitor,
+                timeProvider,
+                new GameTimerState())
+        {
+        }
+
+        internal GameConnectionSession(
+            GameMemoryReader memoryReader,
+            GameProcessDetectionService processDetectionService,
+            IGameProcessDetector pollingProcessDetector,
+            DllInjector dllInjector,
+            IGameEventMonitor eventMonitor,
+            TimeProvider timeProvider,
+            IGameTimerState timerState)
         {
             ArgumentNullException.ThrowIfNull(memoryReader);
             ArgumentNullException.ThrowIfNull(processDetectionService);
@@ -64,12 +85,14 @@ namespace BO2.Services
             ArgumentNullException.ThrowIfNull(dllInjector);
             ArgumentNullException.ThrowIfNull(eventMonitor);
             ArgumentNullException.ThrowIfNull(timeProvider);
+            ArgumentNullException.ThrowIfNull(timerState);
 
             _memoryReader = memoryReader;
             _processDetectionService = processDetectionService;
             _pollingProcessDetector = pollingProcessDetector;
             _dllInjector = dllInjector;
             _eventMonitor = eventMonitor;
+            _timerState = timerState;
             _timeProvider = timeProvider;
             _currentGame = _processDetectionService.CurrentGame;
             _snapshot = CreateSnapshot(CreateStatusSnapshotLocked(_currentGame));
@@ -212,8 +235,13 @@ namespace BO2.Services
             lock (_syncRoot)
             {
                 DetectedGame? detectedGame = _currentGame;
-                _lifecycle.BeginConnect(
+                bool didBeginConnect = _lifecycle.BeginConnect(
                     GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
+                if (didBeginConnect)
+                {
+                    ResetTimerStateLocked();
+                }
+
                 result = CreateStatusSnapshotLocked(detectedGame);
             }
 
@@ -315,6 +343,11 @@ namespace BO2.Services
             lock (_syncRoot)
             {
                 disconnectAction = _lifecycle.BeginDisconnect(receivedAt);
+                if (disconnectAction.ShouldReadSnapshot || disconnectAction.ShouldRequestStop)
+                {
+                    ResetTimerStateLocked();
+                }
+
                 if (!disconnectAction.ShouldReadSnapshot)
                 {
                     result = CreateDisconnectingSnapshotLocked(
@@ -343,6 +376,7 @@ namespace BO2.Services
             lock (_syncRoot)
             {
                 stopRequest = _lifecycle.ResetMonitorConnectionState();
+                ResetTimerStateLocked();
             }
 
             if (stopRequest.ShouldRequestStop)
@@ -537,6 +571,7 @@ namespace BO2.Services
                 stopRequest = ApplyMonitorReadinessTimeoutLocked(detectedGame, eventStatus, receivedAt);
                 if (!stopRequest.ShouldRequestStop)
                 {
+                    ApplyTimerLifecycleEventsLocked(eventStatus);
                     result = CreateRefreshResultLocked(detectedGame, readResult, eventStatus, eventMonitorSummaryOverride);
                 }
             }
@@ -652,6 +687,7 @@ namespace BO2.Services
                 stopRequest = _lifecycle.ResetForDetectedGameChange(
                     currentLifecycleGame,
                     detectedLifecycleGame);
+                ResetTimerStateLocked();
                 snapshotChangedArgs = UpdateSnapshotLocked(
                     CreateSnapshot(CreateStatusSnapshotLocked(
                         detectedGame,
@@ -820,9 +856,25 @@ namespace BO2.Services
                 connectionPhase,
                 readResult,
                 eventMonitorSummary,
-                GameConnectionTimerDisplayState.Placeholder,
+                _timerState.DisplayState,
                 commandAvailability.Connect,
                 commandAvailability.Disconnect);
+        }
+
+        private void ApplyTimerLifecycleEventsLocked(GameEventMonitorStatus eventStatus)
+        {
+            GameTimerLifecycleEventBatch lifecycleEvents =
+                _lifecycleEventSequencer.ReadNewLifecycleEvents(eventStatus);
+            if (lifecycleEvents.Events.Count > 0 || lifecycleEvents.HasSequenceGap)
+            {
+                _timerState.ApplyLifecycleEvents(lifecycleEvents);
+            }
+        }
+
+        private void ResetTimerStateLocked()
+        {
+            _lifecycleEventSequencer.Reset();
+            _timerState.Reset();
         }
 
         private static GameConnectionSessionCommandAvailability CreateCommandAvailability(

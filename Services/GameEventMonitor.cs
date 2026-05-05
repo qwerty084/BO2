@@ -194,6 +194,7 @@ namespace BO2.Services
             int startSlot = readableEventCount == MaxEventCount
                 ? (int)(eventWriteIndex % MaxEventCount)
                 : 0;
+            ulong oldestEventSequence = (ulong)droppedEventCount + 1UL;
 
             for (int index = 0; index < readableEventCount; index++)
             {
@@ -233,7 +234,8 @@ namespace BO2.Services
                     ownerId,
                     stringValue,
                     eventReceivedAt,
-                    string.IsNullOrWhiteSpace(weaponName) ? null : weaponName));
+                    string.IsNullOrWhiteSpace(weaponName) ? null : weaponName,
+                    oldestEventSequence + (ulong)index));
             }
 
             return new GameEventMonitorStatus(
