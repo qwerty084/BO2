@@ -3,7 +3,14 @@ using System.ComponentModel;
 
 namespace BO2.Services
 {
-    internal sealed class GameTimingReader : IDisposable
+    internal interface IGameTimingReader : IDisposable
+    {
+        GameTimingReadResult ReadGameTiming(DetectedGame detectedGame);
+
+        void ClearAttachedGame();
+    }
+
+    internal sealed class GameTimingReader : IGameTimingReader
     {
         private const uint MinimumValidPointer = 0x00010000U;
 
@@ -102,6 +109,11 @@ namespace BO2.Services
         internal void ClearAttachedGame()
         {
             _processMemoryAccessor.Close();
+        }
+
+        void IGameTimingReader.ClearAttachedGame()
+        {
+            ClearAttachedGame();
         }
 
         private bool TryReadBoolean(uint address, string valueName, out bool value)

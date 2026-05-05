@@ -13,6 +13,7 @@ namespace BO2.Services
 
         private readonly object _syncRoot = new();
         private readonly GameMemoryReader _memoryReader;
+        private readonly IGameTimingReader _timingReader;
         private readonly GameProcessDetectionService _processDetectionService;
         private readonly IGameProcessDetector _pollingProcessDetector;
         private readonly DllInjector _dllInjector;
@@ -28,6 +29,7 @@ namespace BO2.Services
         public GameConnectionSession()
             : this(
                 new GameMemoryReader(),
+                new GameTimingReader(),
                 new GameProcessDetectionService(),
                 new GameProcessDetector(),
                 new DllInjector(),
@@ -44,6 +46,7 @@ namespace BO2.Services
             IGameEventMonitor eventMonitor)
             : this(
                 memoryReader,
+                new GameTimingReader(),
                 processDetectionService,
                 pollingProcessDetector,
                 dllInjector,
@@ -61,6 +64,27 @@ namespace BO2.Services
             TimeProvider timeProvider)
             : this(
                 memoryReader,
+                new GameTimingReader(),
+                processDetectionService,
+                pollingProcessDetector,
+                dllInjector,
+                eventMonitor,
+                timeProvider,
+                new GameTimerState())
+        {
+        }
+
+        internal GameConnectionSession(
+            GameMemoryReader memoryReader,
+            IGameTimingReader timingReader,
+            GameProcessDetectionService processDetectionService,
+            IGameProcessDetector pollingProcessDetector,
+            DllInjector dllInjector,
+            IGameEventMonitor eventMonitor,
+            TimeProvider timeProvider)
+            : this(
+                memoryReader,
+                timingReader,
                 processDetectionService,
                 pollingProcessDetector,
                 dllInjector,
@@ -78,8 +102,30 @@ namespace BO2.Services
             IGameEventMonitor eventMonitor,
             TimeProvider timeProvider,
             IGameTimerState timerState)
+            : this(
+                memoryReader,
+                new GameTimingReader(),
+                processDetectionService,
+                pollingProcessDetector,
+                dllInjector,
+                eventMonitor,
+                timeProvider,
+                timerState)
+        {
+        }
+
+        internal GameConnectionSession(
+            GameMemoryReader memoryReader,
+            IGameTimingReader timingReader,
+            GameProcessDetectionService processDetectionService,
+            IGameProcessDetector pollingProcessDetector,
+            DllInjector dllInjector,
+            IGameEventMonitor eventMonitor,
+            TimeProvider timeProvider,
+            IGameTimerState timerState)
         {
             ArgumentNullException.ThrowIfNull(memoryReader);
+            ArgumentNullException.ThrowIfNull(timingReader);
             ArgumentNullException.ThrowIfNull(processDetectionService);
             ArgumentNullException.ThrowIfNull(pollingProcessDetector);
             ArgumentNullException.ThrowIfNull(dllInjector);
@@ -88,6 +134,7 @@ namespace BO2.Services
             ArgumentNullException.ThrowIfNull(timerState);
 
             _memoryReader = memoryReader;
+            _timingReader = timingReader;
             _processDetectionService = processDetectionService;
             _pollingProcessDetector = pollingProcessDetector;
             _dllInjector = dllInjector;
@@ -359,6 +406,7 @@ namespace BO2.Services
             if (disconnectAction.ShouldRequestStop)
             {
                 _memoryReader.ClearAttachedGame();
+                _timingReader.ClearAttachedGame();
                 _eventMonitor.RequestStop(disconnectAction.MonitorProcessId);
             }
 
@@ -387,6 +435,7 @@ namespace BO2.Services
             _processDetectionService.Dispose();
             _eventMonitor.Dispose();
             _memoryReader.Dispose();
+            _timingReader.Dispose();
         }
 
         private GameConnectionRefreshResult ReadDisconnectSnapshot(
@@ -482,6 +531,7 @@ namespace BO2.Services
         {
             bool shouldReadPlayerStats;
             bool shouldReadEventMonitor;
+            bool shouldReadGameTiming;
             lock (_syncRoot)
             {
                 if (!Equals(_currentGame, detectedGame))
@@ -493,11 +543,13 @@ namespace BO2.Services
                     GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
                 shouldReadEventMonitor = ShouldReadEventMonitor(detectedGame, lifecycleSnapshot);
                 shouldReadPlayerStats = ShouldReadPlayerStats(detectedGame, lifecycleSnapshot);
+                shouldReadGameTiming = ShouldReadGameTiming(detectedGame, lifecycleSnapshot);
             }
 
-            if (!shouldReadPlayerStats && !shouldReadEventMonitor)
+            if (!shouldReadPlayerStats && !shouldReadEventMonitor && !shouldReadGameTiming)
             {
                 _memoryReader.ClearAttachedGame();
+                _timingReader.ClearAttachedGame();
 
                 lock (_syncRoot)
                 {
@@ -510,7 +562,8 @@ namespace BO2.Services
                         GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
                     shouldReadEventMonitor = ShouldReadEventMonitor(detectedGame, lifecycleSnapshot);
                     shouldReadPlayerStats = ShouldReadPlayerStats(detectedGame, lifecycleSnapshot);
-                    if ((!shouldReadPlayerStats && !shouldReadEventMonitor)
+                    shouldReadGameTiming = ShouldReadGameTiming(detectedGame, lifecycleSnapshot);
+                    if ((!shouldReadPlayerStats && !shouldReadEventMonitor && !shouldReadGameTiming)
                         || lifecycleSnapshot.IsDisconnecting)
                     {
                         return CreateRefreshResultLocked(
@@ -538,6 +591,16 @@ namespace BO2.Services
             else
             {
                 _memoryReader.ClearAttachedGame();
+            }
+
+            GameTimingReadResult? timingRead = null;
+            if (shouldReadGameTiming)
+            {
+                timingRead = ReadGameTiming(detectedGame);
+            }
+            else
+            {
+                _timingReader.ClearAttachedGame();
             }
 
             int? ownedMonitorProcessId;
@@ -572,6 +635,7 @@ namespace BO2.Services
                 if (!stopRequest.ShouldRequestStop)
                 {
                     ApplyTimerLifecycleEventsLocked(eventStatus);
+                    ApplyTimerTimingReadLocked(timingRead);
                     result = CreateRefreshResultLocked(detectedGame, readResult, eventStatus, eventMonitorSummaryOverride);
                 }
             }
@@ -579,6 +643,7 @@ namespace BO2.Services
             if (stopRequest.ShouldRequestStop)
             {
                 _memoryReader.ClearAttachedGame();
+                _timingReader.ClearAttachedGame();
                 _eventMonitor.RequestStop(stopRequest.MonitorProcessId);
                 lock (_syncRoot)
                 {
@@ -657,6 +722,14 @@ namespace BO2.Services
                 && lifecycleSnapshot.IsMonitorConnectedForCurrentGame;
         }
 
+        private static bool ShouldReadGameTiming(
+            DetectedGame? detectedGame,
+            GameConnectionSessionLifecycleSnapshot lifecycleSnapshot)
+        {
+            return detectedGame is not null
+                && lifecycleSnapshot.IsMonitorConnectedForCurrentGame;
+        }
+
         private PlayerStatsReadResult? ReadPlayerStats(DetectedGame? detectedGame)
         {
             if (detectedGame?.AddressMap is null)
@@ -666,6 +739,17 @@ namespace BO2.Services
             }
 
             return _memoryReader.ReadPlayerStats(detectedGame);
+        }
+
+        private GameTimingReadResult? ReadGameTiming(DetectedGame? detectedGame)
+        {
+            if (detectedGame is null)
+            {
+                _timingReader.ClearAttachedGame();
+                return null;
+            }
+
+            return _timingReader.ReadGameTiming(detectedGame);
         }
 
         private void ApplyDetectedGame(DetectedGame? detectedGame)
@@ -868,6 +952,14 @@ namespace BO2.Services
             if (lifecycleEvents.Events.Count > 0 || lifecycleEvents.HasSequenceGap)
             {
                 _timerState.ApplyLifecycleEvents(lifecycleEvents);
+            }
+        }
+
+        private void ApplyTimerTimingReadLocked(GameTimingReadResult? timingRead)
+        {
+            if (timingRead is not null)
+            {
+                _timerState.ApplyTimingRead(timingRead);
             }
         }
 

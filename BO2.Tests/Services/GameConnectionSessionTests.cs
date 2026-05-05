@@ -992,6 +992,47 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void Read_WhenObservedRoundOneHasTimingReads_PublishesWholeSecondGameTimerSnapshots()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            DateTimeOffset receivedAt = new(2026, 5, 5, 12, 0, 0, TimeSpan.Zero);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus(
+                    new GameEvent(
+                        GameEventType.StartOfRound,
+                        "start_of_round",
+                        1,
+                        0,
+                        0,
+                        receivedAt,
+                        Sequence: 1))
+            };
+            FakeGameTimingReader timingReader = new()
+            {
+                Result = CreateTimingRead(detectedGame, gameTimeMilliseconds: 10_000)
+            };
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timingReader: timingReader);
+            GameConnectionSnapshot connectedSnapshot = CompleteConnectWithLoadedMonitor(session);
+            List<GameConnectionSnapshotChangedEventArgs> changes = [];
+            session.SnapshotChanged += (_, args) => changes.Add(args);
+
+            timingReader.Result = CreateTimingRead(detectedGame, gameTimeMilliseconds: 11_999);
+            GameConnectionSnapshot snapshot = session.Read();
+
+            AssertGameTimer(connectedSnapshot, TimerDisplayKind.Active, "0:00");
+            AssertGameTimer(snapshot, TimerDisplayKind.Active, "0:01");
+            AssertRoundTimerPlaceholder(snapshot);
+            GameConnectionSnapshotChangedEventArgs change = Assert.Single(changes);
+            Assert.Equal(snapshot, change.Snapshot);
+            Assert.Equal(2, timingReader.ReadCallCount);
+            Assert.Same(detectedGame, timingReader.LastDetectedGame);
+        }
+
+        [Fact]
         public void Read_WhenLifecycleEventsRepeat_AppliesEachLifecycleSequenceOnce()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
@@ -1706,7 +1747,8 @@ namespace BO2.Tests.Services
             TimeProvider? timeProvider = null,
             FakeProcessMemoryAccessor? memoryAccessor = null,
             DllInjector? dllInjector = null,
-            IGameTimerState? timerState = null)
+            IGameTimerState? timerState = null,
+            IGameTimingReader? timingReader = null)
         {
             SessionContext context = CreateSessionContext(
                 eventMonitor,
@@ -1714,7 +1756,8 @@ namespace BO2.Tests.Services
                 detectedGame,
                 memoryAccessor: memoryAccessor,
                 dllInjector: dllInjector,
-                timerState: timerState);
+                timerState: timerState,
+                timingReader: timingReader);
             context.Session.Start();
             return context.Session;
         }
@@ -1727,7 +1770,8 @@ namespace BO2.Tests.Services
             FakeProcessMemoryAccessor? memoryAccessor = null,
             FakeProcessLifecycleEventSource? lifecycleEventSource = null,
             DllInjector? dllInjector = null,
-            IGameTimerState? timerState = null)
+            IGameTimerState? timerState = null,
+            IGameTimingReader? timingReader = null)
         {
             FakeGameProcessDetector eventDetector = new()
             {
@@ -1742,6 +1786,7 @@ namespace BO2.Tests.Services
 
             GameConnectionSession session = new(
                 new GameMemoryReader(memoryAccessor),
+                timingReader ?? new FakeGameTimingReader(),
                 new GameProcessDetectionService(eventDetector, lifecycleEventSource),
                 pollingProcessDetector,
                 dllInjector ?? CreateDllInjector(),
@@ -1808,6 +1853,17 @@ namespace BO2.Tests.Services
                 recentEvents);
         }
 
+        private static GameTimingReadResult CreateTimingRead(
+            DetectedGame detectedGame,
+            int gameTimeMilliseconds,
+            bool isPaused = false)
+        {
+            return GameTimingReadResult.SupportedTiming(
+                detectedGame,
+                TimeSpan.FromMilliseconds(gameTimeMilliseconds),
+                isPaused);
+        }
+
         private static void AssertCommandAvailability(
             GameConnectionSnapshot snapshot,
             bool connectEnabled,
@@ -1836,6 +1892,36 @@ namespace BO2.Tests.Services
             Assert.Equal(TimerDisplayState.Placeholder.Text, roundTime.Text);
         }
 
+        private static void AssertGameTimer(
+            GameConnectionSnapshot snapshot,
+            TimerDisplayKind expectedKind,
+            string expectedText)
+        {
+            Assert.NotNull(snapshot.TimerDisplayState);
+            TimerDisplayState? timer = snapshot.TimerDisplayState!.GameTime;
+            Assert.NotNull(timer);
+            TimerDisplayState gameTime = timer!;
+
+            Assert.Equal(expectedKind, gameTime.Kind);
+            Assert.Equal(expectedText, RenderTimerText(gameTime));
+        }
+
+        private static void AssertRoundTimerPlaceholder(GameConnectionSnapshot snapshot)
+        {
+            Assert.NotNull(snapshot.TimerDisplayState);
+            TimerDisplayState? timer = snapshot.TimerDisplayState!.RoundTime;
+            Assert.NotNull(timer);
+            TimerDisplayState roundTime = timer!;
+
+            Assert.Equal(TimerDisplayKind.Placeholder, roundTime.Kind);
+            Assert.Equal(TimerDisplayState.PlaceholderText, RenderTimerText(roundTime));
+        }
+
+        private static string RenderTimerText(TimerDisplayState timerDisplayState)
+        {
+            return Assert.IsType<DisplayText.PlainText>(timerDisplayState.Text).Text;
+        }
+
         private sealed class SessionContext(
             GameConnectionSession session,
             FakeGameProcessDetector eventDetector,
@@ -1855,6 +1941,8 @@ namespace BO2.Tests.Services
         {
             public List<GameTimerLifecycleEventBatch> AppliedBatches { get; } = [];
 
+            public List<GameTimingReadResult> AppliedTimingReads { get; } = [];
+
             public int FailClosedBatchCount { get; private set; }
 
             public int ResetCallCount { get; private set; }
@@ -1871,9 +1959,45 @@ namespace BO2.Tests.Services
                 }
             }
 
+            public void ApplyTimingRead(GameTimingReadResult timingRead)
+            {
+                AppliedTimingReads.Add(timingRead);
+            }
+
             public void Reset()
             {
                 ResetCallCount++;
+            }
+        }
+
+        private sealed class FakeGameTimingReader : IGameTimingReader
+        {
+            public GameTimingReadResult? Result { get; set; }
+
+            public int ReadCallCount { get; private set; }
+
+            public int ClearAttachedGameCallCount { get; private set; }
+
+            public int DisposeCallCount { get; private set; }
+
+            public DetectedGame? LastDetectedGame { get; private set; }
+
+            public GameTimingReadResult ReadGameTiming(DetectedGame detectedGame)
+            {
+                ReadCallCount++;
+                LastDetectedGame = detectedGame;
+
+                return Result ?? GameTimingReadResult.InvalidTimingSourceState(detectedGame);
+            }
+
+            public void ClearAttachedGame()
+            {
+                ClearAttachedGameCallCount++;
+            }
+
+            public void Dispose()
+            {
+                DisposeCallCount++;
             }
         }
 
