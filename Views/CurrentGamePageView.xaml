@@ -41,16 +41,16 @@
                             x:Uid="GameTimeLabel"
                             Style="{StaticResource BO2CaptionTextBlockStyle}" />
                         <TextBlock
-                            x:Uid="GameTimePlaceholder"
-                            Style="{StaticResource BO2BodyTextBlockStyle}" />
+                            Style="{StaticResource BO2BodyTextBlockStyle}"
+                            Text="{Binding GameTimeText, Mode=OneWay}" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Spacing="4">
                         <TextBlock
                             x:Uid="RoundTimeLabel"
                             Style="{StaticResource BO2CaptionTextBlockStyle}" />
                         <TextBlock
-                            x:Uid="RoundTimePlaceholder"
-                            Style="{StaticResource BO2BodyTextBlockStyle}" />
+                            Style="{StaticResource BO2BodyTextBlockStyle}"
+                            Text="{Binding RoundTimeText, Mode=OneWay}" />
                     </StackPanel>
                 </Grid>
             </StackPanel>

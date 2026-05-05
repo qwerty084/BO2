@@ -69,6 +69,23 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void Snapshot_WhenSessionStarts_ExposesPlaceholderTimerDisplayState()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame);
+
+            GameConnectionSnapshot snapshot = session.Snapshot;
+
+            AssertPlaceholderTimers(snapshot);
+        }
+
+        [Fact]
         public void Snapshot_WhenSessionStartsWithUnsupportedGame_ExposesUnsupportedStatusState()
         {
             DetectedGame detectedGame = CreateUnsupportedGame(processId: 1001);
@@ -1654,6 +1671,21 @@ namespace BO2.Tests.Services
             Assert.Equal(connectVisible, snapshot.ConnectCommandAvailability.IsVisible);
             Assert.Equal(disconnectEnabled, snapshot.DisconnectCommandAvailability.IsEnabled);
             Assert.Equal(disconnectVisible, snapshot.DisconnectCommandAvailability.IsVisible);
+        }
+
+        private static void AssertPlaceholderTimers(GameConnectionSnapshot snapshot)
+        {
+            Assert.NotNull(snapshot.TimerDisplayState);
+            GameConnectionTimerDisplayState timers = snapshot.TimerDisplayState!;
+            Assert.NotNull(timers.GameTime);
+            Assert.NotNull(timers.RoundTime);
+            TimerDisplayState gameTime = timers.GameTime!;
+            TimerDisplayState roundTime = timers.RoundTime!;
+
+            Assert.Equal(TimerDisplayKind.Placeholder, gameTime.Kind);
+            Assert.Equal(TimerDisplayKind.Placeholder, roundTime.Kind);
+            Assert.Equal(TimerDisplayState.Placeholder.Text, gameTime.Text);
+            Assert.Equal(TimerDisplayState.Placeholder.Text, roundTime.Text);
         }
 
         private sealed class SessionContext(

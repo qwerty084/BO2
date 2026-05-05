@@ -714,6 +714,7 @@ namespace BO2.Services
             return Equals(left.CurrentGame, right.CurrentGame)
                 && left.ConnectionPhase == right.ConnectionPhase
                 && Equals(left.ReadResult, right.ReadResult)
+                && Equals(left.TimerDisplayState, right.TimerDisplayState)
                 && left.ConnectCommandAvailability == right.ConnectCommandAvailability
                 && left.DisconnectCommandAvailability == right.DisconnectCommandAvailability
                 && HasSameEventMonitorSummary(left.EventMonitorSummary, right.EventMonitorSummary);
@@ -819,6 +820,7 @@ namespace BO2.Services
                 connectionPhase,
                 readResult,
                 eventMonitorSummary,
+                GameConnectionTimerDisplayState.Placeholder,
                 commandAvailability.Connect,
                 commandAvailability.Disconnect);
         }
@@ -921,6 +923,7 @@ namespace BO2.Services
                 result.ConnectionPhase,
                 result.ReadResult,
                 result.EventMonitorSummary,
+                result.TimerDisplayState,
                 result.ConnectCommandAvailability,
                 result.DisconnectCommandAvailability);
         }
@@ -930,6 +933,7 @@ namespace BO2.Services
             GameConnectionPhase ConnectionPhase,
             PlayerStatsReadResult? ReadResult,
             GameConnectionEventMonitorSummary EventMonitorSummary,
+            GameConnectionTimerDisplayState? TimerDisplayState,
             GameConnectionCommandAvailability ConnectCommandAvailability,
             GameConnectionCommandAvailability DisconnectCommandAvailability);
     }
@@ -960,6 +964,7 @@ namespace BO2.Services
         GameConnectionPhase ConnectionPhase,
         PlayerStatsReadResult? ReadResult,
         GameConnectionEventMonitorSummary EventMonitorSummary,
+        GameConnectionTimerDisplayState? TimerDisplayState,
         GameConnectionCommandAvailability ConnectCommandAvailability,
         GameConnectionCommandAvailability DisconnectCommandAvailability);
 

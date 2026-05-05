@@ -366,6 +366,7 @@ namespace BO2.Tests.Services
                 phase,
                 null,
                 eventMonitorSummary ?? GameConnectionEventMonitorSummary.Waiting,
+                GameConnectionTimerDisplayState.Placeholder,
                 connectCommandAvailability ?? CreateConnectCommandAvailability(phase, canAttemptConnect),
                 disconnectCommandAvailability ?? CreateDisconnectCommandAvailability(phase));
         }
