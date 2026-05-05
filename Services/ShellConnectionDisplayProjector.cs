@@ -94,15 +94,12 @@ namespace BO2.Services
             GameConnectionPhase connectionPhase,
             GameConnectionEventMonitorSummary eventMonitor)
         {
-            projection.LatestEventStatus = eventMonitor.Status;
-
             if (connectionPhase == GameConnectionPhase.Disconnecting
                 || eventMonitor.State is GameConnectionEventMonitorState.Disconnecting or GameConnectionEventMonitorState.StopPending)
             {
                 projection.MainStatusText = DisplayText.Resource("ConnectionStatusDisconnecting");
                 projection.EventMonitorStatusText = DisplayText.Resource("EventMonitorDisconnecting");
                 projection.ConnectionLastUpdateText = EmptyText;
-                projection.LatestEventStatus = GameEventMonitorStatus.WaitingForMonitor;
                 SetConnectionState(
                     projection,
                     detectedGame,
@@ -134,6 +131,7 @@ namespace BO2.Services
 
             projection.ConnectionLastUpdateText = DisplayText.Resource("ConnectionLastUpdateJustNow");
             projection.EventMonitorStatusText = GameConnectionDisplayTextProjector.FormatMonitorStatus(eventMonitor);
+            projection.LatestEventStatus = eventMonitor.Status;
         }
 
         private static void ApplyCommandPresentation(

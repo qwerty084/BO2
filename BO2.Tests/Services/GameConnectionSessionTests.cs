@@ -99,7 +99,7 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void Read_WhenStatsChange_PublishesSnapshotChangedAndUpdatesCurrentSnapshot()
+        public void Read_WhenPreConnectCurrentGameSupported_ReturnsDetectedStatusOnlyWithoutPublishingSnapshotChanged()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
             FakeGameEventMonitor eventMonitor = new()
@@ -117,19 +117,101 @@ namespace BO2.Tests.Services
 
             GameConnectionSnapshot readSnapshot = session.Read();
 
-            GameConnectionSnapshotChangedEventArgs change = Assert.Single(changes);
-            Assert.Equal(initialSnapshot, change.PreviousSnapshot);
-            Assert.Same(readSnapshot.CurrentGame, change.Snapshot.CurrentGame);
-            Assert.Same(readSnapshot.ReadResult, change.Snapshot.ReadResult);
-            Assert.NotNull(change.Snapshot.ReadResult);
-            Assert.NotNull(change.Snapshot.ReadResult!.Stats);
-            Assert.Equal(readSnapshot.EventMonitorSummary, change.Snapshot.EventMonitorSummary);
-            Assert.Equal(change.Snapshot, session.Snapshot);
-            Assert.Equal(1, memoryAccessor.AttachCallCount);
+            Assert.Empty(changes);
+            Assert.Equal(initialSnapshot, readSnapshot);
+            Assert.Same(detectedGame, readSnapshot.CurrentGame);
+            Assert.Equal(GameConnectionPhase.Detected, readSnapshot.ConnectionPhase);
+            Assert.Null(readSnapshot.ReadResult);
+            AssertCommandAvailability(
+                readSnapshot,
+                connectEnabled: true,
+                connectVisible: true,
+                disconnectEnabled: false,
+                disconnectVisible: false);
+            Assert.Equal(readSnapshot, session.Snapshot);
+            Assert.Equal(0, memoryAccessor.AttachCallCount);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
         }
 
         [Fact]
-        public void Read_WhenObservableStateIsUnchanged_DoesNotPublishSnapshotChanged()
+        public void Read_WhenStatusOnlyCurrentGameChangesBeforeReturn_ReturnsUpdatedCurrentGame()
+        {
+            DetectedGame originalGame = CreateSupportedGame(processId: 1001);
+            DetectedGame changedGame = CreateSupportedGame(processId: 2002);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            SessionContext context = CreateSessionContext(
+                eventMonitor,
+                detectedGame: originalGame,
+                memoryAccessor: memoryAccessor);
+            context.Session.Start();
+            memoryAccessor.CloseCallback = () =>
+            {
+                context.EventDetector.Result = changedGame;
+                context.LifecycleEventSource.RaiseStarted(changedGame.ProcessName, changedGame.ProcessId);
+            };
+
+            GameConnectionSnapshot snapshot = context.Session.Read();
+
+            Assert.Same(changedGame, snapshot.CurrentGame);
+            Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
+            Assert.Null(snapshot.ReadResult);
+            Assert.Equal(snapshot, context.Session.Snapshot);
+            Assert.Equal(0, memoryAccessor.AttachCallCount);
+            Assert.Equal(1, memoryAccessor.CloseCallCount);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+        }
+
+        [Fact]
+        public void Read_WhenStatusOnlyLifecycleChangesBeforeReturn_RecomputesReadPlan()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            GameEventMonitorStatus compatibleStatus = CreateCompatibleStatus();
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = compatibleStatus
+            };
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            SessionContext context = CreateSessionContext(
+                eventMonitor,
+                detectedGame: detectedGame,
+                memoryAccessor: memoryAccessor);
+            context.Session.Start();
+            bool connectedDuringClear = false;
+            memoryAccessor.CloseCallback = () =>
+            {
+                if (connectedDuringClear)
+                {
+                    return;
+                }
+
+                connectedDuringClear = true;
+                CompleteConnectWithLoadedMonitor(context.Session);
+            };
+
+            GameConnectionSnapshot snapshot = context.Session.Read();
+
+            Assert.True(connectedDuringClear);
+            Assert.Same(detectedGame, snapshot.CurrentGame);
+            Assert.Equal(GameConnectionPhase.Connected, snapshot.ConnectionPhase);
+            Assert.NotNull(snapshot.ReadResult);
+            Assert.Equal(GameConnectionEventMonitorState.Ready, snapshot.EventMonitorSummary.State);
+            Assert.Same(compatibleStatus, snapshot.EventMonitorSummary.Status);
+            AssertCommandAvailability(
+                snapshot,
+                connectEnabled: false,
+                connectVisible: false,
+                disconnectEnabled: true,
+                disconnectVisible: true);
+            Assert.Equal(snapshot, context.Session.Snapshot);
+            Assert.Equal(1, memoryAccessor.CloseCallCount);
+        }
+
+        [Fact]
+        public void Read_WhenConnectedObservableStateIsUnchanged_DoesNotPublishSnapshotChanged()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
             FakeGameEventMonitor eventMonitor = new()
@@ -141,7 +223,7 @@ namespace BO2.Tests.Services
                 eventMonitor,
                 detectedGame,
                 memoryAccessor: memoryAccessor);
-            GameConnectionSnapshot firstSnapshot = session.Read();
+            GameConnectionSnapshot firstSnapshot = CompleteConnectWithLoadedMonitor(session);
             List<GameConnectionSnapshotChangedEventArgs> changes = [];
             session.SnapshotChanged += (_, args) => changes.Add(args);
 
@@ -151,7 +233,7 @@ namespace BO2.Tests.Services
             Assert.Equal(firstSnapshot, secondSnapshot);
             Assert.Equal(firstSnapshot, session.Snapshot);
             Assert.Equal(2, memoryAccessor.AttachCallCount);
-            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(2, eventMonitor.ReadStatusCallCount);
         }
 
         [Fact]
@@ -183,7 +265,7 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void Read_WhenCurrentGameSupported_ReturnsStatsSnapshotWithoutEventMonitor()
+        public void Read_WhenCurrentGameSupportedBeforeConnect_ReturnsDetectedSnapshotWithoutActiveReads()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
             FakeGameEventMonitor eventMonitor = new()
@@ -199,19 +281,50 @@ namespace BO2.Tests.Services
             GameConnectionSnapshot snapshot = session.Read();
 
             Assert.Same(detectedGame, snapshot.CurrentGame);
-            Assert.Equal(GameConnectionPhase.StatsOnlyDetected, snapshot.ConnectionPhase);
-            Assert.NotNull(snapshot.ReadResult);
-            Assert.Same(detectedGame, snapshot.ReadResult!.DetectedGame);
-            Assert.NotNull(snapshot.ReadResult!.Stats);
+            Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
+            Assert.Null(snapshot.ReadResult);
             AssertCommandAvailability(
                 snapshot,
                 connectEnabled: true,
                 connectVisible: true,
                 disconnectEnabled: false,
                 disconnectVisible: false);
-            Assert.Equal(1, memoryAccessor.AttachCallCount);
+            Assert.Equal(0, memoryAccessor.AttachCallCount);
             Assert.Equal(0, eventMonitor.ReadStatusCallCount);
             Assert.Equal(snapshot, session.Snapshot);
+        }
+
+        [Fact]
+        public void Read_WhenConnectedGameChangesToSupportedBeforeReconnect_ClearsAttachedGame()
+        {
+            DetectedGame originalGame = CreateSupportedGame(processId: 1001);
+            DetectedGame changedGame = CreateSupportedGame(processId: 2002);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            SessionContext context = CreateSessionContext(
+                eventMonitor,
+                detectedGame: originalGame,
+                memoryAccessor: memoryAccessor);
+            context.Session.Start();
+            CompleteConnectWithLoadedMonitor(context.Session);
+            int attachCallCount = memoryAccessor.AttachCallCount;
+            int closeCallCount = memoryAccessor.CloseCallCount;
+            context.EventDetector.Result = changedGame;
+            context.LifecycleEventSource.RaiseStarted(changedGame.ProcessName, changedGame.ProcessId);
+            eventMonitor.ResetCalls();
+
+            GameConnectionSnapshot snapshot = context.Session.Read();
+
+            Assert.Same(changedGame, snapshot.CurrentGame);
+            Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
+            Assert.Null(snapshot.ReadResult);
+            Assert.Equal(attachCallCount, memoryAccessor.AttachCallCount);
+            Assert.Equal(closeCallCount + 1, memoryAccessor.CloseCallCount);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(snapshot, context.Session.Snapshot);
         }
 
         [Fact]
@@ -246,7 +359,7 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void Read_WhenPollingFallbackIsActive_UpdatesCurrentGameBeforeReadingStats()
+        public void Read_WhenPollingFallbackIsActive_UpdatesCurrentGameBeforeReturningStatusOnly()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
             FakeGameEventMonitor eventMonitor = new()
@@ -269,11 +382,11 @@ namespace BO2.Tests.Services
 
             Assert.True(context.Session.UsesPollingProcessDetection);
             Assert.Same(detectedGame, snapshot.CurrentGame);
-            Assert.NotNull(snapshot.ReadResult);
-            Assert.Same(detectedGame, snapshot.ReadResult!.DetectedGame);
-            Assert.NotNull(snapshot.ReadResult!.Stats);
+            Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
+            Assert.Null(snapshot.ReadResult);
             Assert.Equal(1, context.PollingProcessDetector.DetectCallCount);
-            Assert.Equal(1, memoryAccessor.AttachCallCount);
+            Assert.Equal(0, memoryAccessor.AttachCallCount);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
             AssertCommandAvailability(
                 snapshot,
                 connectEnabled: true,
@@ -558,6 +671,7 @@ namespace BO2.Tests.Services
             {
                 Status = CreateCompatibleStatus()
             };
+            FakeProcessMemoryAccessor memoryAccessor = new();
             DllInjector dllInjector = CreateDllInjector(
                 fileExists: _ => true,
                 injectLibrary: (processId, _) =>
@@ -566,7 +680,11 @@ namespace BO2.Tests.Services
                         snapshot => snapshot.ConnectionPhase == GameConnectionPhase.Connecting);
                     injectedProcessId = processId;
                 });
-            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, dllInjector: dllInjector);
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                memoryAccessor: memoryAccessor,
+                dllInjector: dllInjector);
             session.SnapshotChanged += (_, args) => publishedSnapshots.Add(args.Snapshot);
 
             GameConnectionSnapshot connectedSnapshot = session.Connect();
@@ -584,6 +702,8 @@ namespace BO2.Tests.Services
             Assert.Equal(1001, injectedProcessId);
             Assert.Same(detectedGame, connectedSnapshot.CurrentGame);
             Assert.Equal(GameConnectionPhase.Connected, connectedSnapshot.ConnectionPhase);
+            Assert.NotNull(connectedSnapshot.ReadResult);
+            Assert.Same(detectedGame, connectedSnapshot.ReadResult.DetectedGame);
             Assert.Equal(GameConnectionEventMonitorState.Ready, connectedSnapshot.EventMonitorSummary.State);
             AssertCommandAvailability(
                 connectedSnapshot,
@@ -593,6 +713,49 @@ namespace BO2.Tests.Services
                 disconnectVisible: true);
             Assert.Equal(connectedSnapshot, publishedSnapshots[^1]);
             Assert.Equal(GameConnectionPhase.Connected, session.GetStatusSnapshot().ConnectionPhase);
+            Assert.Equal(1, memoryAccessor.AttachCallCount);
+            Assert.Equal(1, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(1001, eventMonitor.LastTargetProcessId);
+        }
+
+        [Fact]
+        public void Connect_WhenCompletingConnect_RecordsMonitorOwnershipBeforeFirstActiveRead()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            GameConnectionSession? session = null;
+            GameConnectionSnapshot? statusSnapshotDuringStatsRead = null;
+            int readStatusCallCountDuringStatsRead = -1;
+            memoryAccessor.AttachCallback = (_, _) =>
+            {
+                statusSnapshotDuringStatsRead = session!.GetStatusSnapshot();
+                readStatusCallCountDuringStatsRead = eventMonitor.ReadStatusCallCount;
+            };
+            session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                memoryAccessor: memoryAccessor);
+
+            GameConnectionSnapshot connectedSnapshot = session.Connect();
+
+            Assert.True(statusSnapshotDuringStatsRead.HasValue);
+            GameConnectionSnapshot statusSnapshot = statusSnapshotDuringStatsRead.Value;
+            Assert.Equal(GameConnectionPhase.Connected, statusSnapshot.ConnectionPhase);
+            Assert.Same(detectedGame, statusSnapshot.CurrentGame);
+            Assert.Null(statusSnapshot.ReadResult);
+            AssertCommandAvailability(
+                statusSnapshot,
+                connectEnabled: false,
+                connectVisible: false,
+                disconnectEnabled: true,
+                disconnectVisible: true);
+            Assert.Equal(0, readStatusCallCountDuringStatsRead);
+            Assert.Equal(GameConnectionPhase.Connected, connectedSnapshot.ConnectionPhase);
+            Assert.NotNull(connectedSnapshot.ReadResult);
             Assert.Equal(1, eventMonitor.ReadStatusCallCount);
             Assert.Equal(1001, eventMonitor.LastTargetProcessId);
         }
@@ -652,32 +815,36 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void Connect_WhenMonitorLoadingFails_ExposesLoadingFailedSummary()
+        public void Connect_WhenMonitorLoadingFails_ReturnsDetectedStatusOnlyWithLoadingFailedSummary()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
             FakeGameEventMonitor eventMonitor = new()
             {
                 Status = CreateCompatibleStatus()
             };
+            FakeProcessMemoryAccessor memoryAccessor = new();
             DllInjector dllInjector = CreateDllInjector(fileExists: _ => false);
             GameConnectionSession session = CreateStartedSession(
                 eventMonitor,
                 detectedGame,
+                memoryAccessor: memoryAccessor,
                 dllInjector: dllInjector);
 
             GameConnectionSnapshot snapshot = session.Connect();
 
-            Assert.Equal(GameConnectionPhase.StatsOnlyDetected, snapshot.ConnectionPhase);
+            Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
             Assert.Equal(GameConnectionEventMonitorState.LoadingFailed, snapshot.EventMonitorSummary.State);
             Assert.Equal(
                 AppStrings.Format("DllInjectionMissingDllFormat", string.Empty),
                 snapshot.EventMonitorSummary.FailureMessage);
+            Assert.Null(snapshot.ReadResult);
             AssertCommandAvailability(
                 snapshot,
                 connectEnabled: true,
                 connectVisible: true,
                 disconnectEnabled: false,
                 disconnectVisible: false);
+            Assert.Equal(0, memoryAccessor.AttachCallCount);
             Assert.Equal(0, eventMonitor.ReadStatusCallCount);
         }
 
@@ -873,10 +1040,48 @@ namespace BO2.Tests.Services
             Assert.Equal(GameConnectionEventMonitorState.CleanupRequested, cleanupSnapshot.EventMonitorSummary.State);
             Assert.Same(detectedGame, snapshot.CurrentGame);
             Assert.Equal(GameConnectionEventMonitorState.Waiting, snapshot.EventMonitorSummary.State);
-            Assert.NotNull(snapshot.ReadResult);
-            Assert.Same(detectedGame, snapshot.ReadResult!.DetectedGame);
-            Assert.NotNull(snapshot.ReadResult!.Stats);
-            Assert.Equal(attachCallCount + 1, memoryAccessor.AttachCallCount);
+            Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
+            Assert.Null(snapshot.ReadResult);
+            Assert.Equal(attachCallCount, memoryAccessor.AttachCallCount);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(1, eventMonitor.RequestStopCallCount);
+            Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);
+        }
+
+        [Fact]
+        public void Connect_WhenCurrentGameChangesDuringFirstConnectedStatsRead_ReturnsCurrentStatusWithoutReadingOldMonitor()
+        {
+            DetectedGame originalGame = CreateSupportedGame(processId: 1001);
+            DetectedGame changedGame = CreateSupportedGame(processId: 2002);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            SessionContext? context = null;
+            memoryAccessor.AttachCallback = (_, _) =>
+            {
+                context!.EventDetector.Result = changedGame;
+                context.LifecycleEventSource.RaiseStarted(changedGame.ProcessName, changedGame.ProcessId);
+            };
+            context = CreateSessionContext(
+                eventMonitor,
+                detectedGame: originalGame,
+                memoryAccessor: memoryAccessor);
+            context.Session.Start();
+
+            GameConnectionSnapshot snapshot = context.Session.Connect();
+
+            Assert.Same(changedGame, snapshot.CurrentGame);
+            Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
+            Assert.Null(snapshot.ReadResult);
+            Assert.Equal(GameConnectionEventMonitorState.Waiting, snapshot.EventMonitorSummary.State);
+            AssertCommandAvailability(
+                snapshot,
+                connectEnabled: true,
+                connectVisible: true,
+                disconnectEnabled: false,
+                disconnectVisible: false);
             Assert.Equal(0, eventMonitor.ReadStatusCallCount);
             Assert.Equal(1, eventMonitor.RequestStopCallCount);
             Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);
@@ -929,13 +1134,21 @@ namespace BO2.Tests.Services
                 Status = GameEventMonitorStatus.WaitingForMonitor
             };
             var timeProvider = new FakeTimeProvider();
-            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, timeProvider);
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timeProvider,
+                memoryAccessor);
             CompleteConnectWithLoadedMonitor(session);
+            int closeCallCount = memoryAccessor.CloseCallCount;
             eventMonitor.ResetCalls();
 
             timeProvider.Advance(TimeSpan.FromSeconds(16));
             GameConnectionSnapshot snapshot = session.Read();
 
+            Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
+            Assert.Null(snapshot.ReadResult);
             Assert.Equal(GameConnectionEventMonitorState.ReadinessFailed, snapshot.EventMonitorSummary.State);
             Assert.Equal(AppStrings.Get("DllInjectionReadinessTimedOut"), snapshot.EventMonitorSummary.FailureMessage);
             AssertCommandAvailability(
@@ -946,6 +1159,108 @@ namespace BO2.Tests.Services
                 disconnectVisible: false);
             Assert.Equal(1, eventMonitor.RequestStopCallCount);
             Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);
+            Assert.Equal(closeCallCount + 1, memoryAccessor.CloseCallCount);
+        }
+
+        [Fact]
+        public void Read_WhenMonitorReadinessTimesOutAndStatsReadFails_RequestsStopAndMarksInjectionFailed()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = GameEventMonitorStatus.WaitingForMonitor
+            };
+            var timeProvider = new FakeTimeProvider();
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timeProvider,
+                memoryAccessor);
+            CompleteConnectWithLoadedMonitor(session);
+            memoryAccessor.AttachException = new InvalidOperationException("stats unavailable");
+            eventMonitor.ResetCalls();
+
+            timeProvider.Advance(TimeSpan.FromSeconds(16));
+            Assert.Throws<InvalidOperationException>(() => session.Read());
+
+            GameConnectionSnapshot snapshot = session.Snapshot;
+            Assert.Equal(GameConnectionEventMonitorState.ReadinessFailed, snapshot.EventMonitorSummary.State);
+            Assert.Equal(AppStrings.Get("DllInjectionReadinessTimedOut"), snapshot.EventMonitorSummary.FailureMessage);
+            Assert.Null(snapshot.ReadResult);
+            AssertCommandAvailability(
+                snapshot,
+                connectEnabled: true,
+                connectVisible: true,
+                disconnectEnabled: false,
+                disconnectVisible: false);
+            Assert.Equal(1, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(1001, eventMonitor.LastTargetProcessId);
+            Assert.Equal(1, eventMonitor.RequestStopCallCount);
+            Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);
+
+            eventMonitor.ResetCalls();
+            GameConnectionSnapshot statusSnapshot = session.GetStatusSnapshot();
+
+            Assert.Equal(GameConnectionPhase.Detected, statusSnapshot.ConnectionPhase);
+            Assert.Equal(GameConnectionEventMonitorState.ReadinessFailed, statusSnapshot.EventMonitorSummary.State);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(0, eventMonitor.RequestStopCallCount);
+        }
+
+        [Fact]
+        public void Read_WhenMonitorReadinessTimeoutElapsedForDifferentCurrentGame_DoesNotFireTimeout()
+        {
+            DetectedGame connectedGame = CreateSupportedGame(processId: 1001);
+            DetectedGame detectedGame = CreateSupportedGame(processId: 2002);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = GameEventMonitorStatus.WaitingForMonitor
+            };
+            var timeProvider = new FakeTimeProvider();
+            SessionContext context = CreateSessionContext(
+                eventMonitor,
+                timeProvider,
+                detectedGame: connectedGame);
+            context.Session.Start();
+            CompleteConnectWithLoadedMonitor(context.Session);
+
+            timeProvider.Advance(TimeSpan.FromSeconds(16));
+            context.EventDetector.Result = detectedGame;
+            context.LifecycleEventSource.RaiseStarted(detectedGame.ProcessName, detectedGame.ProcessId);
+            eventMonitor.ResetCalls();
+            GameConnectionSnapshot snapshot = context.Session.Read();
+
+            Assert.Same(detectedGame, snapshot.CurrentGame);
+            Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
+            Assert.Equal(GameConnectionEventMonitorState.Waiting, snapshot.EventMonitorSummary.State);
+            Assert.Null(snapshot.ReadResult);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(0, eventMonitor.RequestStopCallCount);
+        }
+
+        [Fact]
+        public void Read_WhenMonitorIsReadyPastReadinessTimeout_DoesNotRequestStop()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            GameEventMonitorStatus compatibleStatus = CreateCompatibleStatus();
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = compatibleStatus
+            };
+            var timeProvider = new FakeTimeProvider();
+            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, timeProvider);
+            CompleteConnectWithLoadedMonitor(session);
+            eventMonitor.ResetCalls();
+
+            timeProvider.Advance(TimeSpan.FromSeconds(16));
+            GameConnectionSnapshot snapshot = session.Read();
+
+            Assert.Equal(GameConnectionPhase.Connected, snapshot.ConnectionPhase);
+            Assert.Equal(GameConnectionEventMonitorState.Ready, snapshot.EventMonitorSummary.State);
+            Assert.Same(compatibleStatus, snapshot.EventMonitorSummary.Status);
+            Assert.Equal(1, eventMonitor.ReadStatusCallCount);
+            Assert.Equal(0, eventMonitor.RequestStopCallCount);
         }
 
         [Fact]
@@ -956,8 +1271,14 @@ namespace BO2.Tests.Services
             {
                 Status = CreateCompatibleStatus()
             };
-            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame);
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                memoryAccessor: memoryAccessor);
             CompleteConnectWithLoadedMonitor(session);
+            int attachCallCount = memoryAccessor.AttachCallCount;
+            int closeCallCount = memoryAccessor.CloseCallCount;
             eventMonitor.ResetCalls();
 
             List<GameConnectionSnapshotChangedEventArgs> changes = [];
@@ -967,6 +1288,8 @@ namespace BO2.Tests.Services
 
             Assert.Equal(GameConnectionPhase.Disconnecting, snapshot.ConnectionPhase);
             Assert.Equal(GameConnectionEventMonitorState.Disconnecting, snapshot.EventMonitorSummary.State);
+            Assert.Same(GameEventMonitorStatus.WaitingForMonitor, snapshot.EventMonitorSummary.Status);
+            Assert.Empty(snapshot.EventMonitorSummary.Status.RecentEvents);
             Assert.Equal(GameConnectionPhase.Disconnecting, session.GetStatusSnapshot().ConnectionPhase);
             AssertCommandAvailability(
                 snapshot,
@@ -981,6 +1304,8 @@ namespace BO2.Tests.Services
             Assert.Equal(1, eventMonitor.RequestStopCallCount);
             Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);
             Assert.Equal(0, eventMonitor.IsStopCompleteCallCount);
+            Assert.Equal(attachCallCount, memoryAccessor.AttachCallCount);
+            Assert.Equal(closeCallCount + 1, memoryAccessor.CloseCallCount);
         }
 
         [Fact]
@@ -1024,7 +1349,7 @@ namespace BO2.Tests.Services
 
             GameConnectionSnapshot snapshot = session.Disconnect();
 
-            Assert.Equal(GameConnectionPhase.StatsOnlyDetected, snapshot.ConnectionPhase);
+            Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
             AssertCommandAvailability(
                 snapshot,
                 connectEnabled: true,
@@ -1032,14 +1357,50 @@ namespace BO2.Tests.Services
                 disconnectEnabled: false,
                 disconnectVisible: false);
             Assert.Same(detectedGame, snapshot.CurrentGame);
-            Assert.NotNull(snapshot.ReadResult);
-            Assert.Same(detectedGame, snapshot.ReadResult!.DetectedGame);
-            Assert.NotNull(snapshot.ReadResult!.Stats);
+            Assert.Null(snapshot.ReadResult);
             Assert.Equal(snapshot, session.Snapshot);
             Assert.Equal(0, eventMonitor.RequestStopCallCount);
             Assert.Equal(0, eventMonitor.IsStopCompleteCallCount);
             Assert.Equal(0, eventMonitor.ReadStatusCallCount);
-            Assert.Equal(1, memoryAccessor.AttachCallCount);
+            Assert.Equal(0, memoryAccessor.AttachCallCount);
+        }
+
+        [Fact]
+        public void Dispose_WhenMonitorIsConnected_RequestsStopForOwnedMonitor()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            using GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame);
+            CompleteConnectWithLoadedMonitor(session);
+            eventMonitor.ResetCalls();
+
+            session.Dispose();
+
+            Assert.Equal(1, eventMonitor.RequestStopCallCount);
+            Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);
+            Assert.Equal(0, eventMonitor.IsStopCompleteCallCount);
+        }
+
+        [Fact]
+        public void Dispose_WhenMonitorStopAlreadyRequested_DoesNotRequestDuplicateStop()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            using GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame);
+            CompleteConnectWithLoadedMonitor(session);
+            session.Disconnect();
+
+            session.Dispose();
+
+            Assert.Equal(1, eventMonitor.RequestStopCallCount);
+            Assert.Equal(1001, eventMonitor.LastStopTargetProcessId);
+            Assert.Equal(0, eventMonitor.IsStopCompleteCallCount);
         }
 
         [Fact]
@@ -1082,20 +1443,31 @@ namespace BO2.Tests.Services
                 IsStopCompleteResult = false,
                 Status = CreateCompatibleStatus()
             };
+            FakeProcessMemoryAccessor memoryAccessor = new();
             var timeProvider = new FakeTimeProvider();
-            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, timeProvider);
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timeProvider,
+                memoryAccessor);
             CompleteConnectWithLoadedMonitor(session);
             session.Disconnect();
+            int attachCallCount = memoryAccessor.AttachCallCount;
             eventMonitor.ResetCalls();
 
             GameConnectionSnapshot snapshot = session.Read();
 
             Assert.Equal(GameConnectionPhase.Disconnecting, snapshot.ConnectionPhase);
             Assert.Equal(GameConnectionEventMonitorState.StopPending, snapshot.EventMonitorSummary.State);
+            Assert.Same(GameEventMonitorStatus.WaitingForMonitor, snapshot.EventMonitorSummary.Status);
+            Assert.Empty(snapshot.EventMonitorSummary.Status.RecentEvents);
+            Assert.Null(snapshot.ReadResult);
             Assert.Equal(GameConnectionPhase.Disconnecting, session.GetStatusSnapshot().ConnectionPhase);
+            Assert.Equal(attachCallCount, memoryAccessor.AttachCallCount);
             Assert.Equal(0, eventMonitor.RequestStopCallCount);
             Assert.Equal(1, eventMonitor.IsStopCompleteCallCount);
             Assert.Equal(1001, eventMonitor.LastStopCompleteTargetProcessId);
+            Assert.Equal(0, eventMonitor.ReadStatusCallCount);
         }
 
         [Fact]
@@ -1107,17 +1479,26 @@ namespace BO2.Tests.Services
                 IsStopCompleteResult = true,
                 Status = CreateCompatibleStatus()
             };
+            FakeProcessMemoryAccessor memoryAccessor = new();
             var timeProvider = new FakeTimeProvider();
-            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, timeProvider);
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timeProvider,
+                memoryAccessor);
             CompleteConnectWithLoadedMonitor(session);
             session.Disconnect();
+            int attachCallCount = memoryAccessor.AttachCallCount;
             eventMonitor.ResetCalls();
 
             GameConnectionSnapshot snapshot = session.Read();
 
             Assert.Equal(GameConnectionEventMonitorState.StopCompleted, snapshot.EventMonitorSummary.State);
-            Assert.Equal(GameConnectionPhase.StatsOnlyDetected, snapshot.ConnectionPhase);
+            Assert.Same(GameEventMonitorStatus.WaitingForMonitor, snapshot.EventMonitorSummary.Status);
+            Assert.Null(snapshot.ReadResult);
+            Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
             Assert.NotEqual(GameConnectionPhase.Disconnecting, session.GetStatusSnapshot().ConnectionPhase);
+            Assert.Equal(attachCallCount, memoryAccessor.AttachCallCount);
             Assert.Equal(0, eventMonitor.RequestStopCallCount);
             Assert.Equal(1, eventMonitor.IsStopCompleteCallCount);
             Assert.Equal(0, eventMonitor.ReadStatusCallCount);
@@ -1132,18 +1513,27 @@ namespace BO2.Tests.Services
                 IsStopCompleteResult = false,
                 Status = CreateCompatibleStatus()
             };
+            FakeProcessMemoryAccessor memoryAccessor = new();
             var timeProvider = new FakeTimeProvider();
-            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame, timeProvider);
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timeProvider,
+                memoryAccessor);
             CompleteConnectWithLoadedMonitor(session);
             session.Disconnect();
+            int attachCallCount = memoryAccessor.AttachCallCount;
             eventMonitor.ResetCalls();
 
             timeProvider.Advance(TimeSpan.FromSeconds(3));
             GameConnectionSnapshot snapshot = session.Read();
 
             Assert.Equal(GameConnectionEventMonitorState.StopTimedOut, snapshot.EventMonitorSummary.State);
-            Assert.Equal(GameConnectionPhase.StatsOnlyDetected, snapshot.ConnectionPhase);
+            Assert.Same(GameEventMonitorStatus.WaitingForMonitor, snapshot.EventMonitorSummary.Status);
+            Assert.Null(snapshot.ReadResult);
+            Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
             Assert.NotEqual(GameConnectionPhase.Disconnecting, session.GetStatusSnapshot().ConnectionPhase);
+            Assert.Equal(attachCallCount, memoryAccessor.AttachCallCount);
             Assert.Equal(0, eventMonitor.RequestStopCallCount);
             Assert.Equal(1, eventMonitor.IsStopCompleteCallCount);
             Assert.Equal(0, eventMonitor.ReadStatusCallCount);

@@ -5,7 +5,6 @@ namespace BO2.Services
         NoGame,
         UnsupportedGame,
         Detected,
-        StatsOnlyDetected,
         Connecting,
         Connected,
         Disconnecting
