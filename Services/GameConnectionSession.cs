@@ -446,7 +446,6 @@ namespace BO2.Services
             DateTimeOffset receivedAt,
             GameConnectionEventMonitorSummary? eventMonitorSummaryOverride = null)
         {
-            GameConnectionRefreshResult? statusOnlyResult = null;
             bool shouldReadPlayerStats;
             bool shouldReadEventMonitor;
             lock (_syncRoot)
@@ -460,14 +459,6 @@ namespace BO2.Services
                     GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
                 shouldReadEventMonitor = ShouldReadEventMonitor(detectedGame, lifecycleSnapshot);
                 shouldReadPlayerStats = ShouldReadPlayerStats(detectedGame, lifecycleSnapshot);
-                if (!shouldReadPlayerStats && !shouldReadEventMonitor)
-                {
-                    statusOnlyResult = CreateRefreshResultLocked(
-                        detectedGame,
-                        null,
-                        GameEventMonitorStatus.WaitingForMonitor,
-                        eventMonitorSummaryOverride);
-                }
             }
 
             if (!shouldReadPlayerStats && !shouldReadEventMonitor)
@@ -481,7 +472,19 @@ namespace BO2.Services
                         return CreateStatusSnapshotLocked(_currentGame);
                     }
 
-                    return statusOnlyResult!.Value;
+                    GameConnectionSessionLifecycleSnapshot lifecycleSnapshot = _lifecycle.CreateSnapshot(
+                        GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
+                    shouldReadEventMonitor = ShouldReadEventMonitor(detectedGame, lifecycleSnapshot);
+                    shouldReadPlayerStats = ShouldReadPlayerStats(detectedGame, lifecycleSnapshot);
+                    if ((!shouldReadPlayerStats && !shouldReadEventMonitor)
+                        || lifecycleSnapshot.IsDisconnecting)
+                    {
+                        return CreateRefreshResultLocked(
+                            detectedGame,
+                            null,
+                            GameEventMonitorStatus.WaitingForMonitor,
+                            eventMonitorSummaryOverride);
+                    }
                 }
             }
 

@@ -166,6 +166,51 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void Read_WhenStatusOnlyLifecycleChangesBeforeReturn_RecomputesReadPlan()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            GameEventMonitorStatus compatibleStatus = CreateCompatibleStatus();
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = compatibleStatus
+            };
+            FakeProcessMemoryAccessor memoryAccessor = new();
+            SessionContext context = CreateSessionContext(
+                eventMonitor,
+                detectedGame: detectedGame,
+                memoryAccessor: memoryAccessor);
+            context.Session.Start();
+            bool connectedDuringClear = false;
+            memoryAccessor.CloseCallback = () =>
+            {
+                if (connectedDuringClear)
+                {
+                    return;
+                }
+
+                connectedDuringClear = true;
+                CompleteConnectWithLoadedMonitor(context.Session);
+            };
+
+            GameConnectionSnapshot snapshot = context.Session.Read();
+
+            Assert.True(connectedDuringClear);
+            Assert.Same(detectedGame, snapshot.CurrentGame);
+            Assert.Equal(GameConnectionPhase.Connected, snapshot.ConnectionPhase);
+            Assert.NotNull(snapshot.ReadResult);
+            Assert.Equal(GameConnectionEventMonitorState.Ready, snapshot.EventMonitorSummary.State);
+            Assert.Same(compatibleStatus, snapshot.EventMonitorSummary.Status);
+            AssertCommandAvailability(
+                snapshot,
+                connectEnabled: false,
+                connectVisible: false,
+                disconnectEnabled: true,
+                disconnectVisible: true);
+            Assert.Equal(snapshot, context.Session.Snapshot);
+            Assert.Equal(1, memoryAccessor.CloseCallCount);
+        }
+
+        [Fact]
         public void Read_WhenConnectedObservableStateIsUnchanged_DoesNotPublishSnapshotChanged()
         {
             DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
