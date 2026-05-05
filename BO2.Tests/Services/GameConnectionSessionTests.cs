@@ -1328,7 +1328,7 @@ namespace BO2.Tests.Services
             {
                 Status = CreateCompatibleStatus()
             };
-            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame);
+            using GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame);
             CompleteConnectWithLoadedMonitor(session);
             eventMonitor.ResetCalls();
 
@@ -1347,7 +1347,7 @@ namespace BO2.Tests.Services
             {
                 Status = CreateCompatibleStatus()
             };
-            GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame);
+            using GameConnectionSession session = CreateStartedSession(eventMonitor, detectedGame);
             CompleteConnectWithLoadedMonitor(session);
             session.Disconnect();
 

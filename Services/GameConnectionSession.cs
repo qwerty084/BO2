@@ -449,7 +449,6 @@ namespace BO2.Services
             GameConnectionRefreshResult? statusOnlyResult = null;
             bool shouldReadPlayerStats;
             bool shouldReadEventMonitor;
-            bool shouldClearAttachedGame;
             lock (_syncRoot)
             {
                 if (!Equals(_currentGame, detectedGame))
@@ -461,7 +460,6 @@ namespace BO2.Services
                     GameConnectionSessionLifecycleGame.FromDetectedGame(detectedGame));
                 shouldReadEventMonitor = ShouldReadEventMonitor(detectedGame, lifecycleSnapshot);
                 shouldReadPlayerStats = ShouldReadPlayerStats(detectedGame, lifecycleSnapshot);
-                shouldClearAttachedGame = !shouldReadPlayerStats;
                 if (!shouldReadPlayerStats && !shouldReadEventMonitor)
                 {
                     statusOnlyResult = CreateRefreshResultLocked(
@@ -474,10 +472,7 @@ namespace BO2.Services
 
             if (!shouldReadPlayerStats && !shouldReadEventMonitor)
             {
-                if (shouldClearAttachedGame)
-                {
-                    _memoryReader.ClearAttachedGame();
-                }
+                _memoryReader.ClearAttachedGame();
 
                 lock (_syncRoot)
                 {
@@ -503,7 +498,7 @@ namespace BO2.Services
                     throw;
                 }
             }
-            else if (shouldClearAttachedGame)
+            else
             {
                 _memoryReader.ClearAttachedGame();
             }
