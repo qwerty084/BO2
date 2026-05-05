@@ -1025,9 +1025,47 @@ namespace BO2.Tests.Services
 
             AssertGameTimer(connectedSnapshot, TimerDisplayKind.Active, "0:00");
             AssertGameTimer(snapshot, TimerDisplayKind.Active, "0:01");
-            AssertRoundTimerPlaceholder(snapshot);
+            AssertRoundTimer(snapshot, TimerDisplayKind.Active, "0:01");
             GameConnectionSnapshotChangedEventArgs change = Assert.Single(changes);
             Assert.Equal(snapshot, change.Snapshot);
+            Assert.Equal(2, timingReader.ReadCallCount);
+            Assert.Same(detectedGame, timingReader.LastDetectedGame);
+        }
+
+        [Fact]
+        public void Read_WhenObservedLaterRoundHasTimingReads_PublishesRoundTimerWithoutGameTimer()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            DateTimeOffset receivedAt = new(2026, 5, 5, 12, 0, 0, TimeSpan.Zero);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus(
+                    new GameEvent(
+                        GameEventType.StartOfRound,
+                        "start_of_round",
+                        4,
+                        0,
+                        0,
+                        receivedAt,
+                        Sequence: 1))
+            };
+            FakeGameTimingReader timingReader = new()
+            {
+                Result = CreateTimingRead(detectedGame, gameTimeMilliseconds: 180_000)
+            };
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timingReader: timingReader);
+            GameConnectionSnapshot connectedSnapshot = CompleteConnectWithLoadedMonitor(session);
+
+            timingReader.Result = CreateTimingRead(detectedGame, gameTimeMilliseconds: 189_999);
+            GameConnectionSnapshot snapshot = session.Read();
+
+            AssertGameTimer(connectedSnapshot, TimerDisplayKind.Placeholder, TimerDisplayState.PlaceholderText);
+            AssertRoundTimer(connectedSnapshot, TimerDisplayKind.Active, "0:00");
+            AssertGameTimer(snapshot, TimerDisplayKind.Placeholder, TimerDisplayState.PlaceholderText);
+            AssertRoundTimer(snapshot, TimerDisplayKind.Active, "0:09");
             Assert.Equal(2, timingReader.ReadCallCount);
             Assert.Same(detectedGame, timingReader.LastDetectedGame);
         }
@@ -1908,13 +1946,21 @@ namespace BO2.Tests.Services
 
         private static void AssertRoundTimerPlaceholder(GameConnectionSnapshot snapshot)
         {
+            AssertRoundTimer(snapshot, TimerDisplayKind.Placeholder, TimerDisplayState.PlaceholderText);
+        }
+
+        private static void AssertRoundTimer(
+            GameConnectionSnapshot snapshot,
+            TimerDisplayKind expectedKind,
+            string expectedText)
+        {
             Assert.NotNull(snapshot.TimerDisplayState);
             TimerDisplayState? timer = snapshot.TimerDisplayState!.RoundTime;
             Assert.NotNull(timer);
             TimerDisplayState roundTime = timer!;
 
-            Assert.Equal(TimerDisplayKind.Placeholder, roundTime.Kind);
-            Assert.Equal(TimerDisplayState.PlaceholderText, RenderTimerText(roundTime));
+            Assert.Equal(expectedKind, roundTime.Kind);
+            Assert.Equal(expectedText, RenderTimerText(roundTime));
         }
 
         private static string RenderTimerText(TimerDisplayState timerDisplayState)

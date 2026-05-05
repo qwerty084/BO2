@@ -634,8 +634,8 @@ namespace BO2.Services
                 stopRequest = ApplyMonitorReadinessTimeoutLocked(detectedGame, eventStatus, receivedAt);
                 if (!stopRequest.ShouldRequestStop)
                 {
-                    ApplyTimerLifecycleEventsLocked(eventStatus);
                     ApplyTimerTimingReadLocked(timingRead);
+                    ApplyTimerLifecycleEventsLocked(eventStatus);
                     result = CreateRefreshResultLocked(detectedGame, readResult, eventStatus, eventMonitorSummaryOverride);
                 }
             }

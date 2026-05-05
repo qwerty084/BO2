@@ -20,15 +20,20 @@ namespace BO2.Services
         private bool _hasUntrustedLifecycleSequence;
         private bool _hasObservedRoundOneStart;
         private bool _isAwaitingGameTimeBaseline;
+        private bool _isAwaitingRoundTimeBaseline;
         private TimeSpan? _latestGameTime;
         private bool _latestGameTimeIsPaused;
         private TimeSpan? _gameTimeBaseline;
         private TimeSpan? _currentGameTime;
         private bool _currentGameTimeIsPaused;
+        private TimeSpan? _roundTimeBaseline;
+        private TimeSpan? _currentRoundGameTime;
+        private bool _currentRoundGameTimeIsPaused;
+        private bool _isRoundActive;
 
         public GameConnectionTimerDisplayState DisplayState => new(
             CreateGameTimerDisplayState(),
-            TimerDisplayState.Placeholder);
+            CreateRoundTimerDisplayState());
 
         internal bool HasUntrustedLifecycleSequence => _hasUntrustedLifecycleSequence;
 
@@ -39,7 +44,7 @@ namespace BO2.Services
             if (lifecycleEvents.HasSequenceGap)
             {
                 _hasUntrustedLifecycleSequence = true;
-                ClearGameTimer();
+                ClearTimers();
                 return;
             }
 
@@ -52,11 +57,19 @@ namespace BO2.Services
             {
                 switch (lifecycleEvent.EventType)
                 {
-                    case GameEventType.StartOfRound when lifecycleEvent.LevelTime == 1:
-                        ObserveRoundOneStart();
+                    case GameEventType.StartOfRound when IsValidRound(lifecycleEvent.LevelTime):
+                        ObserveRoundStart();
+                        if (lifecycleEvent.LevelTime == 1)
+                        {
+                            ObserveRoundOneStart();
+                        }
+
+                        break;
+                    case GameEventType.EndOfRound when IsValidRound(lifecycleEvent.LevelTime):
+                        ObserveRoundEnd();
                         break;
                     case GameEventType.EndGame:
-                        ClearGameTimer();
+                        ClearTimers();
                         break;
                 }
             }
@@ -78,13 +91,23 @@ namespace BO2.Services
             if (_isAwaitingGameTimeBaseline)
             {
                 CaptureGameTimeBaseline();
-                return;
+            }
+
+            if (_isAwaitingRoundTimeBaseline)
+            {
+                CaptureRoundTimeBaseline();
             }
 
             if (_gameTimeBaseline is not null)
             {
                 _currentGameTime = gameTime;
                 _currentGameTimeIsPaused = _latestGameTimeIsPaused;
+            }
+
+            if (_roundTimeBaseline is not null && _isRoundActive)
+            {
+                _currentRoundGameTime = gameTime;
+                _currentRoundGameTimeIsPaused = _latestGameTimeIsPaused;
             }
         }
 
@@ -94,7 +117,7 @@ namespace BO2.Services
             _hasObservedRoundOneStart = false;
             _latestGameTime = null;
             _latestGameTimeIsPaused = false;
-            ClearGameTimer();
+            ClearTimers();
         }
 
         private TimerDisplayState CreateGameTimerDisplayState()
@@ -114,6 +137,35 @@ namespace BO2.Services
             return _currentGameTimeIsPaused
                 ? TimerDisplayState.Frozen(elapsed)
                 : TimerDisplayState.Active(elapsed);
+        }
+
+        private TimerDisplayState CreateRoundTimerDisplayState()
+        {
+            if (_roundTimeBaseline is not TimeSpan baseline
+                || _currentRoundGameTime is not TimeSpan currentGameTime)
+            {
+                return TimerDisplayState.Placeholder;
+            }
+
+            TimeSpan elapsed = currentGameTime - baseline;
+            if (elapsed < TimeSpan.Zero)
+            {
+                elapsed = TimeSpan.Zero;
+            }
+
+            return !_isRoundActive || _currentRoundGameTimeIsPaused
+                ? TimerDisplayState.Frozen(elapsed)
+                : TimerDisplayState.Active(elapsed);
+        }
+
+        private void ObserveRoundStart()
+        {
+            _isRoundActive = true;
+            _isAwaitingRoundTimeBaseline = true;
+            _roundTimeBaseline = null;
+            _currentRoundGameTime = null;
+            _currentRoundGameTimeIsPaused = false;
+            CaptureRoundTimeBaseline();
         }
 
         private void ObserveRoundOneStart()
@@ -137,14 +189,44 @@ namespace BO2.Services
             _isAwaitingGameTimeBaseline = false;
         }
 
-        private void ClearGameTimer()
+        private void CaptureRoundTimeBaseline()
+        {
+            if (!_isRoundActive
+                || _latestGameTime is not TimeSpan latestGameTime)
+            {
+                return;
+            }
+
+            _roundTimeBaseline = latestGameTime;
+            _currentRoundGameTime = latestGameTime;
+            _currentRoundGameTimeIsPaused = _latestGameTimeIsPaused;
+            _isAwaitingRoundTimeBaseline = false;
+        }
+
+        private void ObserveRoundEnd()
+        {
+            _isRoundActive = false;
+            _isAwaitingRoundTimeBaseline = false;
+        }
+
+        private void ClearTimers()
         {
             _isAwaitingGameTimeBaseline = false;
+            _isAwaitingRoundTimeBaseline = false;
             _latestGameTime = null;
             _latestGameTimeIsPaused = false;
             _gameTimeBaseline = null;
             _currentGameTime = null;
             _currentGameTimeIsPaused = false;
+            _roundTimeBaseline = null;
+            _currentRoundGameTime = null;
+            _currentRoundGameTimeIsPaused = false;
+            _isRoundActive = false;
+        }
+
+        private static bool IsValidRound(int round)
+        {
+            return round > 0;
         }
     }
 
