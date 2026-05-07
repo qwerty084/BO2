@@ -28,6 +28,14 @@ _Avoid_: injector, hook
 A read-only sample of confirmed player stat and candidate addresses from the current **Detected Game**.
 _Avoid_: polling update, refresh
 
+**Game Timing Read**:
+A read-only sample of supported Steam Zombies timing facts, including the memory-backed game time and pause evidence used by timer state.
+_Avoid_: timer poll, pause poll, timing refresh
+
+**Game Timer State**:
+The app-owned state machine that turns **Game Timing Read** samples and **Event Monitor** lifecycle events into placeholder, active, or frozen timer display state.
+_Avoid_: UI timer, wall-clock timer, event timer
+
 **Box Tracker Widget**:
 A user-enabled overlay window that displays recent box events from the current **Event Monitor** outside the main app shell.
 _Avoid_: overlay, native widget window
@@ -46,6 +54,9 @@ _Avoid_: widget manager, overlay service
 - A **Current Game Page** is the app's default first page; the old home stats surface no longer exists as a separate page.
 - A **Player Stats Read** belongs to exactly one **Detected Game** when Steam Zombies is supported.
 - An **Event Monitor** can provide event data only after the **Game Connection Session** connects to Steam Zombies.
+- A **Game Timing Read** belongs to exactly one **Detected Game** when Steam Zombies timing support is available.
+- **Game Timer State** belongs to the **Game Connection Session** and is reset when the session disconnects, the **Detected Game** changes, or timing confirms inactive/lobby state.
+- The **Current Game Page** displays only projected timer text from the **Game Connection Snapshot**; it does not know timing addresses, event cursors, pause evidence, or stale-state reasons.
 - A **Box Tracker Widget** displays recent box events from the current **Event Monitor**.
 - A **Box Tracker Widget Runtime** owns the lifecycle of zero or one visible **Box Tracker Widget**.
 
@@ -58,3 +69,4 @@ _Avoid_: widget manager, overlay service
 
 - "refresh" can mean UI timer work, process memory reads, or monitor snapshot reads. Use **Player Stats Read** for memory sampling and **Game Connection Session** for lifecycle coordination.
 - Today, **Player Stats Read** can occur before the user connects the **Game Connection Session**. Planned direction: connect should become the user's explicit initiation point for active game reads, including **Player Stats Read** and **Event Monitor** data.
+- In-game and round timers are v1 Steam Zombies solo behavior. Do not promise co-op pause correctness, timer widgets, timer history, pause badge UI, or native **Event Monitor** shared snapshot timer fields without a separate validation pass.

@@ -19,6 +19,7 @@ namespace BO2.Services
     {
         private bool _hasUntrustedLifecycleSequence;
         private bool _hasObservedRoundOneStart;
+        private bool _hasObservedEndGame;
         private bool _isAwaitingGameTimeBaseline;
         private bool _isAwaitingRoundTimeBaseline;
         private TimeSpan? _latestGameTime;
@@ -44,11 +45,11 @@ namespace BO2.Services
             if (lifecycleEvents.HasSequenceGap)
             {
                 _hasUntrustedLifecycleSequence = true;
-                ClearTimers();
+                FreezeKnownTimers();
                 return;
             }
 
-            if (_hasUntrustedLifecycleSequence)
+            if (_hasUntrustedLifecycleSequence || _hasObservedEndGame)
             {
                 return;
             }
@@ -69,8 +70,8 @@ namespace BO2.Services
                         ObserveRoundEnd();
                         break;
                     case GameEventType.EndGame:
-                        ClearTimers();
-                        break;
+                        ObserveEndGame();
+                        return;
                 }
             }
         }
@@ -79,8 +80,21 @@ namespace BO2.Services
         {
             ArgumentNullException.ThrowIfNull(timingRead);
 
+            if (timingRead.Status == GameTimingReadStatus.InactiveLobbyState)
+            {
+                ClearTimers();
+                return;
+            }
+
             if (timingRead.Status != GameTimingReadStatus.SupportedTiming
                 || timingRead.GameTime is not TimeSpan gameTime)
+            {
+                return;
+            }
+
+            if (_hasUntrustedLifecycleSequence
+                || _hasObservedEndGame
+                || IsStaleGameTime(gameTime))
             {
                 return;
             }
@@ -113,10 +127,6 @@ namespace BO2.Services
 
         public void Reset()
         {
-            _hasUntrustedLifecycleSequence = false;
-            _hasObservedRoundOneStart = false;
-            _latestGameTime = null;
-            _latestGameTimeIsPaused = false;
             ClearTimers();
         }
 
@@ -131,7 +141,7 @@ namespace BO2.Services
             TimeSpan elapsed = currentGameTime - baseline;
             if (elapsed < TimeSpan.Zero)
             {
-                elapsed = TimeSpan.Zero;
+                return TimerDisplayState.Placeholder;
             }
 
             return _currentGameTimeIsPaused
@@ -150,7 +160,7 @@ namespace BO2.Services
             TimeSpan elapsed = currentGameTime - baseline;
             if (elapsed < TimeSpan.Zero)
             {
-                elapsed = TimeSpan.Zero;
+                return TimerDisplayState.Placeholder;
             }
 
             return !_isRoundActive || _currentRoundGameTimeIsPaused
@@ -209,8 +219,33 @@ namespace BO2.Services
             _isAwaitingRoundTimeBaseline = false;
         }
 
+        private void ObserveEndGame()
+        {
+            _hasObservedEndGame = true;
+            FreezeKnownTimers();
+        }
+
+        private bool IsStaleGameTime(TimeSpan gameTime)
+        {
+            return (_latestGameTime is TimeSpan latestGameTime && gameTime < latestGameTime)
+                || (_gameTimeBaseline is TimeSpan gameTimeBaseline && gameTime < gameTimeBaseline)
+                || (_roundTimeBaseline is TimeSpan roundTimeBaseline && gameTime < roundTimeBaseline);
+        }
+
+        private void FreezeKnownTimers()
+        {
+            _isAwaitingGameTimeBaseline = false;
+            _isAwaitingRoundTimeBaseline = false;
+            _currentGameTimeIsPaused = true;
+            _currentRoundGameTimeIsPaused = true;
+            _isRoundActive = false;
+        }
+
         private void ClearTimers()
         {
+            _hasUntrustedLifecycleSequence = false;
+            _hasObservedRoundOneStart = false;
+            _hasObservedEndGame = false;
             _isAwaitingGameTimeBaseline = false;
             _isAwaitingRoundTimeBaseline = false;
             _latestGameTime = null;

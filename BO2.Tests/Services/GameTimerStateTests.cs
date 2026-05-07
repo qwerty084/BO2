@@ -133,10 +133,195 @@ namespace BO2.Tests.Services
             AssertRoundTimer(state, TimerDisplayKind.Active, "0:12");
         }
 
+        [Theory]
+        [InlineData((int)GameTimingReadStatus.UnsupportedTiming)]
+        [InlineData((int)GameTimingReadStatus.InvalidTimingSourceState)]
+        [InlineData((int)GameTimingReadStatus.GenericReadFailure)]
+        public void ApplyTimingRead_WhenNonSupportedReadIsNotInactiveLobby_PreservesExistingTimers(
+            int statusValue)
+        {
+            GameTimingReadStatus status = (GameTimingReadStatus)statusValue;
+            GameTimerState state = new();
+            state.ApplyLifecycleEvents(CreateLifecycleBatch(CreateRoundStart(round: 1)));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 10_000));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 42_000));
+
+            state.ApplyTimingRead(CreateTimingRead(status));
+
+            AssertGameTimer(state, TimerDisplayKind.Active, "0:32");
+            AssertRoundTimer(state, TimerDisplayKind.Active, "0:32");
+        }
+
+        [Fact]
+        public void ApplyTimingRead_WhenInactiveLobbyStateIsConfirmed_ClearsTimersAndAllowsNewMatch()
+        {
+            GameTimerState state = new();
+            state.ApplyLifecycleEvents(CreateLifecycleBatch(CreateRoundStart(round: 1)));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 10_000));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 40_000));
+            state.ApplyLifecycleEvents(CreateLifecycleBatch(CreateGameEnd()));
+
+            AssertGameTimer(state, TimerDisplayKind.Frozen, "0:30");
+            AssertRoundTimer(state, TimerDisplayKind.Frozen, "0:30");
+
+            state.ApplyTimingRead(CreateTimingRead(GameTimingReadStatus.InactiveLobbyState));
+
+            AssertPlaceholderGameTimer(state);
+            AssertRoundTimerPlaceholder(state);
+
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 2_000));
+            state.ApplyLifecycleEvents(CreateLifecycleBatch(CreateRoundStart(round: 1)));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 12_000));
+
+            AssertGameTimer(state, TimerDisplayKind.Active, "0:10");
+            AssertRoundTimer(state, TimerDisplayKind.Active, "0:10");
+        }
+
+        [Fact]
+        public void ApplyTimingRead_WhenSupportedReadMovesGameTimeBackward_PreservesLastKnownTimers()
+        {
+            GameTimerState state = new();
+            state.ApplyLifecycleEvents(CreateLifecycleBatch(CreateRoundStart(round: 1)));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 10_000));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 40_000));
+
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 25_000));
+
+            AssertGameTimer(state, TimerDisplayKind.Active, "0:30");
+            AssertRoundTimer(state, TimerDisplayKind.Active, "0:30");
+
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 45_000));
+
+            AssertGameTimer(state, TimerDisplayKind.Active, "0:35");
+            AssertRoundTimer(state, TimerDisplayKind.Active, "0:35");
+        }
+
+        [Fact]
+        public void ApplyTimingRead_WhenSupportedReadWouldMakeElapsedNegative_DoesNotClampIntoNormalOutput()
+        {
+            GameTimerState state = new();
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 100_000));
+            state.ApplyLifecycleEvents(CreateLifecycleBatch(CreateRoundStart(round: 4)));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 130_000));
+
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 90_000));
+
+            AssertPlaceholderGameTimer(state);
+            AssertRoundTimer(state, TimerDisplayKind.Active, "0:30");
+        }
+
+        [Fact]
+        public void ApplyLifecycleEvents_WhenSequenceGapIsObserved_FreezesKnownTimersAndStopsAdvancementUntilLobby()
+        {
+            GameTimerState state = new();
+            state.ApplyLifecycleEvents(CreateLifecycleBatch(CreateRoundStart(round: 1)));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 10_000));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 40_000));
+
+            state.ApplyLifecycleEvents(CreateGappedLifecycleBatch(CreateGameEnd()));
+
+            Assert.True(state.HasUntrustedLifecycleSequence);
+            AssertGameTimer(state, TimerDisplayKind.Frozen, "0:30");
+            AssertRoundTimer(state, TimerDisplayKind.Frozen, "0:30");
+
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 60_000));
+            state.ApplyLifecycleEvents(CreateLifecycleBatch(CreateRoundStart(round: 2)));
+
+            AssertGameTimer(state, TimerDisplayKind.Frozen, "0:30");
+            AssertRoundTimer(state, TimerDisplayKind.Frozen, "0:30");
+
+            state.ApplyTimingRead(CreateTimingRead(GameTimingReadStatus.InactiveLobbyState));
+
+            Assert.False(state.HasUntrustedLifecycleSequence);
+            AssertPlaceholderGameTimer(state);
+            AssertRoundTimerPlaceholder(state);
+
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 5_000));
+            state.ApplyLifecycleEvents(CreateLifecycleBatch(CreateRoundStart(round: 1)));
+
+            AssertGameTimer(state, TimerDisplayKind.Active, "0:00");
+            AssertRoundTimer(state, TimerDisplayKind.Active, "0:00");
+        }
+
+        [Fact]
+        public void ApplyLifecycleEvents_WhenSequenceGapIsObservedWithMissingBaselines_KeepsPlaceholders()
+        {
+            GameTimerState state = new();
+            state.ApplyLifecycleEvents(CreateLifecycleBatch(CreateRoundStart(round: 2)));
+
+            state.ApplyLifecycleEvents(CreateGappedLifecycleBatch());
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 50_000));
+
+            Assert.True(state.HasUntrustedLifecycleSequence);
+            AssertPlaceholderGameTimer(state);
+            AssertRoundTimerPlaceholder(state);
+        }
+
+        [Fact]
+        public void ApplyLifecycleEvents_WhenEndGameIsObserved_FreezesKnownTimersAndPreservesThroughReadFailures()
+        {
+            GameTimerState state = new();
+            state.ApplyLifecycleEvents(CreateLifecycleBatch(CreateRoundStart(round: 1)));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 10_000));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 70_000));
+
+            state.ApplyLifecycleEvents(CreateLifecycleBatch(CreateGameEnd()));
+
+            AssertGameTimer(state, TimerDisplayKind.Frozen, "1:00");
+            AssertRoundTimer(state, TimerDisplayKind.Frozen, "1:00");
+
+            state.ApplyTimingRead(CreateTimingRead(GameTimingReadStatus.GenericReadFailure));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 90_000));
+
+            AssertGameTimer(state, TimerDisplayKind.Frozen, "1:00");
+            AssertRoundTimer(state, TimerDisplayKind.Frozen, "1:00");
+        }
+
+        [Fact]
+        public void ApplyLifecycleEvents_WhenEndGameIsObservedWithMissingGameTimer_LeavesGamePlaceholderAndFreezesRound()
+        {
+            GameTimerState state = new();
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 100_000));
+            state.ApplyLifecycleEvents(CreateLifecycleBatch(CreateRoundStart(round: 4)));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 125_000));
+
+            state.ApplyLifecycleEvents(CreateLifecycleBatch(CreateGameEnd()));
+
+            AssertPlaceholderGameTimer(state);
+            AssertRoundTimer(state, TimerDisplayKind.Frozen, "0:25");
+        }
+
+        [Fact]
+        public void Reset_WhenTimersExist_ClearsTimersAndAllowsFreshMatch()
+        {
+            GameTimerState state = new();
+            state.ApplyLifecycleEvents(CreateLifecycleBatch(CreateRoundStart(round: 1)));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 10_000));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 30_000));
+
+            state.Reset();
+
+            AssertPlaceholderGameTimer(state);
+            AssertRoundTimerPlaceholder(state);
+
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 5_000));
+            state.ApplyLifecycleEvents(CreateLifecycleBatch(CreateRoundStart(round: 1)));
+            state.ApplyTimingRead(CreateTimingRead(gameTimeMilliseconds: 15_000));
+
+            AssertGameTimer(state, TimerDisplayKind.Active, "0:10");
+            AssertRoundTimer(state, TimerDisplayKind.Active, "0:10");
+        }
+
         private static GameTimerLifecycleEventBatch CreateLifecycleBatch(
             params GameTimerLifecycleEvent[] events)
         {
             return new GameTimerLifecycleEventBatch(events, HasSequenceGap: false);
+        }
+
+        private static GameTimerLifecycleEventBatch CreateGappedLifecycleBatch(
+            params GameTimerLifecycleEvent[] events)
+        {
+            return new GameTimerLifecycleEventBatch(events, HasSequenceGap: true);
         }
 
         private static GameTimerLifecycleEvent CreateRoundStart(int round)
@@ -157,6 +342,15 @@ namespace BO2.Tests.Services
                 new DateTimeOffset(2026, 5, 5, 12, 0, 0, TimeSpan.Zero));
         }
 
+        private static GameTimerLifecycleEvent CreateGameEnd()
+        {
+            return new GameTimerLifecycleEvent(
+                Sequence: 99,
+                GameEventType.EndGame,
+                0,
+                new DateTimeOffset(2026, 5, 5, 12, 0, 0, TimeSpan.Zero));
+        }
+
         private static GameTimingReadResult CreateTimingRead(
             int gameTimeMilliseconds,
             bool isPaused = false)
@@ -165,6 +359,18 @@ namespace BO2.Tests.Services
                 CreateDetectedGame(),
                 TimeSpan.FromMilliseconds(gameTimeMilliseconds),
                 isPaused);
+        }
+
+        private static GameTimingReadResult CreateTimingRead(GameTimingReadStatus status)
+        {
+            return status switch
+            {
+                GameTimingReadStatus.UnsupportedTiming => GameTimingReadResult.UnsupportedTiming(CreateDetectedGame()),
+                GameTimingReadStatus.InvalidTimingSourceState => GameTimingReadResult.InvalidTimingSourceState(CreateDetectedGame()),
+                GameTimingReadStatus.InactiveLobbyState => GameTimingReadResult.InactiveLobbyState(CreateDetectedGame()),
+                GameTimingReadStatus.GenericReadFailure => GameTimingReadResult.GenericReadFailure(CreateDetectedGame()),
+                _ => throw new ArgumentOutOfRangeException(nameof(status), status, null)
+            };
         }
 
         private static GameTimingReadResult CreateInvalidTimingRead()
