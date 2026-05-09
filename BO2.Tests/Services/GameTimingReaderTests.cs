@@ -140,6 +140,21 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void WhenTimingSourceReturnsZeroElapsedTime_ThenReturnsSupportedTiming()
+        {
+            DetectedGame detectedGame = MakeSteamZombiesGame();
+            var memoryAccessor = new FakeProcessMemoryAccessor();
+            ConfigureActiveTimingRead(memoryAccessor, gameTimeMilliseconds: 0, isPaused: true);
+            using var reader = new GameTimingReader(memoryAccessor);
+
+            GameTimingReadResult result = reader.ReadGameTiming(detectedGame);
+
+            Assert.Equal(GameTimingReadStatus.SupportedTiming, result.Status);
+            Assert.Equal(TimeSpan.Zero, result.GameTime);
+            Assert.True(result.IsPaused);
+        }
+
+        [Fact]
         public void WhenTimingSourceReturnsNegativeElapsedTime_ThenReturnsInvalidTimingSourceState()
         {
             DetectedGame detectedGame = MakeSteamZombiesGame();

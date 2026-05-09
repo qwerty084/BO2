@@ -81,7 +81,7 @@ namespace BO2.Services
                 }
 
                 int gameTimeMilliseconds = ReadInt32(gameTimeMillisecondsAddress, "game time milliseconds");
-                if (gameTimeMilliseconds <= 0)
+                if (gameTimeMilliseconds < 0)
                 {
                     return GameTimingReadResult.InvalidTimingSourceState(detectedGame);
                 }
