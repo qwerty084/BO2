@@ -74,7 +74,7 @@ Timing uses a separate map:
 
 | Field | Address or offset | Usage |
 |---|---:|---|
-| `sv_running` | `0x02A09F00` | Nonzero server-running gate. |
+| `sv_running` | `0x02A09F00` | Byte boolean server-running gate. |
 | `cl_paused` | `0x02A09DE0` | Pause state. |
 | client-active pointer | `0x0119DC04` | Pointer followed by `GameTimingReader`. |
 | snapshot valid | `+0x50` | Must be nonzero. |
@@ -105,7 +105,7 @@ Timing values:
 
 | Field | Address or offset | Live value |
 |---|---:|---:|
-| `sv_running` | `0x02A09F00` | `12573441` |
+| `sv_running` | `0x02A09F00` | `12573441` from an obsolete int32 probe; production reads this as a byte boolean. |
 | `cl_paused` | `0x02A09DE0` | `1` |
 | client-active pointer | `0x0119DC04` | `0x2D3ECEB0` |
 | snapshot valid | `client + 0x50` | `1` |

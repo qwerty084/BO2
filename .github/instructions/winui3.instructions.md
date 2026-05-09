@@ -12,7 +12,7 @@ These UWP patterns are **wrong** for WinUI 3 desktop apps. Always use the Window
 - **NEVER** use `Windows.UI.Popups.MessageDialog`. Use `ContentDialog` with `XamlRoot` set.
 - **NEVER** show a `ContentDialog` without setting `dialog.XamlRoot = this.Content.XamlRoot` (or `this.XamlRoot` from a Page) first.
 - **NEVER** use `CoreDispatcher.RunAsync` or `Dispatcher.RunAsync`. Use `DispatcherQueue.TryEnqueue`.
-- **NEVER** use `Window.Current`. Track the main window via `App.MainWindow` (static property).
+- **NEVER** use `Window.Current`. Follow the existing app/window ownership pattern; BO2 keeps a private `_window` reference in `App.xaml.cs` and passes window or dispatcher context explicitly where needed.
 - **NEVER** use `Windows.UI.Xaml.*` namespaces. Use `Microsoft.UI.Xaml.*`.
 - **NEVER** use `Windows.UI.Composition`. Use `Microsoft.UI.Composition`.
 - **NEVER** use `Windows.UI.Colors`. Use `Microsoft.UI.Colors`.
@@ -46,18 +46,18 @@ These UWP patterns are **wrong** for WinUI 3 desktop apps. Always use the Window
 - Get the `AppWindow` from a WinUI 3 `Window` via `WindowNative.GetWindowHandle` → `Win32Interop.GetWindowIdFromWindow` → `AppWindow.GetFromWindowId`.
 - Use `AppWindow` for resize, move, title, and presenter operations.
 - Custom title bar: use `AppWindow.TitleBar` properties, not `CoreApplicationViewTitleBar`.
-- Track the main window as `App.MainWindow` (static property set in `OnLaunched`).
+- Do not assume an `App.MainWindow` static property exists. Use the existing window reference and dispatcher patterns from `App.xaml.cs` and `MainWindow.xaml.cs`.
 
 ## Dialogs and Pickers
 
 - **ContentDialog**: Always set `dialog.XamlRoot` before calling `ShowAsync()`.
-- **Project-specific:** This project uses `WinUISDKReferences=false`, so `ContentDialog.ShowAsync()` cannot be directly awaited. Use event-based pattern: `dialog.PrimaryButtonClick += ...; _ = dialog.ShowAsync();`
-- **File/Folder Pickers**: Initialize with `WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd)` where `hwnd` comes from `WindowNative.GetWindowHandle(App.MainWindow)`.
+- **Project-specific:** Set `XamlRoot`, then `await dialog.ShowAsync()` as in the current dialog helpers. Use event handlers only for dialog setup or validation behavior that the control requires.
+- **File/Folder Pickers**: Initialize with `WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd)` where `hwnd` comes from the active WinUI `Window` instance.
 
 ## MVVM and Data Binding
 
-- This project uses **manual `INotifyPropertyChanged`** with `[CallerMemberName]` — not CommunityToolkit.Mvvm.
-- Use the custom `RelayCommand` / `RelayCommand<T>` from `Commands/` for ICommand bindings.
+- This project uses **manual `INotifyPropertyChanged`** with `[CallerMemberName]`, not CommunityToolkit.Mvvm.
+- The current shell command state is projected through view models and event handlers. Follow existing command patterns before adding an `ICommand` abstraction.
 - Keep UI (Views) focused on layout and bindings; keep logic in ViewModels and services.
 - Use `async`/`await` for I/O and long-running work to keep the UI responsive.
 
@@ -93,9 +93,8 @@ These UWP patterns are **wrong** for WinUI 3 desktop apps. Always use the Window
 
 ## App Settings
 
-- **Packaged apps**: `ApplicationData.Current.LocalSettings` works as expected.
-- **Unpackaged apps**: Settings may not persist — use a custom settings file as fallback.
-- This project uses `ApplicationData.Current.LocalSettings` for language preference (`LanguageOverride` key).
+- This project stores preferences in custom JSON files under `%LocalAppData%\BO2`, such as `preferences.json` and `widgets.json`.
+- Use the existing store types before adding new settings persistence. Do not use `ApplicationData.Current.LocalSettings` unless a change intentionally introduces and tests that storage model.
 
 ## Typography
 
@@ -152,7 +151,7 @@ These UWP patterns are **wrong** for WinUI 3 desktop apps. Always use the Window
 
 ## Testing
 
-- This project uses a separate xUnit test project (`ZombieForge.Tests/`) that **links source files** (not a project reference) to avoid WinAppSDK runtime auto-init failures.
+- This project uses a separate xUnit test project (`BO2.Tests/`) that **links source files** where needed to avoid WinAppSDK runtime auto-init failures.
 - Pure logic tests (models, services) use standard `[Fact]`/`[Theory]` with xUnit.
 - Tests that create WinUI XAML types require a **Unit Test App (WinUI in Desktop)** project.
 

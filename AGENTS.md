@@ -6,6 +6,7 @@
 - Build 32-bit Windows app: `dotnet build .\BO2.csproj -p:Platform=x86`.
 - Run non-UI unit tests: `dotnet test BO2.Tests\BO2.Tests.csproj`.
 - Run native C++ unit tests: `.\tools\Run-NativeTests.ps1 -Configuration Release`.
+- Run native C++ unit tests with the production hook flag: `.\tools\Run-NativeTests.ps1 -Configuration ReleaseWithVmNotifyHook`.
 - Create the standard .NET editor configuration with `dotnet new editorconfig` when adopting or refreshing the formatter baseline.
 - Apply C# formatter fixes with `dotnet format .\BO2.slnx -v detailed --severity info`.
 - Check C# formatting without editing files with `dotnet format .\BO2.slnx -v detailed --verify-no-changes --severity info`.
@@ -16,10 +17,10 @@
 
 ## Architecture
 
-- Single-project WinUI 3 desktop app. `BO2.csproj` targets `net8.0-windows10.0.19041.0`, uses Windows App SDK + single-project MSIX tooling.
+- WinUI 3 desktop app with native payloads and tests in `BO2.slnx`. `BO2.csproj` targets `net8.0-windows10.0.19041.0`, uses Windows App SDK + single-project MSIX tooling, and supports only `Platform=x86`.
 - `App.xaml` merges `XamlControlsResources` for app-wide WinUI resources.
 - `App.xaml.cs`: launch entry. `OnLaunched` creates `MainWindow`, stores private `_window`, activates it.
-- `MainWindow.xaml`: full UI shell; one `Window` with `MicaBackdrop` and app main UI content, including player stats + candidate details. `MainWindow.xaml.cs` only initializes partial class.
+- `MainWindow.xaml`: app shell window with `MicaBackdrop`, navigation, connection controls, settings UI, and page host. `MainWindow.xaml.cs` owns shell wiring, refresh resources, connection handlers, widget runtime coordination, theme persistence, and cleanup.
 - Packaging in project, no separate packaging project. `Package.appxmanifest` defines identity, logos, capabilities; `app.manifest` carries unpackaged compatibility + DPI.
 - `Properties\launchSettings.json`: two local run profiles: packaged (`MsixPackage`) and unpackaged (`Project`).
 

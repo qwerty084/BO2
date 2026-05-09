@@ -55,7 +55,7 @@ This file records what remains unresolved after the static Ghidra pass and the 2
 - `tools/Find-BO2BoxWeaponByGhidraLayout.ps1` now tolerates missing exact field names and continues with available IDs.
 - Ghidra project functions were renamed and conservatively typed for `local_vm_notify_entry`, `sl_get_string_of_size`, `scr_find_variable`, `scr_get_variable_value`, `scr_get_variable_value_address`, `scr_set_variable_field`, and `scr_find_object`.
 - Ghidra project globals were labelled/commented for the script string pointer, child table slots, callback table, and notify remap globals.
-- `function-catalog.csv` now includes Ghidra prototypes, calling convention, and bounded decompile snippets.
+- `function-catalog.csv` now includes Ghidra prototypes, calling convention, callers, callees, and xrefs without raw decompiler snippets.
 
 ## Runtime Confirmation Boundary
 

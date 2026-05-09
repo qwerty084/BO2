@@ -41,11 +41,11 @@ These automated tests do not start Steam Zombies, attach to a live `t6zm.exe`, v
 - Successful connection: Connect succeeds against the live Detected Game.
 - Monitor compatibility: the **Event Monitor** reaches a compatible state for the running Steam Zombies build.
 - Live stat refresh: player stats update while in a match.
-- Real box-event capture: a mystery-box roll produces a box event rendered as `randomization_done: <weapon alias>` in the app and widget.
+- Real box-event capture: a mystery-box roll produces a box event containing `randomization_done` and the resolved weapon display name or alias in the app and widget.
 - Disconnect cleanup: Disconnect requests monitor shutdown, returns the UI to disconnected state, and does not crash.
 - Game-exit recovery: closing BO2 while connected returns the UI to disconnected state on the next refresh.
 
 ## Notes
 
-- The app should remain read-only: do not add Detected Game memory writes or BO2 process modification as part of this smoke test.
-- Preserve the snapshot v6 `randomization_done` weapon-name path unless new wiki-backed evidence proves it changed.
+- The app should not write game state: do not add Detected Game memory writes or new BO2 process modification beyond the existing explicit Connect / `BO2Monitor.dll` injection path as part of this smoke test.
+- Preserve the snapshot v6 weapon-name path unless new repo-backed evidence proves it changed.

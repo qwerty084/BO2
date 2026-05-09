@@ -4,7 +4,7 @@ This pack documents the Steam Zombies executable used by this repo's current liv
 
 ## Binary And Build
 
-- Target binary: `C:\Program Files (x86)\Steam\steamapps\common\Call of Duty Black Ops II\t6zm.exe`
+- Target binary: Steam app `202970` `t6zm.exe` from a local Steam install. The local install path is intentionally omitted.
 - Steam app id: `202970`
 - Steam build id: `65428`
 - File size: `13096504` bytes
@@ -28,18 +28,16 @@ The repo supports live reads for Steam Zombies only:
 
 Primary outputs created by this pass:
 
-- `artifacts/reverse/ghidra/bo2-ghidra-recon.txt`: original Ghidra post-script output with decompile snippets, xrefs, and ASCII searches.
 - `artifacts/reverse/function-catalog.csv`: Ghidra-derived function catalog for the important code targets.
 - `artifacts/reverse/globals-catalog.csv`: Ghidra-derived global/data catalog for important VM pointers.
 - `artifacts/reverse/callgraph-notes.md`: readable callgraph notes exported from Ghidra.
 - `artifacts/reverse/address-ledger.csv`: final provenance ledger.
-- `artifacts/reverse/address-ledger.seed.csv`: repo-first seed ledger.
 - `artifacts/reverse/open-questions.md`: remaining work queue.
 - `artifacts/reverse/runtime-validation-2026-05-09.md`: read-only Town runtime notes.
 
-The first Ghidra import completed and saved the project. Ghidra reported Java heap warnings in constant propagation and stack-variable analyzers, but the project, original post-script output, and companion catalogs were produced. The companion exporter was rerun with `-noanalysis` against the saved project.
+The first Ghidra import completed and saved the local project. Ghidra reported Java heap warnings in constant propagation and stack-variable analyzers, but the companion catalogs were produced. The companion exporter was rerun with `-noanalysis` against the saved local project.
 
-The 2026-05-09 continuation pass reran the companion exporter with `-noanalysis`, applied durable names/comments and conservative helper signatures in the saved Ghidra project, and refreshed the catalogs. The function catalog now includes Ghidra prototypes, calling conventions, and bounded decompile snippets.
+The 2026-05-09 continuation pass reran the companion exporter with `-noanalysis`, applied durable names/comments and conservative helper signatures in the saved Ghidra project, and refreshed the catalogs. The function catalog now includes Ghidra prototypes, calling conventions, callers, callees, and xrefs without raw decompiler snippets.
 
 ## Subsystem Map
 
@@ -76,7 +74,7 @@ Future agents can split work along these issue boundaries:
 5. Mystery-box and weapon alias flow.
 6. Snapshot contract and native/managed bridge verification.
 7. x32dbg runtime confirmation.
-8. Final docs and wiki-ready knowledge consolidation.
+8. Final repo-docs knowledge consolidation.
 
 ## Dynamic Validation Status
 

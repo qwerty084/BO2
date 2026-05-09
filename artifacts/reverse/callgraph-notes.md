@@ -1,6 +1,6 @@
 # t6zm.exe Callgraph Notes
 
-- Program: /C:/Program Files (x86)/Steam/steamapps/common/Call of Duty Black Ops II/t6zm.exe
+- Program: t6zm.exe (Steam app 202970, local path intentionally omitted)
 - Image base: 00400000
 - Language: x86:LE:32:default
 - Compiler spec: windows

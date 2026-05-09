@@ -1,36 +1,38 @@
 # Copilot Instructions
 
-## Build, test, and lint
+Use [AGENTS.md](../AGENTS.md) as the primary agent instruction file. Local docs under [docs](../docs/index.md) are canonical; the external GitHub wiki is historical and has been migrated.
 
-- Build the solution with `dotnet build .\BO2.slnx`.
-- Build arch with `dotnet build .\BO2.csproj -p:Platform=x64`; platforms: `x86`, `x64`, `ARM64`.
-- Run non-UI unit tests with: `dotnet test BO2.Tests\BO2.Tests.csproj`
-- Tests are pure xUnit (no WinAppSDK runtime); target `net8.0-windows10.0.19041.0` but do NOT reference WinUI.
-- No repo-specific lint or format command/config checked in.
+## Build, Test, And Lint
 
-## Repository knowledge
+- Build solution: `dotnet build .\BO2.slnx`.
+- Build the 32-bit Windows app payload: `dotnet build .\BO2.csproj -p:Platform=x86`.
+- Run non-UI managed tests: `dotnet test BO2.Tests\BO2.Tests.csproj`.
+- Run native tests: `.\tools\Run-NativeTests.ps1 -Configuration Release`.
+- Run native tests with the production hook flag: `.\tools\Run-NativeTests.ps1 -Configuration ReleaseWithVmNotifyHook`.
+- Check C# formatting and code style: `dotnet format .\BO2.slnx -v detailed --verify-no-changes --severity info`.
 
-- Complex tasks: consult GitHub wiki before design and implementation: https://github.com/qwerty084/BO2/wiki.
-- Memory reading, address discovery, CDB/WinDbg usage, BO2 Zombies runtime data: check wiki pages such as `Confirmed-Memory-Addresses` for confirmed addresses + validation notes.
-- For mystery-box weapon tracking, use `BO2-Box-Weapon-Tracking`: https://github.com/qwerty084/BO2/wiki/BO2-Box-Weapon-Tracking.
-- For Ghidra/x32dbg reverse-engineering workflows, use `Ghidra-and-x32dbg-Workflow`: https://github.com/qwerty084/BO2/wiki/Ghidra-and-x32dbg-Workflow.
-- Durable future-agent findings go in repo wiki, not ad-hoc local notes. Use `repo-wiki-notes`.
-- Never store secrets, credentials, raw sensitive memory dumps, anti-cheat bypass techniques, process hiding techniques, code injection workflows, or memory-writing instructions in wiki.
+The app supports only `Platform=x86` / `win-x86`. Do not document or rely on x64 or ARM64 builds unless the project file and native payloads are changed first.
+
+## Repository Knowledge
+
+- Runtime and reverse-engineering docs live under [docs/reverse](../docs/reverse/index.md).
+- Build, test, and local validation guidance lives under [docs/validation](../docs/validation/index.md).
+- Migration history for the former wiki lives in [docs/migration/wiki-migration.md](../docs/migration/wiki-migration.md).
+- Keep future durable findings in repo docs or `artifacts/reverse`, not in the external wiki.
+- Never store secrets, credentials, raw sensitive memory dumps, anti-cheat bypass techniques, process hiding techniques, or generic memory-writing procedures in docs.
 
 ## Architecture
 
-- Single-project WinUI 3 desktop app. `BO2.csproj` targets `net8.0-windows10.0.19041.0`, uses Windows App SDK + single-project MSIX tooling.
-- `App.xaml` merges `XamlControlsResources` for app-wide WinUI resources.
-- `App.xaml.cs`: launch entry. `OnLaunched` creates `MainWindow`, stores private `_window`, activates it.
-- `MainWindow.xaml`: full UI shell; one `Window` with `MicaBackdrop` and the app's main UI content, including sections such as player stats and candidate details. `MainWindow.xaml.cs` only initializes partial class.
-- Packaging lives in project, no separate packaging project. `Package.appxmanifest` defines identity, logos, capabilities; `app.manifest` carries unpackaged compatibility + DPI.
-- `Properties\launchSettings.json`: two local run profiles: packaged (`MsixPackage`) and unpackaged (`Project`).
+- `BO2.slnx` includes the WinUI app, managed tests, native tests, `BO2Monitor`, and `BO2InjectorHelper`.
+- `BO2.csproj` targets `net8.0-windows10.0.19041.0`, uses Windows App SDK + single-project MSIX tooling, and rejects non-x86 platforms.
+- `Package.appxmanifest` declares `runFullTrust` for desktop process access. It does not declare `systemAIModels`.
+- Managed stat and timer reads use read-only process handles. Event capture uses the native monitor loaded after explicit Connect.
+- `MainWindow.xaml.cs` is substantial shell code: refresh resources, connect/disconnect handlers, theme persistence, widget runtime coordination, settings navigation, and cleanup.
 
-## Key conventions
+## Key Conventions
 
-- Keep XAML `x:Class`, code-behind partial class names, and `BO2` namespace in sync when renaming or moving UI types.
-- Preserve `_window` field pattern in `App.xaml.cs`; app keeps window reference at application level, not transient local during launch.
-- Add shared styles, brushes, app-wide resources in `App.xaml`, not directly in `MainWindow.xaml`.
-- Packaging assets: keep manifest asset basenames stable. `Package.appxmanifest` references `Assets\Square150x150Logo.png`; physical files in `Assets\` use scale-qualified filenames such as `.scale-200.png`.
-- Be careful with manifest capabilities and packaging settings. App declares both `runFullTrust` and `systemAIModels`.
-- If change depends on output architecture or native/runtime packaging behavior, specify `Platform`; project builds for `x86`, `x64`, `ARM64`.
+- Preserve the explicit Connect boundary for live BO2 process access.
+- Keep XAML `x:Class`, code-behind partial class names, and `BO2` namespace in sync.
+- Preserve the `_window` field pattern in `App.xaml.cs`; the app keeps the window reference at application level.
+- Add shared styles, brushes, and app-wide resources in `App.xaml`, not directly in page XAML.
+- Keep manifest asset basenames stable. `Package.appxmanifest` references `Assets\Square150x150Logo.png`; physical files in `Assets\` use scale-qualified names.

@@ -115,7 +115,7 @@ A second Town session was started to capture owner-scoped aliases at the `vm_not
 
 The supervised x32dbg GUI retry did not produce owner evidence. x32dbg was run elevated, the disassembly was verified at `t6zm.exe:0x008F31D0`, and a hardware execute breakpoint was set for `randomization_done` / `user_grabbed_weapon`. BO2 hit another access violation during resume/loader or Xbox Live related execution before any target notify breakpoint was captured. No `inst`, `ownerId`, or pre/post alias state was observed.
 
-Later in the same read-only Town launch, the user spun the box and reported the visible weapon as `python_zm`. The helper's targeted field/value scan was extended with optional regex filters and appended JSONL evidence to `artifacts/reverse/notify-owner-alias-capture-2026-05-09.jsonl`.
+Later in the same read-only Town launch, the user spun the box and reported the visible weapon as `python_zm`. The helper's targeted field/value scan was extended with optional regex filters and wrote local JSONL evidence; only the curated findings below are kept in the repo.
 
 Post-spin/post-pickup passive snapshots found a strong current-build candidate owner, but not a proven notify owner:
 
@@ -137,7 +137,7 @@ Current alias-lifetime status:
 
 ## Static Evidence
 
-Ghidra string search in `bo2-ghidra-recon.txt`:
+The Ghidra static string search from this pass:
 
 - Did not find `randomization_done`, `user_grabbed_weapon`, `weapon_string`, `grab_weapon_name`, or `chest_accessed` as plain ASCII in the static binary.
 - Found `zbarrier` in `.rdata` at multiple addresses.

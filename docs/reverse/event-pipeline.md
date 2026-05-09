@@ -51,10 +51,9 @@ The monitor publishes discovery events into the same snapshot:
 
 Read-only live validation was performed against Steam Zombies Town on build `65428`.
 
-Confirmed live process provenance:
+Confirmed executable provenance:
 
-- PID observed: `29172`.
-- Path: `C:\Program Files (x86)\Steam\steamapps\common\Call of Duty Black Ops II\t6zm.exe`.
+- Executable: Steam app `202970` `t6zm.exe` from a local Steam install. The local install path is intentionally omitted.
 - MD5: `68C62BE753DE8ADF2C2C7B28DB769B99`.
 - SHA256: `3645528D61EF0FB0591D5195E111718235EF3C75F2211BD3633A2DB4DE7C67AC`.
 
@@ -104,7 +103,6 @@ Read-only baseline from that retry still confirmed:
 
 | Item | Live value |
 |---|---:|
-| PID | `27316` |
 | `randomization_done` | `7491` |
 | `user_grabbed_weapon` | `7436` |
 | `zbarrier` | `7452` |
@@ -114,7 +112,7 @@ Read-only baseline from that retry still confirmed:
 | instance 0 child bucket base | `0x2EE30000` |
 | instance 0 child variable base | `0x2E730000` |
 
-A later read-only continuation used the same PID's paused Town state without x32dbg. The user spun the box, reported the visible weapon as `python_zm`, then picked it up. No `BO2MonitorSharedMem-14236` map existed, so the normal monitor event queue was not available for this session. Passive snapshots found candidate owner `901` with string fields `town_chest`, `treasure_chest_use`, and `python_zm` under `tag_knob` both before pickup and after pickup. This is useful post-state evidence, but it is not equivalent to the normal monitor event record because no `vm_notify` owner argument was captured.
+A later read-only continuation used a paused Town state without x32dbg. The user spun the box, reported the visible weapon as `python_zm`, then picked it up. No monitor shared-memory map existed for that process, so the normal monitor event queue was not available for this session. Passive snapshots found candidate owner `901` with string fields `town_chest`, `treasure_chest_use`, and `python_zm` under `tag_knob` both before pickup and after pickup. This is useful post-state evidence, but it is not equivalent to the normal monitor event record because no `vm_notify` owner argument was captured.
 
 ## Notify Targets
 

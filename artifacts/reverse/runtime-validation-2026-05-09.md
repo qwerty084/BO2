@@ -4,8 +4,7 @@ Scope: read-only validation against Steam Zombies `t6zm.exe` build `65428` on To
 
 ## Process Provenance
 
-- Live PID used for the final checks: `29172`.
-- Path: `C:\Program Files (x86)\Steam\steamapps\common\Call of Duty Black Ops II\t6zm.exe`.
+- Executable: Steam app `202970` `t6zm.exe` from a local Steam install. The local install path is intentionally omitted.
 - MD5: `68C62BE753DE8ADF2C2C7B28DB769B99`.
 - SHA256: `3645528D61EF0FB0591D5195E111718235EF3C75F2211BD3633A2DB4DE7C67AC`.
 
@@ -75,7 +74,6 @@ Read-only baseline:
 
 | Item | Live value |
 |---|---:|
-| PID | `27316` |
 | `randomization_done` | `7491` |
 | `user_grabbed_weapon` | `7436` |
 | `zbarrier` | `7452` |
@@ -99,7 +97,7 @@ No `inst`, `ownerId`, pre-notify alias state, or post-notify alias state was cap
 
 ## Read-Only Box Spin Continuation
 
-A later continuation used PID `14236` in a paused Town session without x32dbg and without monitor injection. The lobby baseline had readable child table pointers but did not yet resolve the target event names. After Town loaded, the same process resolved:
+A later continuation used a paused Town session without x32dbg and without monitor injection. The lobby baseline had readable child table pointers but did not yet resolve the target event names. After Town loaded, the same process resolved:
 
 | Name | Live value |
 |---|---:|
@@ -109,13 +107,13 @@ A later continuation used PID `14236` in a paused Town session without x32dbg an
 | `weapon_string` | not found |
 | `grab_weapon_name` | not found |
 
-The user spun the box once, reported the visible weapon as `python_zm`, then later picked it up. `tools/Capture-BO2NotifyOwnerAliases.ps1` wrote JSONL evidence to `artifacts/reverse/notify-owner-alias-capture-2026-05-09.jsonl`.
+The user spun the box once, reported the visible weapon as `python_zm`, then later picked it up. `tools/Capture-BO2NotifyOwnerAliases.ps1` wrote local JSONL evidence during the run; only the curated findings are kept in the repo.
 
 Strongest passive post-state evidence:
 
 - Candidate parent `901` had `town_chest` and `treasure_chest_use` string fields.
 - Candidate parent `901` had `python_zm` under field `tag_knob`.
 - That same `python_zm` owner-scoped alias was still present after the Python was picked up.
-- The normal monitor shared-memory map for PID `14236` was absent, so no production event record with the actual `ownerId` was available in this session.
+- The normal monitor shared-memory map for that process was absent, so no production event record with the actual `ownerId` was available in this session.
 
 This narrows the failure analysis: child tables were readable, target strings were present, and at least one box-looking parent had the expected alias. It still does not prove alias lifetime for the actual `randomization_done` or `user_grabbed_weapon` notify owner because no `vm_notify` boundary arguments were captured.

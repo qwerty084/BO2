@@ -93,7 +93,7 @@ Production alias scanning does not currently use the exact hash lookup. It scans
 
 See `artifacts/reverse/function-catalog.csv` for callers, callees, bytes, and xrefs.
 
-The saved Ghidra project has durable names and conservative signatures for these helpers as of the 2026-05-09 continuation pass. `function-catalog.csv` now includes Ghidra prototypes, calling conventions, and bounded decompile snippets in addition to the manual inference columns. `scr_set_variable_field` still has an unknown return type; its parameters are named, but direct use should wait for deeper decompilation.
+The saved Ghidra project has durable names and conservative signatures for these helpers as of the 2026-05-09 continuation pass. `function-catalog.csv` now includes Ghidra prototypes, calling conventions, callers, callees, and xrefs in addition to the manual inference columns. `scr_set_variable_field` still has an unknown return type; its parameters are named, but direct use should wait for deeper static analysis.
 
 ## Important Globals
 

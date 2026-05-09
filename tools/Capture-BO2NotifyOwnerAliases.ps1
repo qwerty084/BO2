@@ -17,11 +17,12 @@ The script opens t6zm.exe with PROCESS_VM_READ | PROCESS_QUERY_INFORMATION and
 does not write to the target process. It reads the known script string table,
 the per-instance child bucket/table pointers, exact field candidates, and
 owner-scoped string/istring child values. Use -OutputPath to append JSONL
-records for before/after comparison. Use -IncludeFieldScan with -FieldNameRegex
-or -ValueRegex for read-only narrowing when the notify owner is unknown.
+records for before/after comparison under ignored local folders such as
+`.reverse`. Use -IncludeFieldScan with -FieldNameRegex or -ValueRegex for
+read-only narrowing when the notify owner is unknown.
 
 .EXAMPLE
-.\tools\Capture-BO2NotifyOwnerAliases.ps1 -Phase before -Inst 0 -OwnerId 1234 -StringValue 7492 -EventName randomization_done -OutputPath .\artifacts\reverse\box-alias-capture-2026-05-09.jsonl
+.\tools\Capture-BO2NotifyOwnerAliases.ps1 -Phase before -Inst 0 -OwnerId 1234 -StringValue 7492 -EventName randomization_done -OutputPath .\.reverse\box-alias-capture-2026-05-09.jsonl
 
 .EXAMPLE
 .\tools\Capture-BO2NotifyOwnerAliases.ps1 -Phase after -Inst 0 -OwnerId 1234 -StringValue 7429 -EventName user_grabbed_weapon -IncludeBroadScan

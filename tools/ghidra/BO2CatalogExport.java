@@ -3,8 +3,6 @@
 //   analyzeHeadless <projectDir> BO2Recon -process t6zm.exe -postScript BO2CatalogExport.java <outputDir>
 
 import ghidra.app.script.GhidraScript;
-import ghidra.app.decompiler.DecompInterface;
-import ghidra.app.decompiler.DecompileResults;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.data.CharDataType;
 import ghidra.program.model.data.DataType;
@@ -158,7 +156,7 @@ public class BO2CatalogExport extends GhidraScript {
             "Pointer to script string table base; live Town value 0x02BF8880 on 2026-05-09.",
             "pointer; entries are 0x18 bytes, text at +0x04",
             "strong",
-            "vm_notify decompile references DAT_02bf83a4 for script-string values."));
+            "Static listing references DAT_02bf83a4 for script-string values."));
         globals.add(new GlobalTarget(
             "scr_var_glob_candidate",
             0x02dea400L,
@@ -172,14 +170,14 @@ public class BO2CatalogExport extends GhidraScript {
             "Per-instance child-variable hash bucket table pointer slots.",
             "pointer slot base + inst*0x200",
             "strong",
-            "vm_notify decompile references DAT_02defa00 and companion tooling resolves bucket slots."));
+            "Static listing references DAT_02defa00 and companion tooling resolves bucket slots."));
         globals.add(new GlobalTarget(
             "child_variables_pointer_slot_base",
             0x02defb80L,
             "Per-instance child-variable table pointer slots.",
             "pointer slot base + inst*0x200; child entry size 0x1c",
             "strong",
-            "vm_notify decompile uses DAT_02defb80 with child id * 0x1c."));
+            "Static listing uses DAT_02defb80 with child id * 0x1c."));
         globals.add(new GlobalTarget(
             "vm_notify_callback_table_base",
             0x02df4170L,
@@ -490,39 +488,9 @@ public class BO2CatalogExport extends GhidraScript {
         }
     }
 
-    private String decompileSnippet(DecompInterface decompiler, Function function, int maxLength) {
-        if (function == null) {
-            return "";
-        }
-
-        try {
-            DecompileResults results = decompiler.decompileFunction(function, 30, monitor);
-            if (!results.decompileCompleted() || results.getDecompiledFunction() == null) {
-                return "";
-            }
-
-            String c = results.getDecompiledFunction().getC();
-            if (c == null) {
-                return "";
-            }
-
-            String normalized = c.replace("\r", "").replaceAll("(?m)[ \\t]+$", "").trim();
-            if (normalized.length() <= maxLength) {
-                return normalized;
-            }
-
-            return normalized.substring(0, maxLength) + "...";
-        }
-        catch (Exception ex) {
-            return "";
-        }
-    }
-
     private void writeFunctionCatalog(File output, List<FunctionTarget> targets) throws Exception {
         try (PrintWriter writer = new PrintWriter(output, StandardCharsets.UTF_8.name())) {
-            writer.println("label,address,kind,ghidra_function,containing_function,block,instruction_at_address,first_16_bytes,prototype,calling_convention,inferred_purpose,callers,callees,key_xrefs,inferred_parameters,inferred_return,decompile_snippet,evidence_level,build_specific,notes");
-            DecompInterface decompiler = new DecompInterface();
-            decompiler.openProgram(currentProgram);
+            writer.println("label,address,kind,ghidra_function,containing_function,block,instruction_at_address,first_16_bytes,prototype,calling_convention,inferred_purpose,callers,callees,key_xrefs,inferred_parameters,inferred_return,evidence_level,build_specific,notes");
             for (FunctionTarget target : targets) {
                 Address address = addr(target.address);
                 Function function = currentProgram.getFunctionManager().getFunctionAt(address);
@@ -544,12 +512,10 @@ public class BO2CatalogExport extends GhidraScript {
                     refsTo(function != null ? function.getEntryPoint() : address, 20),
                     target.parameters,
                     target.returnValue,
-                    decompileSnippet(decompiler, function != null ? function : containing, 1200),
                     target.evidenceLevel,
                     "current Steam build 65428 / t6zm.exe MD5 68C62BE753DE8ADF2C2C7B28DB769B99",
                     target.notes));
             }
-            decompiler.closeProgram();
         }
     }
 
@@ -578,7 +544,7 @@ public class BO2CatalogExport extends GhidraScript {
         try (PrintWriter writer = new PrintWriter(output, StandardCharsets.UTF_8.name())) {
             writer.println("# t6zm.exe Callgraph Notes");
             writer.println();
-            writer.println("- Program: " + currentProgram.getExecutablePath());
+            writer.println("- Program: t6zm.exe (Steam app 202970, local path intentionally omitted)");
             writer.println("- Image base: " + currentProgram.getImageBase());
             writer.println("- Language: " + currentProgram.getLanguageID());
             writer.println("- Compiler spec: " + currentProgram.getCompilerSpec().getCompilerSpecID());
