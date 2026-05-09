@@ -171,6 +171,22 @@ jobs:
             $archive.Dispose()
           }
 
+      - name: Upload test-signed x86 MSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bo2-test-signed-x86-msix
+          path: artifacts/msix/**
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Install and launch packaged app smoke test
+        shell: powershell
+        timeout-minutes: 5
+        run: |
+          .\tools\Test-PackagedAppLaunch.ps1 `
+            -PackageDirectory "$env:MSIX_ARTIFACT_DIR" `
+            -DiagnosticsDirectory .\TestResults\PackageSmoke
+
       - name: Remove MSIX test signing certificate
         if: always()
         shell: pwsh
@@ -183,10 +199,11 @@ jobs:
             Remove-Item -LiteralPath "Cert:\CurrentUser\My\$env:MSIX_TEST_CERT_THUMBPRINT" -Force -ErrorAction SilentlyContinue
           }
 
-      - name: Upload test-signed x86 MSIX artifact
+      - name: Upload package smoke diagnostics
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bo2-test-signed-x86-msix
-          path: artifacts/msix/**
-          if-no-files-found: error
+          name: package-smoke-diagnostics
+          path: TestResults/PackageSmoke/**
+          if-no-files-found: warn
           retention-days: 14
