@@ -68,5 +68,5 @@ _Avoid_: widget manager, overlay service
 ## Flagged Ambiguities
 
 - "refresh" can mean UI timer work, process memory reads, or monitor snapshot reads. Use **Player Stats Read** for memory sampling and **Game Connection Session** for lifecycle coordination.
-- Today, **Player Stats Read** can occur before the user connects the **Game Connection Session**. Planned direction: connect should become the user's explicit initiation point for active game reads, including **Player Stats Read** and **Event Monitor** data.
+- Before the user connects the **Game Connection Session**, the app may perform passive **Detected Game** discovery and UI projection only. **Player Stats Read**, **Game Timing Read**, **Event Monitor** startup, and monitor snapshot reads are live-access work and must remain gated by the connected session lifecycle.
 - In-game and round timers are v1 Steam Zombies solo behavior. Do not promise co-op pause correctness, timer widgets, timer history, pause badge UI, or native **Event Monitor** shared snapshot timer fields without a separate validation pass.

@@ -55,17 +55,22 @@ Live Steam Zombies verification is covered by the [native smoke test](docs/nativ
 
 - The app reads process memory and monitor snapshots but does not write game memory.
 - Event capture depends on the native monitor reaching a compatible snapshot state.
-- Mystery-box weapon tracking intentionally uses the proven `randomization_done` path and snapshot v6 weapon-name field.
+- Mystery-box event display uses the snapshot v6 weapon-name field. The native monitor attempts alias recovery for `randomization_done` and `user_grabbed_weapon`; treat only `randomization_done` as the roll-result source for future averages until more event-boundary evidence exists.
 - Widget settings are stored under `%LocalAppData%\BO2\widgets.json`; invalid settings are moved to a timestamped backup and defaults are restored.
 
 ## Packaging
 
 Packaging is single-project MSIX. `Package.appxmanifest` declares `runFullTrust` because the app needs desktop process access. Package identity, publisher, signing, and distribution metadata should be reviewed before external release.
 
-## Reference Notes
+## Documentation
 
-Repo-maintained runtime findings live in the GitHub wiki:
+Repo-maintained docs are canonical under [docs](docs/index.md). Runtime and reverse-engineering findings from the former external wiki were migrated into [docs/reverse](docs/reverse/index.md); see [docs/migration/wiki-migration.md](docs/migration/wiki-migration.md) for the migration note.
 
-- [Confirmed Memory Addresses](https://github.com/qwerty084/BO2/wiki/Confirmed-Memory-Addresses)
-- [BO2 Box Weapon Tracking](https://github.com/qwerty084/BO2/wiki/BO2-Box-Weapon-Tracking)
-- [Ghidra and x32dbg Workflow](https://github.com/qwerty084/BO2/wiki/Ghidra-and-x32dbg-Workflow)
+Useful entry points:
+
+- [Reverse-engineering index](docs/reverse/index.md)
+- [Runtime address ledger](docs/reverse/address-ledger.md)
+- [Event pipeline and snapshot bridge](docs/reverse/event-pipeline.md)
+- [In-game and round timers](docs/reverse/timers.md)
+- [Mystery-box weapon tracking](docs/reverse/box-weapon-tracking.md)
+- [Ghidra and x32dbg workflow](docs/reverse/ghidra-x32dbg-workflow.md)

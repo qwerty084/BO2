@@ -153,7 +153,7 @@ function Resolve-ScriptStringId {
         }
     }
 
-    throw "Could not resolve script string '$Name'. Retry with -MaxStringId 65536."
+    return $null
 }
 
 function Read-ScriptString {
@@ -358,12 +358,27 @@ try {
     $weaponStringId = Resolve-ScriptStringId -StringTable $stringTable -Name 'weapon_string'
     $grabWeaponNameId = Resolve-ScriptStringId -StringTable $stringTable -Name 'grab_weapon_name'
     $zbarrierId = Resolve-ScriptStringId -StringTable $stringTable -Name 'zbarrier'
-    $weaponStringFieldName = [uint32]($weaponStringId + 0x10000)
-    $grabWeaponNameFieldName = [uint32]($grabWeaponNameId + 0x10000)
-    $zbarrierFieldName = [uint32]($zbarrierId + 0x10000)
+    $weaponStringFieldName = if ($null -ne $weaponStringId) { [uint32]($weaponStringId + 0x10000) } else { $null }
+    $grabWeaponNameFieldName = if ($null -ne $grabWeaponNameId) { [uint32]($grabWeaponNameId + 0x10000) } else { $null }
+    $zbarrierFieldName = if ($null -ne $zbarrierId) { [uint32]($zbarrierId + 0x10000) } else { $null }
 
-    'fieldIds weapon_string={0} grab_weapon_name={1} zbarrier={2}' -f $weaponStringId, $grabWeaponNameId, $zbarrierId
-    'encodedFieldNames weapon_string={0} grab_weapon_name={1} zbarrier={2}' -f $weaponStringFieldName, $grabWeaponNameFieldName, $zbarrierFieldName
+    function Format-OptionalId {
+        param($Value)
+        if ($null -eq $Value) {
+            return '<not found>'
+        }
+
+        return $Value
+    }
+
+    'fieldIds weapon_string={0} grab_weapon_name={1} zbarrier={2}' -f `
+        (Format-OptionalId $weaponStringId),
+        (Format-OptionalId $grabWeaponNameId),
+        (Format-OptionalId $zbarrierId)
+    'encodedFieldNames weapon_string={0} grab_weapon_name={1} zbarrier={2}' -f `
+        (Format-OptionalId $weaponStringFieldName),
+        (Format-OptionalId $grabWeaponNameFieldName),
+        (Format-OptionalId $zbarrierFieldName)
 
     $layouts = foreach ($inst in $Instances) {
         Get-InstanceLayout -Inst $inst
@@ -387,12 +402,25 @@ try {
         'owner check: {0}' -f ($OwnerIds -join ',')
         foreach ($layout in $layouts) {
             foreach ($ownerId in $OwnerIds) {
-                Write-FieldHit -Label 'weapon_string' -Hit (Find-ScriptVariable -Layout $layout -ParentId $ownerId -NameId $weaponStringId) -StringTable $stringTable
-                Write-FieldHit -Label 'weapon_string.field' -Hit (Find-ScriptVariable -Layout $layout -ParentId $ownerId -NameId $weaponStringFieldName) -StringTable $stringTable
-                Write-FieldHit -Label 'grab_weapon_name.field' -Hit (Find-ScriptVariable -Layout $layout -ParentId $ownerId -NameId $grabWeaponNameFieldName) -StringTable $stringTable
-                $zbarrier = Find-ScriptVariable -Layout $layout -ParentId $ownerId -NameId $zbarrierFieldName
-                Write-FieldHit -Label 'zbarrier' -Hit $zbarrier -StringTable $stringTable
-                if ($null -ne $zbarrier -and $zbarrier.Value -gt 0) {
+                if ($null -ne $weaponStringId) {
+                    Write-FieldHit -Label 'weapon_string' -Hit (Find-ScriptVariable -Layout $layout -ParentId $ownerId -NameId $weaponStringId) -StringTable $stringTable
+                }
+
+                if ($null -ne $weaponStringFieldName) {
+                    Write-FieldHit -Label 'weapon_string.field' -Hit (Find-ScriptVariable -Layout $layout -ParentId $ownerId -NameId $weaponStringFieldName) -StringTable $stringTable
+                }
+
+                if ($null -ne $grabWeaponNameFieldName) {
+                    Write-FieldHit -Label 'grab_weapon_name.field' -Hit (Find-ScriptVariable -Layout $layout -ParentId $ownerId -NameId $grabWeaponNameFieldName) -StringTable $stringTable
+                }
+
+                $zbarrier = $null
+                if ($null -ne $zbarrierFieldName) {
+                    $zbarrier = Find-ScriptVariable -Layout $layout -ParentId $ownerId -NameId $zbarrierFieldName
+                    Write-FieldHit -Label 'zbarrier' -Hit $zbarrier -StringTable $stringTable
+                }
+
+                if ($null -ne $zbarrier -and $zbarrier.Value -gt 0 -and $null -ne $weaponStringFieldName) {
                     Write-FieldHit -Label 'zbarrier.weapon_string.field' -Hit (Find-ScriptVariable -Layout $layout -ParentId $zbarrier.Value -NameId $weaponStringFieldName) -StringTable $stringTable
                 }
             }
@@ -466,47 +494,62 @@ try {
         }
     }
 
-    'global scan: parents 1..{0}' -f $MaxParentId
-    $hits = 0
-    foreach ($layout in $layouts) {
-        for ($parentId = 1; $parentId -le $MaxParentId; $parentId++) {
-            foreach ($field in @(
-                @{ Label = 'weapon_string.field'; Id = $weaponStringFieldName },
-                @{ Label = 'grab_weapon_name.field'; Id = $grabWeaponNameFieldName }
-            )) {
-                $hit = Find-ScriptVariable -Layout $layout -ParentId $parentId -NameId $field.Id
-                if ($null -eq $hit) {
-                    continue
-                }
+    $exactFieldDefinitions = @()
+    if ($null -ne $weaponStringFieldName) {
+        $exactFieldDefinitions += @{ Label = 'weapon_string.field'; Id = $weaponStringFieldName }
+    }
 
-                Write-FieldHit -Label $field.Label -Hit $hit -StringTable $stringTable
-                $hits++
-                if ($hits -ge $MaxHits) {
-                    'max hits reached'
-                    return
-                }
-            }
+    if ($null -ne $grabWeaponNameFieldName) {
+        $exactFieldDefinitions += @{ Label = 'grab_weapon_name.field'; Id = $grabWeaponNameFieldName }
+    }
 
-            $zbarrier = Find-ScriptVariable -Layout $layout -ParentId $parentId -NameId $zbarrierFieldName
-            if ($null -ne $zbarrier -and $zbarrier.Value -gt 0) {
-                Write-FieldHit -Label 'zbarrier' -Hit $zbarrier -StringTable $stringTable
-                $hits++
-                $weapon = Find-ScriptVariable -Layout $layout -ParentId $zbarrier.Value -NameId $weaponStringFieldName
-                if ($null -ne $weapon) {
-                    Write-FieldHit -Label 'zbarrier.weapon_string.field' -Hit $weapon -StringTable $stringTable
+    if ($exactFieldDefinitions.Count -eq 0 -and $null -eq $zbarrierFieldName) {
+        'global scan skipped: no target field IDs are available in the live string table.'
+    }
+    else {
+        'global scan: parents 1..{0}' -f $MaxParentId
+        $hits = 0
+        foreach ($layout in $layouts) {
+            for ($parentId = 1; $parentId -le $MaxParentId; $parentId++) {
+                foreach ($field in $exactFieldDefinitions) {
+                    $hit = Find-ScriptVariable -Layout $layout -ParentId $parentId -NameId $field.Id
+                    if ($null -eq $hit) {
+                        continue
+                    }
+
+                    Write-FieldHit -Label $field.Label -Hit $hit -StringTable $stringTable
                     $hits++
+                    if ($hits -ge $MaxHits) {
+                        'max hits reached'
+                        return
+                    }
                 }
 
-                if ($hits -ge $MaxHits) {
-                    'max hits reached'
-                    return
+                if ($null -ne $zbarrierFieldName) {
+                    $zbarrier = Find-ScriptVariable -Layout $layout -ParentId $parentId -NameId $zbarrierFieldName
+                    if ($null -ne $zbarrier -and $zbarrier.Value -gt 0) {
+                        Write-FieldHit -Label 'zbarrier' -Hit $zbarrier -StringTable $stringTable
+                        $hits++
+                        if ($null -ne $weaponStringFieldName) {
+                            $weapon = Find-ScriptVariable -Layout $layout -ParentId $zbarrier.Value -NameId $weaponStringFieldName
+                            if ($null -ne $weapon) {
+                                Write-FieldHit -Label 'zbarrier.weapon_string.field' -Hit $weapon -StringTable $stringTable
+                                $hits++
+                            }
+                        }
+
+                        if ($hits -ge $MaxHits) {
+                            'max hits reached'
+                            return
+                        }
+                    }
                 }
             }
         }
-    }
 
-    if ($hits -eq 0) {
-        'No target fields found with the Ghidra-proven child table layout.'
+        if ($hits -eq 0) {
+            'No target fields found with the Ghidra-proven child table layout.'
+        }
     }
 }
 finally {
