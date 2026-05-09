@@ -22,6 +22,7 @@ namespace BO2.Services
         {
             var projection = CurrentGamePageDisplayProjection.CreateDefault();
             projection.PageStatusText = GetPageStatusText(snapshot.ConnectionPhase);
+            ApplyTimers(projection, snapshot.TimerDisplayState);
             ApplyStats(projection, snapshot.ConnectionPhase, snapshot.ReadResult);
             ApplyEventMonitorStatus(
                 projection,
@@ -36,10 +37,25 @@ namespace BO2.Services
                 DownsText = _renderer.Render(projection.DownsText),
                 RevivesText = _renderer.Render(projection.RevivesText),
                 HeadshotsText = _renderer.Render(projection.HeadshotsText),
+                GameTimeText = _renderer.Render(projection.GameTimeText),
+                RoundTimeText = _renderer.Render(projection.RoundTimeText),
                 CurrentRoundText = _renderer.Render(projection.CurrentRoundText),
                 BoxEventsText = _renderer.Render(projection.BoxEventsText),
                 RecentGameEventsText = _renderer.Render(projection.RecentGameEventsText)
             };
+        }
+
+        private static void ApplyTimers(
+            CurrentGamePageDisplayProjection projection,
+            GameConnectionTimerDisplayState? timerDisplayState)
+        {
+            projection.GameTimeText = GetTimerText(timerDisplayState?.GameTime);
+            projection.RoundTimeText = GetTimerText(timerDisplayState?.RoundTime);
+        }
+
+        private static DisplayText GetTimerText(TimerDisplayState? timerDisplayState)
+        {
+            return timerDisplayState?.Text ?? TimerDisplayState.Placeholder.Text;
         }
 
         private static void ApplyStats(
@@ -129,6 +145,10 @@ namespace BO2.Services
 
         public DisplayText HeadshotsText { get; set; } = GameConnectionDisplayTextProjector.EmptyValueText;
 
+        public DisplayText GameTimeText { get; set; } = TimerDisplayState.Placeholder.Text;
+
+        public DisplayText RoundTimeText { get; set; } = TimerDisplayState.Placeholder.Text;
+
         public DisplayText CurrentRoundText { get; set; } = GameConnectionDisplayTextProjector.EmptyValueText;
 
         public DisplayText BoxEventsText { get; set; } = DisplayText.Resource("RecentEventsEmpty");
@@ -145,6 +165,8 @@ namespace BO2.Services
     {
         public const string EmptyStatText = "--";
 
+        public const string EmptyTimerText = TimerDisplayState.PlaceholderText;
+
         public string PageStatusText { get; init; } = AppStrings.Get("CurrentGamePageStatusNotConnected");
 
         public string PointsText { get; init; } = EmptyStatText;
@@ -156,6 +178,10 @@ namespace BO2.Services
         public string RevivesText { get; init; } = EmptyStatText;
 
         public string HeadshotsText { get; init; } = EmptyStatText;
+
+        public string GameTimeText { get; init; } = EmptyTimerText;
+
+        public string RoundTimeText { get; init; } = EmptyTimerText;
 
         public string CurrentRoundText { get; init; } = EmptyStatText;
 

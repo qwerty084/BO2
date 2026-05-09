@@ -8,6 +8,7 @@ namespace BO2.ViewModels
     public sealed class CurrentGamePageViewModel : INotifyPropertyChanged
     {
         private const string EmptyStatText = "--";
+        private const string EmptyTimerText = CurrentGamePageDisplayState.EmptyTimerText;
 
         private readonly CurrentGamePageDisplayProjector _currentGamePageDisplayProjector = new();
         private string _pageStatusText = AppStrings.Get("CurrentGamePageStatusNotConnected");
@@ -16,6 +17,8 @@ namespace BO2.ViewModels
         private string _downsText = EmptyStatText;
         private string _revivesText = EmptyStatText;
         private string _headshotsText = EmptyStatText;
+        private string _gameTimeText = EmptyTimerText;
+        private string _roundTimeText = EmptyTimerText;
         private string _currentRoundText = EmptyStatText;
         private string _boxEventsText = AppStrings.Get("RecentEventsEmpty");
         private string _recentGameEventsText = AppStrings.Get("RecentEventsEmpty");
@@ -58,6 +61,18 @@ namespace BO2.ViewModels
             private set => SetProperty(ref _headshotsText, value);
         }
 
+        public string GameTimeText
+        {
+            get => _gameTimeText;
+            private set => SetProperty(ref _gameTimeText, value);
+        }
+
+        public string RoundTimeText
+        {
+            get => _roundTimeText;
+            private set => SetProperty(ref _roundTimeText, value);
+        }
+
         public string CurrentRoundText
         {
             get => _currentRoundText;
@@ -92,6 +107,8 @@ namespace BO2.ViewModels
             DownsText = currentGameState.DownsText;
             RevivesText = currentGameState.RevivesText;
             HeadshotsText = currentGameState.HeadshotsText;
+            GameTimeText = currentGameState.GameTimeText;
+            RoundTimeText = currentGameState.RoundTimeText;
             CurrentRoundText = currentGameState.CurrentRoundText;
             BoxEventsText = currentGameState.BoxEventsText;
             RecentGameEventsText = currentGameState.RecentGameEventsText;

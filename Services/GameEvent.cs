@@ -9,5 +9,6 @@ namespace BO2.Services
         uint OwnerId,
         uint StringValue,
         DateTimeOffset ReceivedAt,
-        string? WeaponName = null);
+        string? WeaponName = null,
+        ulong Sequence = 0);
 }

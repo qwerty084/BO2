@@ -8,6 +8,8 @@ namespace BO2.Services
 
         int ReadInt32(uint address, string valueName);
 
+        byte ReadByte(uint address, string valueName);
+
         float ReadSingle(uint address, string valueName);
 
         void Close();

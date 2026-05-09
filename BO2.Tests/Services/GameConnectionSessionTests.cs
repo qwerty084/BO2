@@ -69,6 +69,23 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void Snapshot_WhenSessionStarts_ExposesPlaceholderTimerDisplayState()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame);
+
+            GameConnectionSnapshot snapshot = session.Snapshot;
+
+            AssertPlaceholderTimers(snapshot);
+        }
+
+        [Fact]
         public void Snapshot_WhenSessionStartsWithUnsupportedGame_ExposesUnsupportedStatusState()
         {
             DetectedGame detectedGame = CreateUnsupportedGame(processId: 1001);
@@ -974,6 +991,401 @@ namespace BO2.Tests.Services
             Assert.Equal(1001, eventMonitor.LastTargetProcessId);
         }
 
+        [Fact]
+        public void Read_WhenObservedRoundOneHasTimingReads_PublishesWholeSecondGameTimerSnapshots()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            DateTimeOffset receivedAt = new(2026, 5, 5, 12, 0, 0, TimeSpan.Zero);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus(
+                    new GameEvent(
+                        GameEventType.StartOfRound,
+                        "start_of_round",
+                        1,
+                        0,
+                        0,
+                        receivedAt,
+                        Sequence: 1))
+            };
+            FakeGameTimingReader timingReader = new()
+            {
+                Result = CreateTimingRead(detectedGame, gameTimeMilliseconds: 10_000)
+            };
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timingReader: timingReader);
+            GameConnectionSnapshot connectedSnapshot = CompleteConnectWithLoadedMonitor(session);
+            List<GameConnectionSnapshotChangedEventArgs> changes = [];
+            session.SnapshotChanged += (_, args) => changes.Add(args);
+
+            timingReader.Result = CreateTimingRead(detectedGame, gameTimeMilliseconds: 11_999);
+            GameConnectionSnapshot snapshot = session.Read();
+
+            AssertGameTimer(connectedSnapshot, TimerDisplayKind.Active, "0:00");
+            AssertGameTimer(snapshot, TimerDisplayKind.Active, "0:01");
+            AssertRoundTimer(snapshot, TimerDisplayKind.Active, "0:01");
+            GameConnectionSnapshotChangedEventArgs change = Assert.Single(changes);
+            Assert.Equal(snapshot, change.Snapshot);
+            Assert.Equal(2, timingReader.ReadCallCount);
+            Assert.Same(detectedGame, timingReader.LastDetectedGame);
+        }
+
+        [Fact]
+        public void Read_WhenObservedLaterRoundHasTimingReads_PublishesRoundTimerWithoutGameTimer()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            DateTimeOffset receivedAt = new(2026, 5, 5, 12, 0, 0, TimeSpan.Zero);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus(
+                    new GameEvent(
+                        GameEventType.StartOfRound,
+                        "start_of_round",
+                        4,
+                        0,
+                        0,
+                        receivedAt,
+                        Sequence: 1))
+            };
+            FakeGameTimingReader timingReader = new()
+            {
+                Result = CreateTimingRead(detectedGame, gameTimeMilliseconds: 180_000)
+            };
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timingReader: timingReader);
+            GameConnectionSnapshot connectedSnapshot = CompleteConnectWithLoadedMonitor(session);
+
+            timingReader.Result = CreateTimingRead(detectedGame, gameTimeMilliseconds: 189_999);
+            GameConnectionSnapshot snapshot = session.Read();
+
+            AssertGameTimer(connectedSnapshot, TimerDisplayKind.Placeholder, TimerDisplayState.PlaceholderText);
+            AssertRoundTimer(connectedSnapshot, TimerDisplayKind.Active, "0:00");
+            AssertGameTimer(snapshot, TimerDisplayKind.Placeholder, TimerDisplayState.PlaceholderText);
+            AssertRoundTimer(snapshot, TimerDisplayKind.Active, "0:09");
+            Assert.Equal(2, timingReader.ReadCallCount);
+            Assert.Same(detectedGame, timingReader.LastDetectedGame);
+        }
+
+        [Fact]
+        public void Read_WhenTimingUnsupported_PreservesStatsEventsAndConnectionState()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            GameEventMonitorStatus compatibleStatus = CreateCompatibleStatus();
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = compatibleStatus
+            };
+            FakeGameTimingReader timingReader = new()
+            {
+                Result = GameTimingReadResult.UnsupportedTiming(detectedGame)
+            };
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timingReader: timingReader);
+
+            GameConnectionSnapshot snapshot = CompleteConnectWithLoadedMonitor(session);
+
+            Assert.NotNull(snapshot.ReadResult);
+            Assert.Same(compatibleStatus, snapshot.EventMonitorSummary.Status);
+            Assert.Equal(GameConnectionEventMonitorState.Ready, snapshot.EventMonitorSummary.State);
+            Assert.Equal(GameConnectionPhase.Connected, snapshot.ConnectionPhase);
+            AssertPlaceholderTimers(snapshot);
+            Assert.Equal(1, timingReader.ReadCallCount);
+        }
+
+        [Fact]
+        public void Read_WhenTimingConfirmsInactiveLobby_ClearsPublishedTimers()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            DateTimeOffset receivedAt = new(2026, 5, 5, 12, 0, 0, TimeSpan.Zero);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus(
+                    new GameEvent(
+                        GameEventType.StartOfRound,
+                        "start_of_round",
+                        1,
+                        0,
+                        0,
+                        receivedAt,
+                        Sequence: 1))
+            };
+            FakeGameTimingReader timingReader = new()
+            {
+                Result = CreateTimingRead(detectedGame, gameTimeMilliseconds: 10_000)
+            };
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timingReader: timingReader);
+            GameConnectionSnapshot connectedSnapshot = CompleteConnectWithLoadedMonitor(session);
+
+            timingReader.Result = GameTimingReadResult.InactiveLobbyState(detectedGame);
+            GameConnectionSnapshot snapshot = session.Read();
+
+            AssertGameTimer(connectedSnapshot, TimerDisplayKind.Active, "0:00");
+            AssertRoundTimer(connectedSnapshot, TimerDisplayKind.Active, "0:00");
+            AssertPlaceholderTimers(snapshot);
+            Assert.Equal(GameConnectionPhase.Connected, snapshot.ConnectionPhase);
+            Assert.Equal(2, timingReader.ReadCallCount);
+        }
+
+        [Fact]
+        public void Read_WhenNewMatchStartsInSameConnectionAfterLobbyClear_StartsFreshTimers()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            DateTimeOffset receivedAt = new(2026, 5, 5, 12, 0, 0, TimeSpan.Zero);
+            var firstRoundStart = new GameEvent(
+                GameEventType.StartOfRound,
+                "start_of_round",
+                1,
+                0,
+                0,
+                receivedAt,
+                Sequence: 1);
+            var gameOver = new GameEvent(
+                GameEventType.EndGame,
+                "end_game",
+                1,
+                0,
+                0,
+                receivedAt.AddMinutes(1),
+                Sequence: 2);
+            var secondMatchRoundStart = new GameEvent(
+                GameEventType.StartOfRound,
+                "start_of_round",
+                1,
+                0,
+                0,
+                receivedAt.AddMinutes(2),
+                Sequence: 3);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus(firstRoundStart)
+            };
+            FakeGameTimingReader timingReader = new()
+            {
+                Result = CreateTimingRead(detectedGame, gameTimeMilliseconds: 10_000)
+            };
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timingReader: timingReader);
+            CompleteConnectWithLoadedMonitor(session);
+            eventMonitor.Status = CreateCompatibleStatus(gameOver);
+            timingReader.Result = CreateTimingRead(detectedGame, gameTimeMilliseconds: 70_000);
+            GameConnectionSnapshot gameOverSnapshot = session.Read();
+            eventMonitor.Status = CreateCompatibleStatus(gameOver);
+            timingReader.Result = GameTimingReadResult.InactiveLobbyState(detectedGame);
+            GameConnectionSnapshot lobbySnapshot = session.Read();
+
+            eventMonitor.Status = CreateCompatibleStatus(secondMatchRoundStart);
+            timingReader.Result = CreateTimingRead(detectedGame, gameTimeMilliseconds: 5_000);
+            GameConnectionSnapshot secondMatchSnapshot = session.Read();
+
+            AssertGameTimer(gameOverSnapshot, TimerDisplayKind.Frozen, "1:00");
+            AssertRoundTimer(gameOverSnapshot, TimerDisplayKind.Frozen, "1:00");
+            AssertPlaceholderTimers(lobbySnapshot);
+            AssertGameTimer(secondMatchSnapshot, TimerDisplayKind.Active, "0:00");
+            AssertRoundTimer(secondMatchSnapshot, TimerDisplayKind.Active, "0:00");
+            Assert.Equal(GameConnectionPhase.Connected, secondMatchSnapshot.ConnectionPhase);
+        }
+
+        [Fact]
+        public void Read_WhenLifecycleEventsRepeat_AppliesEachLifecycleSequenceOnce()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            DateTimeOffset receivedAt = new(2026, 5, 5, 12, 0, 0, TimeSpan.Zero);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus(
+                    new GameEvent(
+                        GameEventType.StartOfRound,
+                        "start_of_round",
+                        1,
+                        0,
+                        0,
+                        receivedAt,
+                        Sequence: 1))
+            };
+            FakeGameTimerState timerState = new();
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timerState: timerState);
+            CompleteConnectWithLoadedMonitor(session);
+
+            session.Read();
+            eventMonitor.Status = CreateCompatibleStatus(
+                new GameEvent(
+                    GameEventType.StartOfRound,
+                    "start_of_round",
+                    1,
+                    0,
+                    0,
+                    receivedAt,
+                    Sequence: 1),
+                new GameEvent(
+                    GameEventType.EndOfRound,
+                    "end_of_round",
+                    1,
+                    0,
+                    0,
+                    receivedAt.AddSeconds(30),
+                    Sequence: 2));
+            session.Read();
+
+            Assert.Equal(2, timerState.AppliedBatches.Count);
+            Assert.False(timerState.AppliedBatches[0].HasSequenceGap);
+            Assert.False(timerState.AppliedBatches[1].HasSequenceGap);
+            GameTimerLifecycleEvent firstEvent = Assert.Single(timerState.AppliedBatches[0].Events);
+            GameTimerLifecycleEvent secondEvent = Assert.Single(timerState.AppliedBatches[1].Events);
+            Assert.Equal(1UL, firstEvent.Sequence);
+            Assert.Equal(GameEventType.StartOfRound, firstEvent.EventType);
+            Assert.Equal(2UL, secondEvent.Sequence);
+            Assert.Equal(GameEventType.EndOfRound, secondEvent.EventType);
+        }
+
+        [Fact]
+        public void Read_WhenLifecycleEventSequenceGapIsObserved_SurfacesFailClosedBatch()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            DateTimeOffset receivedAt = new(2026, 5, 5, 12, 0, 0, TimeSpan.Zero);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus(
+                    new GameEvent(
+                        GameEventType.StartOfRound,
+                        "start_of_round",
+                        1,
+                        0,
+                        0,
+                        receivedAt,
+                        Sequence: 1))
+            };
+            FakeGameTimerState timerState = new();
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timerState: timerState);
+            CompleteConnectWithLoadedMonitor(session);
+            eventMonitor.Status = CreateCompatibleStatus(
+                new GameEvent(
+                    GameEventType.EndGame,
+                    "end_game",
+                    5,
+                    0,
+                    0,
+                    receivedAt.AddMinutes(5),
+                    Sequence: 4));
+
+            session.Read();
+
+            Assert.Equal(2, timerState.AppliedBatches.Count);
+            GameTimerLifecycleEventBatch gappedBatch = timerState.AppliedBatches[1];
+            Assert.True(gappedBatch.HasSequenceGap);
+            GameTimerLifecycleEvent gameOverEvent = Assert.Single(gappedBatch.Events);
+            Assert.Equal(4UL, gameOverEvent.Sequence);
+            Assert.Equal(GameEventType.EndGame, gameOverEvent.EventType);
+            Assert.Equal(1, timerState.FailClosedBatchCount);
+        }
+
+        [Fact]
+        public void Connect_WhenDetectedGameChanges_ResetsLifecycleSequenceCursorForNewGame()
+        {
+            DetectedGame originalGame = CreateSupportedGame(processId: 1001);
+            DetectedGame changedGame = CreateSupportedGame(processId: 2002);
+            DateTimeOffset receivedAt = new(2026, 5, 5, 12, 0, 0, TimeSpan.Zero);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus(
+                    new GameEvent(
+                        GameEventType.StartOfRound,
+                        "start_of_round",
+                        1,
+                        0,
+                        0,
+                        receivedAt,
+                        Sequence: 1))
+            };
+            FakeGameTimerState timerState = new();
+            SessionContext context = CreateSessionContext(
+                eventMonitor,
+                detectedGame: originalGame,
+                timerState: timerState);
+            context.Session.Start();
+            CompleteConnectWithLoadedMonitor(context.Session);
+            context.EventDetector.Result = changedGame;
+            context.LifecycleEventSource.RaiseStarted(changedGame.ProcessName, changedGame.ProcessId);
+            eventMonitor.Status = CreateCompatibleStatus(
+                new GameEvent(
+                    GameEventType.EndGame,
+                    "end_game",
+                    1,
+                    0,
+                    0,
+                    receivedAt,
+                    Sequence: 1));
+
+            CompleteConnectWithLoadedMonitor(context.Session);
+
+            Assert.Equal(2, timerState.AppliedBatches.Count);
+            Assert.Equal(GameEventType.StartOfRound, timerState.AppliedBatches[0].Events[0].EventType);
+            Assert.Equal(GameEventType.EndGame, timerState.AppliedBatches[1].Events[0].EventType);
+            Assert.All(timerState.AppliedBatches, batch => Assert.False(batch.HasSequenceGap));
+        }
+
+        [Fact]
+        public void Disconnect_WhenMonitorIsConnected_ResetsTimerState()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeGameTimerState timerState = new();
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                timerState: timerState);
+            CompleteConnectWithLoadedMonitor(session);
+            int resetCountAfterConnect = timerState.ResetCallCount;
+
+            session.Disconnect();
+
+            Assert.Equal(resetCountAfterConnect + 1, timerState.ResetCallCount);
+        }
+
+        [Fact]
+        public void Read_WhenConnectedGameChangesToSupportedBeforeReconnect_ResetsTimerState()
+        {
+            DetectedGame originalGame = CreateSupportedGame(processId: 1001);
+            DetectedGame changedGame = CreateSupportedGame(processId: 2002);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeGameTimerState timerState = new();
+            SessionContext context = CreateSessionContext(
+                eventMonitor,
+                detectedGame: originalGame,
+                timerState: timerState);
+            context.Session.Start();
+            CompleteConnectWithLoadedMonitor(context.Session);
+            int resetCountAfterConnect = timerState.ResetCallCount;
+            context.EventDetector.Result = changedGame;
+            context.LifecycleEventSource.RaiseStarted(changedGame.ProcessName, changedGame.ProcessId);
+
+            context.Session.Read();
+
+            Assert.Equal(resetCountAfterConnect + 1, timerState.ResetCallCount);
+        }
+
         [Theory]
         [InlineData(GameCompatibilityState.UnsupportedVersion, GameConnectionEventMonitorState.UnsupportedVersion)]
         [InlineData(GameCompatibilityState.CaptureDisabled, GameConnectionEventMonitorState.CaptureDisabled)]
@@ -1544,14 +1956,18 @@ namespace BO2.Tests.Services
             DetectedGame? detectedGame = null,
             TimeProvider? timeProvider = null,
             FakeProcessMemoryAccessor? memoryAccessor = null,
-            DllInjector? dllInjector = null)
+            DllInjector? dllInjector = null,
+            IGameTimerState? timerState = null,
+            IGameTimingReader? timingReader = null)
         {
             SessionContext context = CreateSessionContext(
                 eventMonitor,
                 timeProvider,
                 detectedGame,
                 memoryAccessor: memoryAccessor,
-                dllInjector: dllInjector);
+                dllInjector: dllInjector,
+                timerState: timerState,
+                timingReader: timingReader);
             context.Session.Start();
             return context.Session;
         }
@@ -1563,7 +1979,9 @@ namespace BO2.Tests.Services
             DetectedGame? pollingDetectedGame = null,
             FakeProcessMemoryAccessor? memoryAccessor = null,
             FakeProcessLifecycleEventSource? lifecycleEventSource = null,
-            DllInjector? dllInjector = null)
+            DllInjector? dllInjector = null,
+            IGameTimerState? timerState = null,
+            IGameTimingReader? timingReader = null)
         {
             FakeGameProcessDetector eventDetector = new()
             {
@@ -1578,11 +1996,13 @@ namespace BO2.Tests.Services
 
             GameConnectionSession session = new(
                 new GameMemoryReader(memoryAccessor),
+                timingReader ?? new FakeGameTimingReader(),
                 new GameProcessDetectionService(eventDetector, lifecycleEventSource),
                 pollingProcessDetector,
                 dllInjector ?? CreateDllInjector(),
                 eventMonitor,
-                timeProvider ?? TimeProvider.System);
+                timeProvider ?? TimeProvider.System,
+                timerState ?? new GameTimerState());
             return new SessionContext(
                 session,
                 eventDetector,
@@ -1633,14 +2053,25 @@ namespace BO2.Tests.Services
             return connectedSnapshot;
         }
 
-        private static GameEventMonitorStatus CreateCompatibleStatus()
+        private static GameEventMonitorStatus CreateCompatibleStatus(params GameEvent[] recentEvents)
         {
             return new GameEventMonitorStatus(
                 GameCompatibilityState.Compatible,
                 0,
                 0,
                 1,
-                []);
+                recentEvents);
+        }
+
+        private static GameTimingReadResult CreateTimingRead(
+            DetectedGame detectedGame,
+            int gameTimeMilliseconds,
+            bool isPaused = false)
+        {
+            return GameTimingReadResult.SupportedTiming(
+                detectedGame,
+                TimeSpan.FromMilliseconds(gameTimeMilliseconds),
+                isPaused);
         }
 
         private static void AssertCommandAvailability(
@@ -1656,6 +2087,59 @@ namespace BO2.Tests.Services
             Assert.Equal(disconnectVisible, snapshot.DisconnectCommandAvailability.IsVisible);
         }
 
+        private static void AssertPlaceholderTimers(GameConnectionSnapshot snapshot)
+        {
+            Assert.NotNull(snapshot.TimerDisplayState);
+            GameConnectionTimerDisplayState timers = snapshot.TimerDisplayState!;
+            Assert.NotNull(timers.GameTime);
+            Assert.NotNull(timers.RoundTime);
+            TimerDisplayState gameTime = timers.GameTime!;
+            TimerDisplayState roundTime = timers.RoundTime!;
+
+            Assert.Equal(TimerDisplayKind.Placeholder, gameTime.Kind);
+            Assert.Equal(TimerDisplayKind.Placeholder, roundTime.Kind);
+            Assert.Equal(TimerDisplayState.Placeholder.Text, gameTime.Text);
+            Assert.Equal(TimerDisplayState.Placeholder.Text, roundTime.Text);
+        }
+
+        private static void AssertGameTimer(
+            GameConnectionSnapshot snapshot,
+            TimerDisplayKind expectedKind,
+            string expectedText)
+        {
+            Assert.NotNull(snapshot.TimerDisplayState);
+            TimerDisplayState? timer = snapshot.TimerDisplayState!.GameTime;
+            Assert.NotNull(timer);
+            TimerDisplayState gameTime = timer!;
+
+            Assert.Equal(expectedKind, gameTime.Kind);
+            Assert.Equal(expectedText, RenderTimerText(gameTime));
+        }
+
+        private static void AssertRoundTimerPlaceholder(GameConnectionSnapshot snapshot)
+        {
+            AssertRoundTimer(snapshot, TimerDisplayKind.Placeholder, TimerDisplayState.PlaceholderText);
+        }
+
+        private static void AssertRoundTimer(
+            GameConnectionSnapshot snapshot,
+            TimerDisplayKind expectedKind,
+            string expectedText)
+        {
+            Assert.NotNull(snapshot.TimerDisplayState);
+            TimerDisplayState? timer = snapshot.TimerDisplayState!.RoundTime;
+            Assert.NotNull(timer);
+            TimerDisplayState roundTime = timer!;
+
+            Assert.Equal(expectedKind, roundTime.Kind);
+            Assert.Equal(expectedText, RenderTimerText(roundTime));
+        }
+
+        private static string RenderTimerText(TimerDisplayState timerDisplayState)
+        {
+            return Assert.IsType<DisplayText.PlainText>(timerDisplayState.Text).Text;
+        }
+
         private sealed class SessionContext(
             GameConnectionSession session,
             FakeGameProcessDetector eventDetector,
@@ -1669,6 +2153,70 @@ namespace BO2.Tests.Services
             public FakeGameProcessDetector PollingProcessDetector { get; } = pollingProcessDetector;
 
             public FakeProcessLifecycleEventSource LifecycleEventSource { get; } = lifecycleEventSource;
+        }
+
+        private sealed class FakeGameTimerState : IGameTimerState
+        {
+            public List<GameTimerLifecycleEventBatch> AppliedBatches { get; } = [];
+
+            public List<GameTimingReadResult> AppliedTimingReads { get; } = [];
+
+            public int FailClosedBatchCount { get; private set; }
+
+            public int ResetCallCount { get; private set; }
+
+            public GameConnectionTimerDisplayState DisplayState { get; set; } =
+                GameConnectionTimerDisplayState.Placeholder;
+
+            public void ApplyLifecycleEvents(GameTimerLifecycleEventBatch lifecycleEvents)
+            {
+                AppliedBatches.Add(lifecycleEvents);
+                if (lifecycleEvents.HasSequenceGap)
+                {
+                    FailClosedBatchCount++;
+                }
+            }
+
+            public void ApplyTimingRead(GameTimingReadResult timingRead)
+            {
+                AppliedTimingReads.Add(timingRead);
+            }
+
+            public void Reset()
+            {
+                ResetCallCount++;
+            }
+        }
+
+        private sealed class FakeGameTimingReader : IGameTimingReader
+        {
+            public GameTimingReadResult? Result { get; set; }
+
+            public int ReadCallCount { get; private set; }
+
+            public int ClearAttachedGameCallCount { get; private set; }
+
+            public int DisposeCallCount { get; private set; }
+
+            public DetectedGame? LastDetectedGame { get; private set; }
+
+            public GameTimingReadResult ReadGameTiming(DetectedGame detectedGame)
+            {
+                ReadCallCount++;
+                LastDetectedGame = detectedGame;
+
+                return Result ?? GameTimingReadResult.InvalidTimingSourceState(detectedGame);
+            }
+
+            public void ClearAttachedGame()
+            {
+                ClearAttachedGameCallCount++;
+            }
+
+            public void Dispose()
+            {
+                DisposeCallCount++;
+            }
         }
 
         private sealed class FakeGameEventMonitor : IGameEventMonitor

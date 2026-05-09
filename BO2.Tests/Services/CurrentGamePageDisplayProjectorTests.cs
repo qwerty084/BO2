@@ -175,6 +175,118 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void Project_WhenConnectedWithPlaceholderTimers_ReturnsTimerPlaceholdersWithoutChangingStatsOrEvents()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+            DateTimeOffset receivedAt = new(2026, 5, 2, 12, 0, 0, TimeSpan.Zero);
+            GameEventMonitorStatus eventStatus = new(
+                GameCompatibilityState.Compatible,
+                DroppedEventCount: 0,
+                DroppedNotifyCount: 0,
+                PublishedNotifyCount: 1,
+                RecentEvents:
+                [
+                    new GameEvent(GameEventType.StartOfRound, "start_of_round", 5, 0, 0, receivedAt)
+                ]);
+
+            CurrentGamePageDisplayState state = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    CreateReadResult(detectedGame),
+                    connectionPhase: GameConnectionPhase.Connected,
+                    eventMonitorSummary: GameConnectionEventMonitorSummary.FromStatus(eventStatus),
+                    timerDisplayState: GameConnectionTimerDisplayState.Placeholder));
+
+            Assert.Equal(CurrentGamePageDisplayState.EmptyTimerText, state.GameTimeText);
+            Assert.Equal(CurrentGamePageDisplayState.EmptyTimerText, state.RoundTimeText);
+            Assert.Equal(1234.ToString("N0", CultureInfo.CurrentCulture), state.PointsText);
+            Assert.Equal("CurrentRoundFormat(5, start_of_round)", state.CurrentRoundText);
+        }
+
+        [Fact]
+        public void Project_WhenConnectedWithMissingTimerState_ReturnsTimerPlaceholdersWithoutChangingStatsOrEvents()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+            DateTimeOffset receivedAt = new(2026, 5, 2, 12, 0, 0, TimeSpan.Zero);
+            GameEventMonitorStatus eventStatus = new(
+                GameCompatibilityState.Compatible,
+                DroppedEventCount: 0,
+                DroppedNotifyCount: 0,
+                PublishedNotifyCount: 1,
+                RecentEvents:
+                [
+                    new GameEvent(GameEventType.StartOfRound, "start_of_round", 5, 0, 0, receivedAt)
+                ]);
+
+            CurrentGamePageDisplayState state = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    CreateReadResult(detectedGame),
+                    connectionPhase: GameConnectionPhase.Connected,
+                    eventMonitorSummary: GameConnectionEventMonitorSummary.FromStatus(eventStatus),
+                    includeTimerDisplayState: false));
+
+            Assert.Equal(CurrentGamePageDisplayState.EmptyTimerText, state.GameTimeText);
+            Assert.Equal(CurrentGamePageDisplayState.EmptyTimerText, state.RoundTimeText);
+            Assert.Equal(1234.ToString("N0", CultureInfo.CurrentCulture), state.PointsText);
+            Assert.Equal("CurrentRoundFormat(5, start_of_round)", state.CurrentRoundText);
+        }
+
+        [Fact]
+        public void Project_WhenTimerDisplayStateHasActiveValues_RendersTimerText()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+
+            CurrentGamePageDisplayState state = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    null,
+                    connectionPhase: GameConnectionPhase.Connected,
+                    timerDisplayState: new GameConnectionTimerDisplayState(
+                        TimerDisplayState.Active(TimeSpan.FromMilliseconds(61_999)),
+                        TimerDisplayState.Active(TimeSpan.FromMilliseconds(3_661_999)))));
+
+            Assert.Equal("1:01", state.GameTimeText);
+            Assert.Equal("1:01:01", state.RoundTimeText);
+        }
+
+        [Fact]
+        public void Project_WhenTimerDisplayStateHasFrozenValues_RendersTimerText()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+
+            CurrentGamePageDisplayState state = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    null,
+                    connectionPhase: GameConnectionPhase.Connected,
+                    timerDisplayState: new GameConnectionTimerDisplayState(
+                        TimerDisplayState.Frozen(TimeSpan.FromMilliseconds(125_999)),
+                        TimerDisplayState.Frozen(TimeSpan.FromMilliseconds(9_999)))));
+
+            Assert.Equal("2:05", state.GameTimeText);
+            Assert.Equal("0:09", state.RoundTimeText);
+        }
+
+        [Fact]
+        public void Project_WhenOneTimerSlotIsMissing_ReturnsPlaceholderForThatSlot()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(1001);
+
+            CurrentGamePageDisplayState state = CreateProjector().Project(
+                CreateSnapshot(
+                    detectedGame,
+                    null,
+                    connectionPhase: GameConnectionPhase.Connected,
+                    timerDisplayState: new GameConnectionTimerDisplayState(
+                        TimerDisplayState.Active(TimeSpan.FromSeconds(65)),
+                        null)));
+
+            Assert.Equal("1:05", state.GameTimeText);
+            Assert.Equal(CurrentGamePageDisplayState.EmptyTimerText, state.RoundTimeText);
+        }
+
+        [Fact]
         public void Project_WhenConnectedWithPublishedEventsWithoutRoundOrBoxEvents_ReturnsEmptyEventSummaries()
         {
             DetectedGame detectedGame = CreateSupportedGame(1001);
@@ -230,10 +342,16 @@ namespace BO2.Tests.Services
                 "Disconnect",
                 "Debug",
                 "Diagnostic",
+                "Evidence",
                 "Injection",
                 "LowLevel",
                 "Monitor",
-                "Position"
+                "Position",
+                "Pause",
+                "Reason",
+                "Sequence",
+                "Source",
+                "Stale"
             ];
 
             Assert.DoesNotContain(
@@ -251,7 +369,9 @@ namespace BO2.Tests.Services
             PlayerStatsReadResult? readResult,
             bool canAttemptConnect = false,
             GameConnectionPhase? connectionPhase = null,
-            GameConnectionEventMonitorSummary? eventMonitorSummary = null)
+            GameConnectionEventMonitorSummary? eventMonitorSummary = null,
+            GameConnectionTimerDisplayState? timerDisplayState = null,
+            bool includeTimerDisplayState = true)
         {
             GameConnectionPhase phase = connectionPhase ?? DetermineConnectionPhase(currentGame);
             return new GameConnectionSnapshot(
@@ -259,6 +379,9 @@ namespace BO2.Tests.Services
                 phase,
                 readResult,
                 eventMonitorSummary ?? GameConnectionEventMonitorSummary.Waiting,
+                includeTimerDisplayState
+                    ? timerDisplayState ?? GameConnectionTimerDisplayState.Placeholder
+                    : null,
                 CreateConnectCommandAvailability(phase, canAttemptConnect),
                 CreateDisconnectCommandAvailability(phase));
         }
