@@ -240,6 +240,7 @@ function Read-MsixManifest {
             Publisher = $identityNode.Publisher
             Version = $identityNode.Version
             ApplicationId = $applicationNode.Id
+            Executable = $applicationNode.Executable
             DisplayName = $displayName
         }
     } finally {
@@ -417,7 +418,17 @@ function Get-InstalledPackageByName {
 }
 
 function Start-PackagedApplication {
-    param([string]$ApplicationUserModelId)
+    param(
+        [string]$ApplicationUserModelId,
+        [string]$ExecutablePath
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($ExecutablePath) -and
+        (Test-Path -LiteralPath $ExecutablePath -PathType Leaf)) {
+        Write-Host "Launching installed package executable: $ExecutablePath"
+        $process = Start-Process -FilePath $ExecutablePath -PassThru -ErrorAction Stop
+        return $process.Id
+    }
 
     Start-Process -FilePath 'explorer.exe' -ArgumentList "shell:AppsFolder\$ApplicationUserModelId" -ErrorAction Stop | Out-Null
     return 0
@@ -723,6 +734,10 @@ function Save-SmokeDiagnostics {
         -LogName 'Microsoft-Windows-AppModel-Runtime/Admin' `
         -Path (Join-Path $Directory 'appmodel-runtime-events.log') `
         -StartTime $StartTime
+    Save-EventLog `
+        -LogName 'Application' `
+        -Path (Join-Path $Directory 'application-events.log') `
+        -StartTime $StartTime
 }
 
 try {
@@ -755,8 +770,11 @@ try {
 
     $installedPackage = Get-InstalledPackageByName -IdentityName $packageIdentityName
     $applicationUserModelId = "$($installedPackage.PackageFamilyName)!$($packageManifest.ApplicationId)"
+    $installedExecutablePath = Join-Path $installedPackage.InstallLocation $packageManifest.Executable
     Write-Host "Launching packaged app: $applicationUserModelId"
-    $launchedProcessId = Start-PackagedApplication -ApplicationUserModelId $applicationUserModelId
+    $launchedProcessId = Start-PackagedApplication `
+        -ApplicationUserModelId $applicationUserModelId `
+        -ExecutablePath $installedExecutablePath
     if ($launchedProcessId -gt 0) {
         Write-Host "Packaged app process id: $launchedProcessId"
     }
