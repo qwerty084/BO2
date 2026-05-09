@@ -70,61 +70,6 @@ function Import-WindowsPackageModules {
 
 Import-WindowsPackageModules
 
-function Add-ApplicationActivationManagerType {
-    if ($null -ne ('BO2.PackageSmoke.ApplicationActivationManager' -as [type])) {
-        return
-    }
-
-    Add-Type -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-
-namespace BO2.PackageSmoke
-{
-    [Flags]
-    public enum ActivateOptions
-    {
-        None = 0,
-        DesignMode = 1,
-        NoErrorUI = 2,
-        NoSplashScreen = 4
-    }
-
-    [ComImport]
-    [Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C")]
-    public class ApplicationActivationManager
-    {
-    }
-
-    [ComImport]
-    [Guid("2e941141-7f97-4756-ba1d-9decde894a3d")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    public interface IApplicationActivationManager
-    {
-        [PreserveSig]
-        int ActivateApplication(
-            [MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
-            [MarshalAs(UnmanagedType.LPWStr)] string arguments,
-            ActivateOptions options,
-            out int processId);
-
-        [PreserveSig]
-        int ActivateForFile(
-            [MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
-            IntPtr itemArray,
-            [MarshalAs(UnmanagedType.LPWStr)] string verb,
-            out int processId);
-
-        [PreserveSig]
-        int ActivateForProtocol(
-            [MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
-            IntPtr itemArray,
-            out int processId);
-    }
-}
-'@
-}
-
 function Find-BuildPackage {
     param([string]$PackageRoot)
 
@@ -474,26 +419,8 @@ function Get-InstalledPackageByName {
 function Start-PackagedApplication {
     param([string]$ApplicationUserModelId)
 
-    Add-ApplicationActivationManagerType
-
-    $activationManager = [BO2.PackageSmoke.IApplicationActivationManager](
-        New-Object BO2.PackageSmoke.ApplicationActivationManager)
-    $processId = 0
-    $hr = $activationManager.ActivateApplication(
-        $ApplicationUserModelId,
-        '',
-        [BO2.PackageSmoke.ActivateOptions]::NoErrorUI,
-        [ref]$processId)
-
-    if ($hr -ne 0) {
-        [System.Runtime.InteropServices.Marshal]::ThrowExceptionForHR($hr)
-    }
-
-    if ($processId -le 0) {
-        throw "Packaged app activation for '$ApplicationUserModelId' did not return a process id."
-    }
-
-    return $processId
+    Start-Process -FilePath 'explorer.exe' -ArgumentList "shell:AppsFolder\$ApplicationUserModelId" -ErrorAction Stop | Out-Null
+    return 0
 }
 
 function New-PropertyCondition {
@@ -830,9 +757,16 @@ try {
     $applicationUserModelId = "$($installedPackage.PackageFamilyName)!$($packageManifest.ApplicationId)"
     Write-Host "Launching packaged app: $applicationUserModelId"
     $launchedProcessId = Start-PackagedApplication -ApplicationUserModelId $applicationUserModelId
-    Write-Host "Packaged app process id: $launchedProcessId"
+    if ($launchedProcessId -gt 0) {
+        Write-Host "Packaged app process id: $launchedProcessId"
+    }
 
     $smokeWindow = Wait-ForTopLevelWindow -ProcessId $launchedProcessId -TimeoutSeconds $LaunchTimeoutSeconds
+    if ($launchedProcessId -le 0) {
+        $launchedProcessId = $smokeWindow.Current.ProcessId
+        Write-Host "Detected packaged app process id: $launchedProcessId"
+    }
+
     Save-UiTree -Window $smokeWindow -Path (Join-Path $diagnosticsRoot 'ui-tree.txt')
     Assert-StartupState -Window $smokeWindow
 
