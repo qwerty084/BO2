@@ -28,6 +28,24 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void WhenServerRunningDvarBoolHasNonBooleanNeighborBytes_ThenReturnsSupportedTimingFacts()
+        {
+            DetectedGame detectedGame = MakeSteamZombiesGame();
+            GameTimingAddressMap addressMap = GameTimingAddressMap.SteamZombies;
+            var memoryAccessor = new FakeProcessMemoryAccessor();
+            ConfigureActiveTimingRead(memoryAccessor, gameTimeMilliseconds: 41_600, isPaused: false);
+            memoryAccessor.SetByte(addressMap.ServerRunningAddress, 1);
+            memoryAccessor.SetInt32(addressMap.ServerRunningAddress, 0x028BBE01);
+            using var reader = new GameTimingReader(memoryAccessor);
+
+            GameTimingReadResult result = reader.ReadGameTiming(detectedGame);
+
+            Assert.Equal(GameTimingReadStatus.SupportedTiming, result.Status);
+            Assert.Equal(TimeSpan.FromMilliseconds(41_600), result.GameTime);
+            Assert.False(result.IsPaused);
+        }
+
+        [Fact]
         public void WhenGameVariantHasNoTimingSupport_ThenReturnsUnsupportedWithoutAttaching()
         {
             DetectedGame detectedGame = new(
@@ -54,7 +72,7 @@ namespace BO2.Tests.Services
             DetectedGame detectedGame = MakeSteamZombiesGame();
             GameTimingAddressMap addressMap = GameTimingAddressMap.SteamZombies;
             var memoryAccessor = new FakeProcessMemoryAccessor();
-            memoryAccessor.SetInt32(addressMap.ServerRunningAddress, 1);
+            memoryAccessor.SetByte(addressMap.ServerRunningAddress, 1);
             memoryAccessor.SetInt32(addressMap.ClientPausedAddress, 0);
             memoryAccessor.SetInt32(addressMap.ClientActivePointerAddress, 0);
             using var reader = new GameTimingReader(memoryAccessor);
@@ -72,7 +90,7 @@ namespace BO2.Tests.Services
             DetectedGame detectedGame = MakeSteamZombiesGame();
             GameTimingAddressMap addressMap = GameTimingAddressMap.SteamZombies;
             var memoryAccessor = new FakeProcessMemoryAccessor();
-            memoryAccessor.SetInt32(addressMap.ServerRunningAddress, 1);
+            memoryAccessor.SetByte(addressMap.ServerRunningAddress, 1);
             memoryAccessor.SetInt32(addressMap.ClientPausedAddress, 0);
             memoryAccessor.SetInt32(addressMap.ClientActivePointerAddress, (int)ClientActivePointer);
             memoryAccessor.SetInt32(ClientActivePointer + addressMap.SnapshotValidOffset, 0);
@@ -91,7 +109,7 @@ namespace BO2.Tests.Services
             DetectedGame detectedGame = MakeSteamZombiesGame();
             GameTimingAddressMap addressMap = GameTimingAddressMap.SteamZombies;
             var memoryAccessor = new FakeProcessMemoryAccessor();
-            memoryAccessor.SetInt32(addressMap.ServerRunningAddress, 0);
+            memoryAccessor.SetByte(addressMap.ServerRunningAddress, 0);
             using var reader = new GameTimingReader(memoryAccessor);
 
             GameTimingReadResult result = reader.ReadGameTiming(detectedGame);
@@ -108,7 +126,7 @@ namespace BO2.Tests.Services
             DetectedGame detectedGame = MakeSteamZombiesGame();
             GameTimingAddressMap addressMap = GameTimingAddressMap.SteamZombies;
             var memoryAccessor = new FakeProcessMemoryAccessor();
-            memoryAccessor.SetInt32Exception(
+            memoryAccessor.SetByteException(
                 addressMap.ServerRunningAddress,
                 new Win32Exception(5, "read failed"));
             using var reader = new GameTimingReader(memoryAccessor);
@@ -153,7 +171,7 @@ namespace BO2.Tests.Services
             bool isPaused)
         {
             GameTimingAddressMap addressMap = GameTimingAddressMap.SteamZombies;
-            memoryAccessor.SetInt32(addressMap.ServerRunningAddress, 1);
+            memoryAccessor.SetByte(addressMap.ServerRunningAddress, 1);
             memoryAccessor.SetInt32(addressMap.ClientPausedAddress, isPaused ? 1 : 0);
             memoryAccessor.SetInt32(addressMap.ClientActivePointerAddress, (int)ClientActivePointer);
             memoryAccessor.SetInt32(ClientActivePointer + addressMap.SnapshotValidOffset, 1);

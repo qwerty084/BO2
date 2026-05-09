@@ -7,6 +7,7 @@ namespace BO2.Services
     internal sealed class WindowsProcessMemoryAccessor : IProcessMemoryAccessor
     {
         private const int Int32Size = sizeof(int);
+        private const int ByteSize = sizeof(byte);
         private const int SingleSize = sizeof(float);
         private static readonly IntPtr InvalidHandleValue = new(-1);
 
@@ -62,6 +63,27 @@ namespace BO2.Services
             }
 
             return BitConverter.ToInt32(buffer, 0);
+        }
+
+        public byte ReadByte(uint address, string valueName)
+        {
+            SafeProcessHandle processHandle = GetRequiredProcessHandle();
+            byte[] buffer = new byte[ByteSize];
+            nuint size = ByteSize;
+
+            // Process memory reads intentionally copy fixed-size primitives from known game addresses.
+            // codeql[cs/call-to-unmanaged-code]
+            if (!ReadProcessMemory(processHandle, new IntPtr(unchecked((long)address)), buffer, size, out nuint bytesRead))
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error(), AppStrings.Format("ReadMemoryFailedFormat", valueName));
+            }
+
+            if (bytesRead != size)
+            {
+                throw new InvalidOperationException(AppStrings.Format("ShortReadFormat", size, bytesRead));
+            }
+
+            return buffer[0];
         }
 
         public float ReadSingle(uint address, string valueName)

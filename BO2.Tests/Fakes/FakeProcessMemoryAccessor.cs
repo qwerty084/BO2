@@ -7,11 +7,15 @@ namespace BO2.Tests.Fakes
     internal sealed class FakeProcessMemoryAccessor : IProcessMemoryAccessor
     {
         private readonly Dictionary<uint, int> _int32Values = [];
+        private readonly Dictionary<uint, byte> _byteValues = [];
         private readonly Dictionary<uint, float> _singleValues = [];
         private readonly Dictionary<uint, Exception> _int32Exceptions = [];
+        private readonly Dictionary<uint, Exception> _byteExceptions = [];
         private readonly Dictionary<uint, Exception> _singleExceptions = [];
 
         public int DefaultInt32Value { get; set; }
+
+        public byte DefaultByteValue { get; set; }
 
         public float DefaultSingleValue { get; set; }
 
@@ -30,6 +34,11 @@ namespace BO2.Tests.Fakes
             _int32Values[address] = value;
         }
 
+        public void SetByte(uint address, byte value)
+        {
+            _byteValues[address] = value;
+        }
+
         public void SetSingle(uint address, float value)
         {
             _singleValues[address] = value;
@@ -39,6 +48,12 @@ namespace BO2.Tests.Fakes
         {
             ArgumentNullException.ThrowIfNull(exception);
             _int32Exceptions[address] = exception;
+        }
+
+        public void SetByteException(uint address, Exception exception)
+        {
+            ArgumentNullException.ThrowIfNull(exception);
+            _byteExceptions[address] = exception;
         }
 
         public void SetSingleException(uint address, Exception exception)
@@ -66,6 +81,16 @@ namespace BO2.Tests.Fakes
             }
 
             return _int32Values.TryGetValue(address, out int value) ? value : DefaultInt32Value;
+        }
+
+        public byte ReadByte(uint address, string valueName)
+        {
+            if (_byteExceptions.TryGetValue(address, out Exception? exception))
+            {
+                throw exception;
+            }
+
+            return _byteValues.TryGetValue(address, out byte value) ? value : DefaultByteValue;
         }
 
         public float ReadSingle(uint address, string valueName)

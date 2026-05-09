@@ -42,17 +42,14 @@ namespace BO2.Services
             {
                 _processMemoryAccessor.Attach(detectedGame.ProcessId, detectedGame.ProcessName);
 
-                if (!TryReadBoolean(addressMap.ServerRunningAddress, "sv_running", out bool serverRunning))
-                {
-                    return GameTimingReadResult.InvalidTimingSourceState(detectedGame);
-                }
+                bool serverRunning = ReadDvarBoolean(addressMap.ServerRunningAddress, "sv_running");
 
                 if (!serverRunning)
                 {
                     return GameTimingReadResult.InactiveLobbyState(detectedGame);
                 }
 
-                if (!TryReadBoolean(addressMap.ClientPausedAddress, "cl_paused", out bool clientPaused))
+                if (!TryReadInt32Boolean(addressMap.ClientPausedAddress, "cl_paused", out bool clientPaused))
                 {
                     return GameTimingReadResult.InvalidTimingSourceState(detectedGame);
                 }
@@ -116,7 +113,7 @@ namespace BO2.Services
             ClearAttachedGame();
         }
 
-        private bool TryReadBoolean(uint address, string valueName, out bool value)
+        private bool TryReadInt32Boolean(uint address, string valueName, out bool value)
         {
             int rawValue = ReadInt32(address, valueName);
             if (rawValue == 0)
@@ -133,6 +130,11 @@ namespace BO2.Services
 
             value = false;
             return false;
+        }
+
+        private bool ReadDvarBoolean(uint address, string valueName)
+        {
+            return _processMemoryAccessor.ReadByte(address, valueName) != 0;
         }
 
         private int ReadInt32(uint address, string valueName)
