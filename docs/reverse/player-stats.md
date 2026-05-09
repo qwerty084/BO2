@@ -82,6 +82,43 @@ Timing uses a separate map:
 
 The timing path is covered by fake-memory unit tests, not by this static Ghidra pass.
 
+## Passive Runtime Snapshot, 2026-05-09
+
+A single read-only snapshot was captured from the running Town session while the game was paused. This is useful sanity evidence, not full transition validation.
+
+Score and round values:
+
+| Field | Address | Live value |
+|---|---:|---:|
+| Round | `0x0233FA10` | `1` |
+| Points | `0x0234C068` | `18300` |
+| Kills | `0x0234C080` | `0` |
+| Downs | `0x0234C084` | `0` |
+| Revives | `0x0234C088` | `0` |
+| Headshots | `0x0234C08C` | `0` |
+| Alternate `0x0234C06C` | `0x0234C06C` | `0` |
+| Alternate `0x0234C098` | `0x0234C098` | `0` |
+| Secondary `0x0234C0C0` | `0x0234C0C0` | `0` |
+| Secondary `0x0234C0FC` | `0x0234C0FC` | `0` |
+
+Timing values:
+
+| Field | Address or offset | Live value |
+|---|---:|---:|
+| `sv_running` | `0x02A09F00` | `12573441` |
+| `cl_paused` | `0x02A09DE0` | `1` |
+| client-active pointer | `0x0119DC04` | `0x2D3ECEB0` |
+| snapshot valid | `client + 0x50` | `1` |
+| game time ms | `client + 0x58` | `40500` |
+
+Local-player sample:
+
+- Base: `0x02346AA0`.
+- Position at `+0x28/+0x2C/+0x30`: `(2077.0027, 17.107466, 88.125)`.
+- Velocity at `+0x34/+0x38/+0x3C`: `(0, 0, 0)`.
+
+This snapshot supports the existing address map for the current build, but it does not prove scoreboard ownership, alternate stat semantics, movement deltas, or timing behavior across transitions.
+
 ## GEntity Hints
 
 The map includes GEntity anchors:

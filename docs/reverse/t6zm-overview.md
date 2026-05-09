@@ -35,8 +35,11 @@ Primary outputs created by this pass:
 - `artifacts/reverse/address-ledger.csv`: final provenance ledger.
 - `artifacts/reverse/address-ledger.seed.csv`: repo-first seed ledger.
 - `artifacts/reverse/open-questions.md`: remaining work queue.
+- `artifacts/reverse/runtime-validation-2026-05-09.md`: read-only Town runtime notes.
 
 The first Ghidra import completed and saved the project. Ghidra reported Java heap warnings in constant propagation and stack-variable analyzers, but the project, original post-script output, and companion catalogs were produced. The companion exporter was rerun with `-noanalysis` against the saved project.
+
+The 2026-05-09 continuation pass reran the companion exporter with `-noanalysis`, applied durable names/comments and conservative helper signatures in the saved Ghidra project, and refreshed the catalogs. The function catalog now includes Ghidra prototypes, calling conventions, and bounded decompile snippets.
 
 ## Subsystem Map
 
@@ -77,4 +80,19 @@ Future agents can split work along these issue boundaries:
 
 ## Dynamic Validation Status
 
-No live BO2 process was attached during this run. Static evidence was enough to build the knowledge pack. The next dynamic pass should be read-only and should start only after the user launches BO2 and controls the game.
+Read-only live validation was performed on 2026-05-09 after the user launched Steam Zombies Town.
+
+Confirmed:
+
+- Running `t6zm.exe` matched build `65428` by MD5/SHA256.
+- `0x008F31D0` matched the expected `vm_notify` prologue in live memory before monitor injection.
+- `0x008F3620` was rejected again in live memory because it is inside the immediate bytes of the `CALL` at `0x008F361F`.
+- `0x00418B40` matched the expected `SL_GetStringOfSize` prologue in live memory.
+- Script string table and child variable pointer slots were readable and populated.
+- `death`/`disconnect` remap globals resolve to `death_or_disconnect` in the observed process.
+
+Not confirmed:
+
+- MinHook installation and snapshot discovery events were not tested because monitor injection is not read-only.
+- `vm_notify` execution reach was not breakpoint-confirmed. x32dbg headless attach failed to detach cleanly and the game crashed, so no further debugger work was used in this pass.
+- Box weapon alias lifetime under the notify owner remains open because no event owner ID was captured.

@@ -33,6 +33,7 @@ Runtime resolver:
 - Expected prologue: `83 EC 0C 8B 54 24 10`.
 - Inferred signature: `uint __cdecl SL_GetStringOfSize(const char* name, int user, uint length, int type)`.
 - Native monitor call pattern: `resolver(name, 0, strlen(name) + 1, 6)`.
+- Live 2026-05-09 Town process bytes: `83 EC 0C 8B 54 24 10 53 8B 5C 24 1C 55 56 57 8B`.
 
 The native monitor does not hard-code notify string IDs. It resolves each target name at startup after checking the resolver prologue. This is safer than storing IDs because script string IDs may be process-lifetime or load-order dependent.
 
@@ -42,6 +43,7 @@ Script string table:
 - Entry stride: `0x18`.
 - Text offset: `0x04`.
 - Max string id guard in native code: `< 0x40000`.
+- Live 2026-05-09 Town pointer value: `0x02BF8880`.
 
 `CopyScriptStringValue` dereferences `0x02BF83A4`, computes `base + stringId * 0x18 + 0x04`, and copies printable ASCII into a 64-byte weapon-name buffer.
 
@@ -91,6 +93,8 @@ Production alias scanning does not currently use the exact hash lookup. It scans
 
 See `artifacts/reverse/function-catalog.csv` for callers, callees, bytes, and xrefs.
 
+The saved Ghidra project has durable names and conservative signatures for these helpers as of the 2026-05-09 continuation pass. `function-catalog.csv` now includes Ghidra prototypes, calling conventions, and bounded decompile snippets in addition to the manual inference columns. `scr_set_variable_field` still has an unknown return type; its parameters are named, but direct use should wait for deeper decompilation.
+
 ## Important Globals
 
 | Label | Address | Meaning |
@@ -105,3 +109,27 @@ See `artifacts/reverse/function-catalog.csv` for callers, callees, bytes, and xr
 | `vm_notify_remap_target` | `0x024BB4D0` | Replacement string id for recursive notify call. |
 
 See `artifacts/reverse/globals-catalog.csv` for static xrefs.
+
+## Runtime Notes, 2026-05-09
+
+Read-only validation in a Town session confirmed the major VM anchors without injecting the monitor:
+
+| Item | Live value |
+|---|---:|
+| `0x008F31D0` bytes | `55 8B EC 83 E4 F8 83 EC 44 53 56 8B 75 08 57 8B` |
+| instance 0 child bucket base | `0x2EE30000` |
+| instance 1 child bucket base | `0x2F8D0000` |
+| instance 0 child variable base | `0x2E730000` |
+| instance 1 child variable base | `0x2F1D0000` |
+
+The three `vm_notify` remap globals resolved to script strings in this process:
+
+| Global | Address | Live ID | Live string |
+|---|---:|---:|---|
+| `vm_notify_remap_a` | `0x024BB4CC` | `5351` | `death` |
+| `vm_notify_remap_b` | `0x024BB4CE` | `5352` | `disconnect` |
+| `vm_notify_remap_target` | `0x024BB4D0` | `5353` | `death_or_disconnect` |
+
+The observed remap values are runtime string IDs, not portable constants. The portable concept is that `vm_notify(inst:0, death|disconnect, ...)` recursively normalizes to `death_or_disconnect`.
+
+The reason `SL_GetStringOfSize` uses `type = 6` remains unresolved. Treat it as the empirically correct resolver mode for notify names until the string-type enum is recovered.

@@ -77,6 +77,30 @@ The runtime tool `tools/Find-BO2BoxWeaponByGhidraLayout.ps1` supports a more exa
 
 This path is not used by production `BO2Monitor.dll` today. It is useful for future narrowing once live evidence proves the owner and field relationship for each box notify.
 
+## Runtime Validation, 2026-05-09
+
+Read-only Town validation was performed before a box spin and again while the box weapon was visible and the game was paused.
+
+Live script string IDs in the visible-box state:
+
+| Name | Result |
+|---|---:|
+| `weapon_string` | not found in the live string table |
+| `grab_weapon_name` | not found in the live string table |
+| `zbarrier` | `7453` |
+| `randomization_done` | `7492` |
+| `user_grabbed_weapon` | `7429` |
+
+`tools/Search-BO2ScriptFieldBytes.ps1` and `tools/Find-BO2BoxWeaponByGhidraLayout.ps1` now tolerate missing field names and continue with available IDs. In this Town session they could only search the `zbarrier` exact path; no `weapon_string` or `grab_weapon_name` exact field path was available to test.
+
+A strict child-variable scan found many existing `_zm` string/istring values, including normal weapon aliases such as `beretta93r_zm`, `m14_zm`, `mp5k_zm`, `python_zm`, and upgraded variants. These were global child-table observations, not notify-owner observations. Without the `vm_notify` owner ID for `randomization_done` or `user_grabbed_weapon`, they do not prove the box alias lifetime or an exact owner field path.
+
+Current field-specific recommendation:
+
+- Do not replace the production broad owner scan with exact lookup yet.
+- Exact lookup is not viable as the only strategy on the observed Town process because `weapon_string` and `grab_weapon_name` were absent from the live script string table even while the box weapon was visible.
+- If exact lookup is later implemented, use exact lookup first only when all required field IDs resolve, then fall back to the current broad owner scan.
+
 ## Static Evidence
 
 Ghidra string search in `bo2-ghidra-recon.txt`:
@@ -101,4 +125,4 @@ When alias recovery fails, the event is still useful for sequence/timing, but th
 
 ## Next Best Improvement
 
-The next feature issue should confirm, with a live read-only x32dbg session, which child field carries the weapon alias for `randomization_done` and `user_grabbed_weapon`. If stable, production can replace the broad owner scan with a field-specific lookup and keep the broad scan as a fallback.
+The next feature issue should capture `inst`, `ownerId`, and `stringValue` for `randomization_done` and `user_grabbed_weapon`, then run exact and broad owner scans against that owner before and after the original `vm_notify` returns. The x32dbg headless path crashed during this pass, so prefer a manually supervised GUI x32dbg session with hardware breakpoints, or add explicit monitor diagnostics in a controlled non-production build if write/injection validation is allowed.

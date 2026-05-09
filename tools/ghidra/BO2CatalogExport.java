@@ -3,13 +3,25 @@
 //   analyzeHeadless <projectDir> BO2Recon -process t6zm.exe -postScript BO2CatalogExport.java <outputDir>
 
 import ghidra.app.script.GhidraScript;
+import ghidra.app.decompiler.DecompInterface;
+import ghidra.app.decompiler.DecompileResults;
 import ghidra.program.model.address.Address;
+import ghidra.program.model.data.CharDataType;
+import ghidra.program.model.data.DataType;
+import ghidra.program.model.data.IntegerDataType;
+import ghidra.program.model.data.PointerDataType;
+import ghidra.program.model.data.UnsignedIntegerDataType;
+import ghidra.program.model.listing.CodeUnit;
 import ghidra.program.model.listing.Function;
+import ghidra.program.model.listing.Function.FunctionUpdateType;
 import ghidra.program.model.listing.Instruction;
+import ghidra.program.model.listing.Parameter;
+import ghidra.program.model.listing.ParameterImpl;
 import ghidra.program.model.mem.Memory;
 import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.symbol.Reference;
 import ghidra.program.model.symbol.ReferenceIterator;
+import ghidra.program.model.symbol.SourceType;
 
 import java.io.File;
 import java.io.PrintWriter;
@@ -91,7 +103,7 @@ public class BO2CatalogExport extends GhidraScript {
             "strong",
             "Address lies inside local_vm_notify_entry rather than at a function entry."));
         functions.add(new FunctionTarget(
-            "sl_get_string_of_size_candidate",
+            "sl_get_string_of_size",
             0x00418b40L,
             "Script-string interning/resolution helper used to resolve notify names at runtime.",
             "__cdecl const char* name, int user, uint len, int type",
@@ -99,7 +111,7 @@ public class BO2CatalogExport extends GhidraScript {
             "strong",
             "Runtime code validates prologue before calling."));
         functions.add(new FunctionTarget(
-            "scr_find_variable_candidate",
+            "scr_find_variable",
             0x006bfb30L,
             "Find child variable by script instance, parent id, and name id.",
             "int inst, uint parentId, uint nameId",
@@ -107,15 +119,15 @@ public class BO2CatalogExport extends GhidraScript {
             "strong",
             "Called by vm_notify with owner and notify string ids."));
         functions.add(new FunctionTarget(
-            "scr_get_variable_value_candidate",
+            "scr_get_variable_value",
             0x00485950L,
             "Read script variable value for a child/object id.",
             "int inst, uint variableId",
             "uint value/object id",
             "strong",
-            "Called immediately after successful scr_find_variable_candidate in vm_notify."));
+            "Called immediately after successful scr_find_variable in vm_notify."));
         functions.add(new FunctionTarget(
-            "scr_get_variable_value_address_candidate",
+            "scr_get_variable_value_address",
             0x0067c1b0L,
             "Return pointer to a script variable value slot.",
             "int inst, uint variableId",
@@ -123,7 +135,7 @@ public class BO2CatalogExport extends GhidraScript {
             "medium",
             "Used in vm_notify complex object traversal path."));
         functions.add(new FunctionTarget(
-            "scr_set_variable_field_candidate",
+            "scr_set_variable_field",
             0x0058f9e0L,
             "Assign or link a variable field in the script VM.",
             "int inst, uint parent/object, uint value/object",
@@ -131,7 +143,7 @@ public class BO2CatalogExport extends GhidraScript {
             "medium",
             "Observed in vm_notify branch that creates or updates script object fields."));
         functions.add(new FunctionTarget(
-            "scr_find_object_candidate",
+            "scr_find_object",
             0x00474ea0L,
             "Resolve/find script object metadata by id.",
             "int inst, uint objectId",
@@ -143,7 +155,7 @@ public class BO2CatalogExport extends GhidraScript {
         globals.add(new GlobalTarget(
             "script_string_data_pointer",
             0x02bf83a4L,
-            "Pointer to script string table base.",
+            "Pointer to script string table base; live Town value 0x02BF8880 on 2026-05-09.",
             "pointer; entries are 0x18 bytes, text at +0x04",
             "strong",
             "vm_notify decompile references DAT_02bf83a4 for script-string values."));
@@ -178,25 +190,26 @@ public class BO2CatalogExport extends GhidraScript {
         globals.add(new GlobalTarget(
             "vm_notify_remap_a",
             0x024bb4ccL,
-            "Script string id remapped by vm_notify when inst is 0.",
-            "uint16 script string id",
+            "Script string id remapped by vm_notify when inst is 0; live Town ID 5351 = death.",
+            "uint16 runtime script string id",
             "medium",
             "vm_notify compares notify stringValue to this global."));
         globals.add(new GlobalTarget(
             "vm_notify_remap_b",
             0x024bb4ceL,
-            "Second script string id remapped by vm_notify when inst is 0.",
-            "uint16 script string id",
+            "Second script string id remapped by vm_notify when inst is 0; live Town ID 5352 = disconnect.",
+            "uint16 runtime script string id",
             "medium",
             "vm_notify compares notify stringValue to this global."));
         globals.add(new GlobalTarget(
             "vm_notify_remap_target",
             0x024bb4d0L,
-            "Replacement script string id used by vm_notify remap.",
-            "uint16 script string id",
+            "Replacement script string id used by vm_notify remap; live Town ID 5353 = death_or_disconnect.",
+            "uint16 runtime script string id",
             "medium",
             "vm_notify recursively calls itself with this value."));
 
+        applyNamesAndComments(functions, globals);
         writeFunctionCatalog(new File(outputDir, "function-catalog.csv"), functions);
         writeGlobalsCatalog(new File(outputDir, "globals-catalog.csv"), globals);
         writeCallgraphNotes(new File(outputDir, "callgraph-notes.md"), functions);
@@ -213,6 +226,140 @@ public class BO2CatalogExport extends GhidraScript {
 
     private String functionName(Function function) {
         return function == null ? "" : function.getName() + "@" + function.getEntryPoint();
+    }
+
+    private void applyNamesAndComments(List<FunctionTarget> functions, List<GlobalTarget> globals) throws Exception {
+        for (FunctionTarget target : functions) {
+            Address address = addr(target.address);
+            Function function = currentProgram.getFunctionManager().getFunctionAt(address);
+            if (function != null && !target.label.contains("rejected")) {
+                function.setName(target.label, SourceType.USER_DEFINED);
+                function.setComment(target.purpose + "\n\n" + target.notes);
+                applyFunctionSignature(function, target);
+                continue;
+            }
+
+            CodeUnit codeUnit = currentProgram.getListing().getCodeUnitContaining(address);
+            if (codeUnit != null) {
+                codeUnit.setComment(CodeUnit.PRE_COMMENT, target.label + ": " + target.purpose + "\n" + target.notes);
+            }
+        }
+
+        for (GlobalTarget target : globals) {
+            Address address = addr(target.address);
+            try {
+                currentProgram.getSymbolTable().createLabel(address, target.label, SourceType.USER_DEFINED);
+            }
+            catch (Exception ex) {
+                // The label may already exist when the exporter is rerun.
+            }
+
+            CodeUnit codeUnit = currentProgram.getListing().getCodeUnitAt(address);
+            if (codeUnit == null) {
+                codeUnit = currentProgram.getListing().getCodeUnitContaining(address);
+            }
+
+            if (codeUnit != null) {
+                codeUnit.setComment(CodeUnit.PLATE_COMMENT, target.purpose + "\nShape: " + target.shape + "\n" + target.notes);
+            }
+        }
+    }
+
+    private Parameter parameter(String name, DataType dataType) throws Exception {
+        return new ParameterImpl(name, dataType, currentProgram);
+    }
+
+    private DataType int32() {
+        return new IntegerDataType();
+    }
+
+    private DataType uint32() {
+        return new UnsignedIntegerDataType();
+    }
+
+    private DataType charPointer() {
+        return new PointerDataType(new CharDataType());
+    }
+
+    private DataType voidPointer() {
+        return new PointerDataType(DataType.VOID);
+    }
+
+    private void applySignature(
+        Function function,
+        DataType returnType,
+        Parameter[] parameters) throws Exception {
+        try {
+            function.setCallingConvention("__cdecl");
+        }
+        catch (Exception ex) {
+            // Keep Ghidra's existing convention if this compiler spec rejects the spelling.
+        }
+
+        if (returnType != null) {
+            function.setReturnType(returnType, SourceType.USER_DEFINED);
+        }
+
+        function.replaceParameters(
+            FunctionUpdateType.DYNAMIC_STORAGE_ALL_PARAMS,
+            true,
+            SourceType.USER_DEFINED,
+            parameters);
+    }
+
+    private void applyFunctionSignature(Function function, FunctionTarget target) throws Exception {
+        switch (target.label) {
+            case "local_vm_notify_entry":
+                applySignature(function, DataType.VOID, new Parameter[] {
+                    parameter("inst", int32()),
+                    parameter("ownerId", uint32()),
+                    parameter("stringValue", uint32()),
+                    parameter("top", voidPointer())
+                });
+                break;
+            case "sl_get_string_of_size":
+                applySignature(function, uint32(), new Parameter[] {
+                    parameter("name", charPointer()),
+                    parameter("user", int32()),
+                    parameter("length", uint32()),
+                    parameter("type", int32())
+                });
+                break;
+            case "scr_find_variable":
+                applySignature(function, uint32(), new Parameter[] {
+                    parameter("inst", int32()),
+                    parameter("parentId", uint32()),
+                    parameter("nameId", uint32())
+                });
+                break;
+            case "scr_get_variable_value":
+                applySignature(function, uint32(), new Parameter[] {
+                    parameter("inst", int32()),
+                    parameter("variableId", uint32())
+                });
+                break;
+            case "scr_get_variable_value_address":
+                applySignature(function, voidPointer(), new Parameter[] {
+                    parameter("inst", int32()),
+                    parameter("variableId", uint32())
+                });
+                break;
+            case "scr_set_variable_field":
+                applySignature(function, null, new Parameter[] {
+                    parameter("inst", int32()),
+                    parameter("parentOrObjectId", uint32()),
+                    parameter("valueOrObjectId", uint32())
+                });
+                break;
+            case "scr_find_object":
+                applySignature(function, uint32(), new Parameter[] {
+                    parameter("inst", int32()),
+                    parameter("objectId", uint32())
+                });
+                break;
+            default:
+                break;
+        }
     }
 
     private String blockInfo(Address address) {
@@ -317,9 +464,65 @@ public class BO2CatalogExport extends GhidraScript {
         return String.join("; ", refs);
     }
 
+    private String prototype(Function function) {
+        if (function == null) {
+            return "";
+        }
+
+        try {
+            return function.getPrototypeString(true, true);
+        }
+        catch (Exception ex) {
+            return "";
+        }
+    }
+
+    private String callingConvention(Function function) {
+        if (function == null) {
+            return "";
+        }
+
+        try {
+            return function.getCallingConventionName();
+        }
+        catch (Exception ex) {
+            return "";
+        }
+    }
+
+    private String decompileSnippet(DecompInterface decompiler, Function function, int maxLength) {
+        if (function == null) {
+            return "";
+        }
+
+        try {
+            DecompileResults results = decompiler.decompileFunction(function, 30, monitor);
+            if (!results.decompileCompleted() || results.getDecompiledFunction() == null) {
+                return "";
+            }
+
+            String c = results.getDecompiledFunction().getC();
+            if (c == null) {
+                return "";
+            }
+
+            String normalized = c.replace("\r", "").replaceAll("(?m)[ \\t]+$", "").trim();
+            if (normalized.length() <= maxLength) {
+                return normalized;
+            }
+
+            return normalized.substring(0, maxLength) + "...";
+        }
+        catch (Exception ex) {
+            return "";
+        }
+    }
+
     private void writeFunctionCatalog(File output, List<FunctionTarget> targets) throws Exception {
         try (PrintWriter writer = new PrintWriter(output, StandardCharsets.UTF_8.name())) {
-            writer.println("label,address,kind,ghidra_function,containing_function,block,instruction_at_address,first_16_bytes,inferred_purpose,callers,callees,key_xrefs,inferred_parameters,inferred_return,evidence_level,build_specific,notes");
+            writer.println("label,address,kind,ghidra_function,containing_function,block,instruction_at_address,first_16_bytes,prototype,calling_convention,inferred_purpose,callers,callees,key_xrefs,inferred_parameters,inferred_return,decompile_snippet,evidence_level,build_specific,notes");
+            DecompInterface decompiler = new DecompInterface();
+            decompiler.openProgram(currentProgram);
             for (FunctionTarget target : targets) {
                 Address address = addr(target.address);
                 Function function = currentProgram.getFunctionManager().getFunctionAt(address);
@@ -333,16 +536,20 @@ public class BO2CatalogExport extends GhidraScript {
                     blockInfo(address),
                     instructionInfo(address),
                     bytesAt(address, 16),
+                    prototype(function != null ? function : containing),
+                    callingConvention(function != null ? function : containing),
                     target.purpose,
                     callersTo(function != null ? function : containing, 12),
                     calleesFrom(containing, 20),
                     refsTo(function != null ? function.getEntryPoint() : address, 20),
                     target.parameters,
                     target.returnValue,
+                    decompileSnippet(decompiler, function != null ? function : containing, 1200),
                     target.evidenceLevel,
                     "current Steam build 65428 / t6zm.exe MD5 68C62BE753DE8ADF2C2C7B28DB769B99",
                     target.notes));
             }
+            decompiler.closeProgram();
         }
     }
 
