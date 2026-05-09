@@ -117,6 +117,76 @@ jobs:
         shell: pwsh
         run: dotnet build .\BO2.slnx --configuration Release --no-restore -p:TreatWarningsAsErrors=true -p:WarningsNotAsErrors=IL2104
 
-      - name: Build x86 app
+      - name: Create MSIX test signing certificate
         shell: pwsh
-        run: dotnet build .\BO2.csproj --configuration Release --no-restore -p:Platform=x86 -p:TreatWarningsAsErrors=true -p:WarningsNotAsErrors=IL2104
+        run: |
+          $workspace = if ([string]::IsNullOrWhiteSpace($env:GITHUB_WORKSPACE)) { (Resolve-Path .).Path } else { $env:GITHUB_WORKSPACE }
+          $tempRoot = if ([string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) { [System.IO.Path]::GetTempPath() } else { $env:RUNNER_TEMP }
+          $artifactDir = Join-Path $workspace 'artifacts\msix'
+          $pfxPath = Join-Path $tempRoot 'BO2-TestSigning.pfx'
+
+          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+          $thumbprint = .\tools\New-TestSigningCertificate.ps1 `
+            -ManifestPath .\Package.appxmanifest `
+            -PfxPath $pfxPath `
+            -CerPath (Join-Path $artifactDir 'BO2-TestSigning.cer')
+          "MSIX_ARTIFACT_DIR=$artifactDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "MSIX_TEST_CERT_PFX=$pfxPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "MSIX_TEST_CERT_THUMBPRINT=$thumbprint" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build test-signed x86 MSIX package
+        shell: pwsh
+        run: |
+          dotnet build .\BO2.csproj `
+            --configuration Release `
+            --no-restore `
+            -p:Platform=x86 `
+            -p:RuntimeIdentifier=win-x86 `
+            -p:AppxPackageDir="$env:MSIX_ARTIFACT_DIR\" `
+            -p:UapAppxPackageBuildMode=SideloadOnly `
+            -p:AppxBundle=Never `
+            -p:GenerateAppxPackageOnBuild=true `
+            -p:PackageCertificateKeyFile="$env:MSIX_TEST_CERT_PFX" `
+            -p:TreatWarningsAsErrors=true `
+            -p:WarningsNotAsErrors=IL2104
+
+      - name: Verify MSIX native payloads
+        shell: pwsh
+        run: |
+          $msixPackages = @(Get-ChildItem -Path "$env:MSIX_ARTIFACT_DIR" -Recurse -Filter 'BO2_*_x86.msix')
+          if ($msixPackages.Count -ne 1) {
+            throw "Expected exactly one MSIX package in '$env:MSIX_ARTIFACT_DIR', found $($msixPackages.Count)."
+          }
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($msixPackages[0].FullName)
+          try {
+            $entries = @($archive.Entries | ForEach-Object { $_.FullName })
+            foreach ($payload in @('BO2Monitor.dll', 'BO2InjectorHelper.exe')) {
+              if ($payload -notin $entries) {
+                throw "MSIX package '$($msixPackages[0].FullName)' is missing native payload '$payload'."
+              }
+            }
+          } finally {
+            $archive.Dispose()
+          }
+
+      - name: Remove MSIX test signing certificate
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path -LiteralPath "$env:MSIX_TEST_CERT_PFX") {
+            Remove-Item -LiteralPath "$env:MSIX_TEST_CERT_PFX" -Force
+          }
+
+          if (-not [string]::IsNullOrWhiteSpace($env:MSIX_TEST_CERT_THUMBPRINT)) {
+            Remove-Item -LiteralPath "Cert:\CurrentUser\My\$env:MSIX_TEST_CERT_THUMBPRINT" -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload test-signed x86 MSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bo2-test-signed-x86-msix
+          path: artifacts/msix/**
+          if-no-files-found: error
+          retention-days: 14
