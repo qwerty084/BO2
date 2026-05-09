@@ -32,6 +32,15 @@
 - Treat manifest capabilities + packaging settings carefully. App declares restricted `runFullTrust` capability for desktop process access.
 - If change depends on output architecture or native/runtime packaging behavior, specify `Platform=x86`; app supports only 32-bit Windows builds.
 
+## Agent tools
+
+- Use `winapp ui` for Windows UI Automation (UIA) against a running app when agents need to inspect rendered UI, find controls, click buttons, read or set values, take screenshots, or verify UI state.
+- Start with `winapp ui status -a BO2; winapp ui inspect -a BO2 --interactive` to confirm the target window and discover invokable controls.
+- Use `winapp ui screenshot -a BO2 --output <path>` for visual verification, and add `--capture-screen` when popups, dropdowns, or flyouts must be included.
+- Prefer stable AutomationId selectors from `inspect` output; otherwise use the generated slug selector. Re-run `inspect` when slug selectors go stale after UI changes.
+- If `-a BO2` matches multiple windows, run `winapp ui list-windows -a BO2` and target the intended window with `-w <HWND>`.
+- Chain related `winapp ui` commands with PowerShell `;` rather than `&&`.
+
 ## Agent skills
 
 ### Issue tracker
