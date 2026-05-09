@@ -288,10 +288,10 @@ function Import-TestCertificate {
 
     $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($CertificatePath)
     $imported = @()
-    $storeNames = @(
-        'TrustedPeople',
-        'Root'
-    )
+    # MSIX sideloading trusts package signing certificates from TrustedPeople.
+    # Importing CI test certificates into Root can trigger a noninteractive prompt
+    # on hosted runners, which hangs the smoke test before package install starts.
+    $storeNames = @('TrustedPeople')
 
     foreach ($storeName in $storeNames) {
         if (Test-CertificateInCurrentUserStore -StoreName $storeName -Thumbprint $certificate.Thumbprint) {
