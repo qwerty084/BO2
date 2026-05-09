@@ -8,10 +8,10 @@ This file records what remains unresolved after the static Ghidra pass and the 2
    Read-only runtime validation confirmed the live process hash and the original bytes at `0x008F31D0`, but MinHook installation requires monitor injection and code patching. No `BO2MonitorSharedMem-<pid>` map existed in the read-only run, so discovery events were not observed through the snapshot.
 
 2. Confirm box weapon alias lifetime.
-   Production reads owner child variables after original `vm_notify` returns. The Town box-visible scan found strict `_zm` aliases in child variables, but did not capture `inst`/`ownerId` for `randomization_done` or `user_grabbed_weapon`, so owner lifetime remains unproven.
+   Production reads owner child variables after original `vm_notify` returns. A later read-only Town continuation found candidate parent `901` with `town_chest`, `treasure_chest_use`, and `python_zm` under `tag_knob` both while the box weapon was visible and after pickup. This is strong post-state evidence for a box-looking owner carrying the expected alias, but it still did not capture `inst`/actual `ownerId` for `randomization_done` or `user_grabbed_weapon`. Elevated GUI x32dbg verified the view at `t6zm.exe:0x008F31D0` and set a hardware execute breakpoint, but BO2 raised another access violation during resume before either target notify was captured.
 
 3. Recover field-specific box weapon path.
-   In the observed Town process, `zbarrier` resolved to `7453`, but `weapon_string` and `grab_weapon_name` were absent from the live string table before the box spin and while the box weapon was visible. A field-specific lookup cannot replace the broad scan unless those fields are observed under the notify owner in another state/map or a different field name is recovered.
+   In the observed Town processes, `zbarrier` resolved to `7453` or `7452`, but `weapon_string` and `grab_weapon_name` were absent from the live string table before the box spin, while the box weapon was visible, and after pickup. Candidate parent `901` stored the observed alias as `tag_knob -> python_zm`, which looks like a model/tag field rather than a semantic box weapon field. A field-specific lookup cannot replace the broad scan unless stable field names are recovered across events/maps.
 
 4. Deepen `scr_var_glob` structure.
    `0x02DEA400` is a useful region anchor, but the exported catalog has no direct xrefs to the exact address. Nearby pointer slots (`0x02DEFB00`, `0x02DEFB80`) have better evidence.
@@ -62,6 +62,7 @@ This file records what remains unresolved after the static Ghidra pass and the 2
 Dynamic confirmation should stay read-only:
 
 - Ask the user to start BO2 and control the game.
-- The x32dbg headless path crashed during this pass; prefer manual GUI x32dbg with hardware breakpoints if debugger validation is still needed.
+- The x32dbg headless path crashed during this pass. A later elevated GUI x32dbg hardware-breakpoint retry also produced an access violation before target notify capture. Treat x32dbg attach as rejected for this validation path unless a new, safer debugger plan is established.
+- Prefer the app's normal monitor shared-memory event record or an explicitly approved diagnostic monitor build for future owner capture; passive after-the-fact scans can miss transient notify-only state.
 - Use x32dbg only for passive breakpoints, registers, stack, and memory inspection.
 - Do not add anti-cheat bypass, stealth, process hiding, or arbitrary memory-writing behavior.

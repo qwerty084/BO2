@@ -63,6 +63,59 @@ Findings:
 
 ## Debugger Boundary
 
-x32dbg headless attach was attempted once for passive attach/detach validation. It did not exit cleanly, and the game crashed after the headless process was stopped. No further debugger work was performed.
+x32dbg headless attach was attempted once for passive attach/detach validation. It did not exit cleanly, and the game crashed after the headless process was stopped. No further debugger work was performed during the initial validation pass.
 
 MinHook installation was not tested because it requires monitor injection and code patching, which is outside the read-only constraint for this pass.
+
+## Debugger Retry Boundary
+
+A second Town session was started later on 2026-05-09 to attempt owner-scoped box alias capture at the `vm_notify` boundary.
+
+Read-only baseline:
+
+| Item | Live value |
+|---|---:|
+| PID | `27316` |
+| `randomization_done` | `7491` |
+| `user_grabbed_weapon` | `7436` |
+| `zbarrier` | `7452` |
+| `weapon_string` | not found |
+| `grab_weapon_name` | not found |
+| script string table pointer slot | `0x02BF83A4 -> 0x02BF8880` |
+| instance 0 child bucket base | `0x2EE30000` |
+| instance 0 child variable base | `0x2E730000` |
+
+`tools/Capture-BO2NotifyOwnerAliases.ps1` was added and parser-checked. A smoke run against owner `1` verified that it can resolve current notify IDs and read the same script string/child table pointers with `OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION)` and `ReadProcessMemory`.
+
+Elevated GUI x32dbg retry:
+
+- x32dbg was run as administrator and attached to `t6zm.exe`.
+- The disassembly view was verified at `t6zm.exe:0x008F31D0`.
+- A hardware execute breakpoint was set at `0x008F31D0`.
+- The condition targeted the current launch's box notify IDs: `randomization_done = 0x1D43`, `user_grabbed_weapon = 0x1D0C`.
+- BO2 raised another `EXCEPTION_ACCESS_VIOLATION` during resume, before any target notify breakpoint was captured.
+
+No `inst`, `ownerId`, pre-notify alias state, or post-notify alias state was captured. Debugger-based notify owner capture is therefore rejected for the current setup. Future validation should prefer either static recovery or an explicitly approved controlled diagnostic monitor path rather than x32dbg attach.
+
+## Read-Only Box Spin Continuation
+
+A later continuation used PID `14236` in a paused Town session without x32dbg and without monitor injection. The lobby baseline had readable child table pointers but did not yet resolve the target event names. After Town loaded, the same process resolved:
+
+| Name | Live value |
+|---|---:|
+| `randomization_done` | `7491` |
+| `user_grabbed_weapon` | `7436` |
+| `zbarrier` | `7452` |
+| `weapon_string` | not found |
+| `grab_weapon_name` | not found |
+
+The user spun the box once, reported the visible weapon as `python_zm`, then later picked it up. `tools/Capture-BO2NotifyOwnerAliases.ps1` wrote JSONL evidence to `artifacts/reverse/notify-owner-alias-capture-2026-05-09.jsonl`.
+
+Strongest passive post-state evidence:
+
+- Candidate parent `901` had `town_chest` and `treasure_chest_use` string fields.
+- Candidate parent `901` had `python_zm` under field `tag_knob`.
+- That same `python_zm` owner-scoped alias was still present after the Python was picked up.
+- The normal monitor shared-memory map for PID `14236` was absent, so no production event record with the actual `ownerId` was available in this session.
+
+This narrows the failure analysis: child tables were readable, target strings were present, and at least one box-looking parent had the expected alias. It still does not prove alias lifetime for the actual `randomization_done` or `user_grabbed_weapon` notify owner because no `vm_notify` boundary arguments were captured.

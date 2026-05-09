@@ -94,9 +94,27 @@ Live notify string IDs in this Town process:
 
 These IDs are runtime values and changed across process launches during this pass. Do not hard-code them in production.
 
-x32dbg headless attach was attempted once for passive validation and the game crashed after the headless process failed to detach cleanly. No further debugger attach was used. The current confirmed runtime facts come from `OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION)` and `ReadProcessMemory` only.
+x32dbg headless attach was attempted once for passive validation and the game crashed after the headless process failed to detach cleanly. No further debugger attach was used in that initial validation pass. The stable confirmed runtime facts come from `OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION)` and `ReadProcessMemory` only.
 
 Because monitor injection is not read-only, MinHook installation was not performed in this pass. No `BO2MonitorSharedMem-<pid>` map existed before injection, so discovery events were not observed in a live snapshot.
+
+A later supervised GUI x32dbg retry was attempted in an elevated debugger. The target view was verified at `t6zm.exe:0x008F31D0`, and a hardware execute breakpoint was set for the current launch's `randomization_done` and `user_grabbed_weapon` IDs. BO2 raised another access violation during resume before either target notify was captured. This confirms that debugger-based notify owner capture is not a reliable validation path in the current setup.
+
+Read-only baseline from that retry still confirmed:
+
+| Item | Live value |
+|---|---:|
+| PID | `27316` |
+| `randomization_done` | `7491` |
+| `user_grabbed_weapon` | `7436` |
+| `zbarrier` | `7452` |
+| `weapon_string` | not found |
+| `grab_weapon_name` | not found |
+| script string table pointer slot | `0x02BF83A4 -> 0x02BF8880` |
+| instance 0 child bucket base | `0x2EE30000` |
+| instance 0 child variable base | `0x2E730000` |
+
+A later read-only continuation used the same PID's paused Town state without x32dbg. The user spun the box, reported the visible weapon as `python_zm`, then picked it up. No `BO2MonitorSharedMem-14236` map existed, so the normal monitor event queue was not available for this session. Passive snapshots found candidate owner `901` with string fields `town_chest`, `treasure_chest_use`, and `python_zm` under `tag_knob` both before pickup and after pickup. This is useful post-state evidence, but it is not equivalent to the normal monitor event record because no `vm_notify` owner argument was captured.
 
 ## Notify Targets
 
@@ -129,6 +147,8 @@ The detour ignores unresolved or untracked notify string IDs.
 4. For `randomization_done` and `user_grabbed_weapon`, calls original first, scans for a weapon alias under the owner object, then enqueues the record with optional weapon name.
 
 Calling original first preserves game behavior and lets the original notify update script state before the monitor reads owner fields.
+
+The production alias scan is not field-name specific. It scans child entries for the current notify owner and accepts the first string/istring child value that passes `_zm` alias validation. Current runtime evidence still supports this broad strategy: `weapon_string` and `grab_weapon_name` were absent from the live Town string table, while a box-looking owner candidate carried `python_zm` under `tag_knob`.
 
 ## Native Notify Queue
 

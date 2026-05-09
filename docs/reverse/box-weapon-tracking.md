@@ -101,6 +101,40 @@ Current field-specific recommendation:
 - Exact lookup is not viable as the only strategy on the observed Town process because `weapon_string` and `grab_weapon_name` were absent from the live script string table even while the box weapon was visible.
 - If exact lookup is later implemented, use exact lookup first only when all required field IDs resolve, then fall back to the current broad owner scan.
 
+A second Town session was started to capture owner-scoped aliases at the `vm_notify` boundary. The read-only baseline again found the script tables readable:
+
+| Name | Result |
+|---|---:|
+| `randomization_done` | `7491` |
+| `user_grabbed_weapon` | `7436` |
+| `zbarrier` | `7452` |
+| `weapon_string` | not found |
+| `grab_weapon_name` | not found |
+
+`tools/Capture-BO2NotifyOwnerAliases.ps1` was added as a read-only helper for paused breakpoint states. It accepts `inst`, `ownerId`, `stringValue`, and event name, then records exact field hits, owner string/istring fields, owner `_zm` aliases, and optional broad `_zm` scan results using only `OpenProcess` and `ReadProcessMemory`.
+
+The supervised x32dbg GUI retry did not produce owner evidence. x32dbg was run elevated, the disassembly was verified at `t6zm.exe:0x008F31D0`, and a hardware execute breakpoint was set for `randomization_done` / `user_grabbed_weapon`. BO2 hit another access violation during resume/loader or Xbox Live related execution before any target notify breakpoint was captured. No `inst`, `ownerId`, or pre/post alias state was observed.
+
+Later in the same read-only Town launch, the user spun the box and reported the visible weapon as `python_zm`. The helper's targeted field/value scan was extended with optional regex filters and appended JSONL evidence to `artifacts/reverse/notify-owner-alias-capture-2026-05-09.jsonl`.
+
+Post-spin/post-pickup passive snapshots found a strong current-build candidate owner, but not a proven notify owner:
+
+| Candidate owner | Phase | Event ID used for annotation | Owner-scoped string fields |
+|---:|---|---:|---|
+| `901` | box weapon visible, not picked up | `randomization_done = 7491` | `town_chest`, `treasure_chest_use`, `python_zm` under field `tag_knob` |
+| `901` | after taking the Python | `user_grabbed_weapon = 7436` | same three owner fields, including `python_zm` under `tag_knob` |
+
+This evidence proves that parent `901` had an owner-scoped `_zm` alias (`python_zm`) after the original box randomization and after pickup, and that parent `901` also looked box-related (`town_chest` / `treasure_chest_use`). It does not prove that `901` was the live `vm_notify` owner for either event because the session had no monitor shared-memory map and x32dbg did not capture the register/stack arguments at the notify boundary.
+
+Source review confirms why timing matters. `VmNotifyDetour` calls `originalVmNotify` first, then `TryReadBoxWeaponName`, which scans all child variables for entries whose packed key parent ID equals the notify `ownerId` and whose value decodes to a likely `_zm` alias. The monitor then enqueues the event with `ownerId`, `stringValue`, and optional `WeaponName`. Because that normal monitor path was not injected/running in this read-only session, passive snapshots can show post-state aliases but cannot prove event-time alias lifetime by themselves.
+
+Current alias-lifetime status:
+
+- `randomization_done`: pre-original state remains unproven; post-original owner alias is plausible for candidate owner `901`, but not proven for the actual notify owner.
+- `user_grabbed_weapon`: pre-original state remains unproven; post-original owner alias is plausible for candidate owner `901`, but not proven for the actual notify owner.
+- Failure cause is narrowed away from unreadable child tables and absent weapon aliases: the tables were readable and `python_zm` was present under a box-looking parent. It is still not narrowed between missing event owner capture, wrong instance/owner assumption, transient notify-only owner, or broad scan selecting a non-event child value.
+- Broad owner scan remains required in production. Field-specific lookup using `weapon_string` / `grab_weapon_name` is not viable as the only strategy on the current evidence.
+
 ## Static Evidence
 
 Ghidra string search in `bo2-ghidra-recon.txt`:
@@ -125,4 +159,4 @@ When alias recovery fails, the event is still useful for sequence/timing, but th
 
 ## Next Best Improvement
 
-The next feature issue should capture `inst`, `ownerId`, and `stringValue` for `randomization_done` and `user_grabbed_weapon`, then run exact and broad owner scans against that owner before and after the original `vm_notify` returns. The x32dbg headless path crashed during this pass, so prefer a manually supervised GUI x32dbg session with hardware breakpoints, or add explicit monitor diagnostics in a controlled non-production build if write/injection validation is allowed.
+The next feature issue should capture `inst`, `ownerId`, `stringValue`, and the scanned `WeaponName` through the app's normal monitor event record or through explicit monitor diagnostics in a controlled non-production build. x32dbg headless and elevated GUI breakpoint paths both destabilized BO2 during this pass, so avoid them for this validation path unless a safer debugger plan is established.

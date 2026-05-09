@@ -94,5 +94,5 @@ Confirmed:
 Not confirmed:
 
 - MinHook installation and snapshot discovery events were not tested because monitor injection is not read-only.
-- `vm_notify` execution reach was not breakpoint-confirmed. x32dbg headless attach failed to detach cleanly and the game crashed, so no further debugger work was used in this pass.
-- Box weapon alias lifetime under the notify owner remains open because no event owner ID was captured.
+- `vm_notify` execution reach was not breakpoint-confirmed. x32dbg headless attach failed to detach cleanly and the game crashed. A later elevated GUI x32dbg retry reached a hardware-breakpoint setup at `0x008F31D0`, but BO2 raised another access violation before target notify capture.
+- Box weapon alias lifetime under the actual notify owner remains open because no event owner ID was captured. A later passive Town box spin did find candidate parent `901` with `town_chest`, `treasure_chest_use`, and the observed alias `python_zm`, but that is post-state evidence rather than notify-boundary evidence.
