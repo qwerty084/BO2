@@ -227,9 +227,27 @@ namespace BO2.Services
 
         private bool IsStaleGameTime(TimeSpan gameTime)
         {
-            return (_latestGameTime is TimeSpan latestGameTime && gameTime < latestGameTime)
-                || (_gameTimeBaseline is TimeSpan gameTimeBaseline && gameTime < gameTimeBaseline)
-                || (_roundTimeBaseline is TimeSpan roundTimeBaseline && gameTime < roundTimeBaseline);
+            if (IsBeforeKnownTime(gameTime, _latestGameTime))
+            {
+                return true;
+            }
+
+            if (IsBeforeKnownTime(gameTime, _gameTimeBaseline))
+            {
+                return true;
+            }
+
+            return IsBeforeKnownTime(gameTime, _roundTimeBaseline);
+        }
+
+        private static bool IsBeforeKnownTime(TimeSpan gameTime, TimeSpan? knownTime)
+        {
+            if (knownTime is not TimeSpan knownGameTime)
+            {
+                return false;
+            }
+
+            return gameTime < knownGameTime;
         }
 
         private void FreezeKnownTimers()
