@@ -374,7 +374,7 @@ namespace BO2.Services
         bool HasSequenceGap)
     {
         public static GameTimerLifecycleEventBatch Empty { get; } = new(
-            Array.Empty<GameTimerLifecycleEvent>(),
+            [],
             HasSequenceGap: false);
     }
 }
