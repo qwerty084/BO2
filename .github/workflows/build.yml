@@ -198,6 +198,7 @@ jobs:
           if (-not [string]::IsNullOrWhiteSpace($env:MSIX_TEST_CERT_THUMBPRINT)) {
             Remove-Item -LiteralPath "Cert:\CurrentUser\My\$env:MSIX_TEST_CERT_THUMBPRINT" -Force -ErrorAction SilentlyContinue
             Remove-Item -LiteralPath "Cert:\CurrentUser\TrustedPeople\$env:MSIX_TEST_CERT_THUMBPRINT" -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath "Cert:\LocalMachine\TrustedPeople\$env:MSIX_TEST_CERT_THUMBPRINT" -Force -ErrorAction SilentlyContinue
           }
 
       - name: Upload package smoke diagnostics

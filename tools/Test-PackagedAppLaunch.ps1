@@ -235,18 +235,22 @@ function Find-TestCertificate {
     throw "Expected one test signing certificate under '$PackageRoot', found $($certificates.Count)."
 }
 
-function Test-CertificateInCurrentUserStore {
+function Test-CertificateInStore {
     param(
         [string]$StoreName,
+        [string]$StoreLocation,
         [string]$Thumbprint
     )
 
     $parsedStoreName = [System.Enum]::Parse(
         [System.Security.Cryptography.X509Certificates.StoreName],
         $StoreName)
+    $parsedStoreLocation = [System.Enum]::Parse(
+        [System.Security.Cryptography.X509Certificates.StoreLocation],
+        $StoreLocation)
     $store = [System.Security.Cryptography.X509Certificates.X509Store]::new(
         $parsedStoreName,
-        [System.Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser)
+        $parsedStoreLocation)
 
     $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly)
     try {
@@ -288,22 +292,28 @@ function Import-TestCertificate {
 
     $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($CertificatePath)
     $imported = @()
-    # MSIX sideloading trusts package signing certificates from TrustedPeople.
+    # AppX deployment validates package signing certificates from LocalMachine\TrustedPeople.
     # Importing CI test certificates into Root can trigger a noninteractive prompt
     # on hosted runners, which hangs the smoke test before package install starts.
-    $storeNames = @('TrustedPeople')
+    $stores = @(
+        [pscustomobject]@{
+            StoreLocation = 'LocalMachine'
+            StoreName = 'TrustedPeople'
+        }
+    )
 
-    foreach ($storeName in $storeNames) {
-        if (Test-CertificateInCurrentUserStore -StoreName $storeName -Thumbprint $certificate.Thumbprint) {
-            Write-Host "Test signing certificate is already trusted in CurrentUser\$($storeName): $($certificate.Thumbprint)"
+    foreach ($store in $stores) {
+        if (Test-CertificateInStore -StoreName $store.StoreName -StoreLocation $store.StoreLocation -Thumbprint $certificate.Thumbprint) {
+            Write-Host "Test signing certificate is already trusted in $($store.StoreLocation)\$($store.StoreName): $($certificate.Thumbprint)"
             continue
         }
 
-        Write-Host "Trusting test signing certificate in CurrentUser\$($storeName): $($certificate.Thumbprint)"
-        Invoke-CertUtil -Arguments @('-user', '-addstore', '-f', $storeName, $CertificatePath)
+        Write-Host "Trusting test signing certificate in $($store.StoreLocation)\$($store.StoreName): $($certificate.Thumbprint)"
+        Invoke-CertUtil -Arguments @('-addstore', '-f', $store.StoreName, $CertificatePath)
 
         $imported += [pscustomobject]@{
-            StoreName = $storeName
+            StoreLocation = $store.StoreLocation
+            StoreName = $store.StoreName
             Thumbprint = $certificate.Thumbprint
         }
     }
@@ -316,9 +326,9 @@ function Remove-ImportedCertificates {
 
     foreach ($certificate in $Certificates) {
         try {
-            if (Test-CertificateInCurrentUserStore -StoreName $certificate.StoreName -Thumbprint $certificate.Thumbprint) {
-                Write-Host "Removing trusted test signing certificate from CurrentUser\$($certificate.StoreName): $($certificate.Thumbprint)"
-                Invoke-CertUtil -Arguments @('-user', '-delstore', $certificate.StoreName, $certificate.Thumbprint)
+            if (Test-CertificateInStore -StoreName $certificate.StoreName -StoreLocation $certificate.StoreLocation -Thumbprint $certificate.Thumbprint) {
+                Write-Host "Removing trusted test signing certificate from $($certificate.StoreLocation)\$($certificate.StoreName): $($certificate.Thumbprint)"
+                Invoke-CertUtil -Arguments @('-delstore', $certificate.StoreName, $certificate.Thumbprint)
             }
         } catch {
             Write-Warning "Failed to remove trusted test signing certificate '$($certificate.Thumbprint)': $($_.Exception.Message)"
