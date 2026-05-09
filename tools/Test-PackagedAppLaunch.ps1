@@ -144,7 +144,7 @@ function Get-PackageDependencies {
 
     $dependencyExtensions = @('.appx', '.msix', '.appxbundle', '.msixbundle')
     $excludedArchitectureSegments = @('arm', 'arm64', 'x64')
-    return @(
+    $dependencyCandidates = @(
         Get-ChildItem -Path $PackageRoot -Recurse -File |
             Where-Object {
                 $_.FullName -ne $PackagePath -and
@@ -157,6 +157,93 @@ function Get-PackageDependencies {
             } |
             ForEach-Object { $_.FullName }
     )
+
+    $selectedDependencies = @{}
+    foreach ($dependencyPath in $dependencyCandidates) {
+        $identity = Read-PackageIdentity -PackagePath $dependencyPath
+        $processorArchitecture = $identity.ProcessorArchitecture
+        if ([string]::IsNullOrWhiteSpace($processorArchitecture)) {
+            $processorArchitecture = 'neutral'
+        }
+
+        if ($processorArchitecture -notin @('neutral', 'x86')) {
+            continue
+        }
+
+        $identityKey = "$($identity.Name)|$($identity.Publisher)|$processorArchitecture"
+        $dependencyRank = Get-DependencyPathRank -Path $dependencyPath
+        if (-not $selectedDependencies.ContainsKey($identityKey) -or
+            $dependencyRank -lt $selectedDependencies[$identityKey].Rank) {
+            $selectedDependencies[$identityKey] = [pscustomobject]@{
+                Path = $dependencyPath
+                Rank = $dependencyRank
+            }
+        }
+    }
+
+    return @(
+        $selectedDependencies.Values |
+            Sort-Object -Property Path |
+            ForEach-Object { $_.Path }
+    )
+}
+
+function Get-DependencyPathRank {
+    param([string]$Path)
+
+    $segments = @($Path.Split([System.IO.Path]::DirectorySeparatorChar) | ForEach-Object { $_.ToLowerInvariant() })
+    if ($segments -contains 'x86') {
+        return 0
+    }
+
+    if ($segments -contains 'win32') {
+        return 1
+    }
+
+    return 2
+}
+
+function Read-PackageIdentity {
+    param([string]$PackagePath)
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($PackagePath)
+    try {
+        $manifestEntry = $archive.GetEntry('AppxManifest.xml')
+        if ($null -eq $manifestEntry) {
+            throw "Package '$PackagePath' does not contain AppxManifest.xml."
+        }
+
+        $manifestStream = $manifestEntry.Open()
+        try {
+            $reader = [System.IO.StreamReader]::new($manifestStream)
+            try {
+                [xml]$manifest = $reader.ReadToEnd()
+            } finally {
+                $reader.Dispose()
+            }
+        } finally {
+            $manifestStream.Dispose()
+        }
+
+        $namespaceManager = [System.Xml.XmlNamespaceManager]::new($manifest.NameTable)
+        $namespaceManager.AddNamespace('appx', 'http://schemas.microsoft.com/appx/manifest/foundation/windows10')
+
+        $identityNode = $manifest.SelectSingleNode('/appx:Package/appx:Identity', $namespaceManager)
+        if ($null -eq $identityNode -or [string]::IsNullOrWhiteSpace($identityNode.Name)) {
+            throw "Package identity name was not found in '$PackagePath'."
+        }
+
+        return [pscustomobject]@{
+            Name = $identityNode.Name
+            Publisher = $identityNode.Publisher
+            Version = $identityNode.Version
+            ProcessorArchitecture = $identityNode.ProcessorArchitecture
+        }
+    } finally {
+        $archive.Dispose()
+    }
 }
 
 function Read-MsixManifest {
