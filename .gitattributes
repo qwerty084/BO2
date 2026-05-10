@@ -1,0 +1,24 @@
+# Keep Windows project files checked out with CRLF regardless of each
+# developer's local core.autocrlf setting. Git still stores text blobs
+# normalized internally.
+* text=auto eol=crlf
+
+# Unix shell entry points need LF for shebang-based execution.
+*.sh text eol=lf
+
+# Binary files must never be line-ending normalized.
+*.bin binary !eol
+*.bmp binary !eol
+*.dll binary !eol
+*.exe binary !eol
+*.gif binary !eol
+*.ico binary !eol
+*.jpg binary !eol
+*.jpeg binary !eol
+*.lib binary !eol
+*.nupkg binary !eol
+*.pdb binary !eol
+*.png binary !eol
+*.snk binary !eol
+*.webp binary !eol
+*.zip binary !eol
