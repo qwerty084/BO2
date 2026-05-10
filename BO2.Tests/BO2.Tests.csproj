@@ -41,6 +41,7 @@
       Exclude="..\Widgets\BoxTrackerWidgetNativeAdapter.cs;..\Widgets\BoxTrackerWidgetSettingsDialog.cs;..\Widgets\BoxTrackerWidgetWindow.cs"
       Link="Widgets\%(Filename)%(Extension)" />
     <Compile Include="..\ViewModels\CurrentGamePageViewModel.cs" Link="ViewModels\CurrentGamePageViewModel.cs" />
+    <Compile Include="..\ViewModels\GameHistory*.cs" Link="ViewModels\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

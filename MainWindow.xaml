@@ -34,6 +34,14 @@
                     <SymbolIcon Symbol="Play" />
                 </NavigationViewItem.Icon>
             </NavigationViewItem>
+            <NavigationViewItem
+                x:Name="GameHistoryNavigationItem"
+                x:Uid="GameHistoryNavigationItem"
+                Tag="game-history">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE81C;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
         </NavigationView.MenuItems>
 
         <NavigationView.FooterMenuItems>
@@ -229,62 +237,76 @@
         </NavigationView.PaneFooter>
 
         <Grid Background="{ThemeResource BO2BackgroundBrush}">
-            <ScrollViewer>
-                <Grid Padding="32,28,32,28">
-                    <StackPanel
-                        HorizontalAlignment="Stretch"
-                        Spacing="20">
+            <Grid
+                Padding="32,28,32,28"
+                RowSpacing="20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
                     <TextBlock
                         x:Name="PageTitle"
                         x:Uid="PageTitle"
                         AutomationProperties.HeadingLevel="Level1"
                         Style="{StaticResource BO2PageTitleTextBlockStyle}" />
 
+                <ScrollViewer
+                    x:Name="CurrentGamePageScrollViewer"
+                    Grid.Row="1">
                     <views:CurrentGamePageView
-                        x:Name="CurrentGamePageContent"
-                        HorizontalAlignment="Stretch"
-                        DataContext="{x:Bind ViewModel.CurrentGamePage, Mode=OneWay}" />
+                            x:Name="CurrentGamePageContent"
+                            HorizontalAlignment="Stretch"
+                            DataContext="{x:Bind ViewModel.CurrentGamePage, Mode=OneWay}" />
+                </ScrollViewer>
 
+                <views:GameHistoryPageView
+                    x:Name="GameHistoryContent"
+                    Grid.Row="1"
+                    DataContext="{x:Bind ViewModel.GameHistoryPage, Mode=OneWay}"
+                    Visibility="Collapsed" />
+
+                <ScrollViewer
+                    x:Name="SettingsScrollViewer"
+                    Grid.Row="1"
+                    Visibility="Collapsed">
                     <StackPanel
-                        x:Name="SettingsContent"
-                        HorizontalAlignment="Stretch"
-                        Spacing="8"
-                        Visibility="Collapsed">
-                        <Border Style="{StaticResource BO2CardBorderStyle}">
-                            <StackPanel Spacing="12">
-                                <TextBlock
-                                    x:Uid="ThemeSettingsTitle"
-                                    AutomationProperties.HeadingLevel="Level2"
-                                    Style="{StaticResource BO2CardTitleTextBlockStyle}" />
-                                <TextBlock
-                                    x:Uid="ThemeSettingsDescription"
-                                    Style="{StaticResource BO2CaptionTextBlockStyle}"
-                                    TextWrapping="Wrap" />
-                                <StackPanel Spacing="6">
+                            x:Name="SettingsContent"
+                            HorizontalAlignment="Stretch"
+                            Spacing="8">
+                            <Border Style="{StaticResource BO2CardBorderStyle}">
+                                <StackPanel Spacing="12">
                                     <TextBlock
-                                        x:Uid="ThemeModeLabel"
-                                        Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                                    <ComboBox
-                                        x:Name="ThemeModeComboBox"
-                                        MinWidth="220"
-                                        HorizontalAlignment="Left"
-                                        SelectionChanged="OnThemeModeSelectionChanged">
-                                        <ComboBoxItem x:Uid="ThemeModeSystemItem" Tag="System" />
-                                        <ComboBoxItem x:Uid="ThemeModeLightItem" Tag="Light" />
-                                        <ComboBoxItem x:Uid="ThemeModeDarkItem" Tag="Dark" />
-                                    </ComboBox>
+                                        x:Uid="ThemeSettingsTitle"
+                                        AutomationProperties.HeadingLevel="Level2"
+                                        Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                                    <TextBlock
+                                        x:Uid="ThemeSettingsDescription"
+                                        Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                        TextWrapping="Wrap" />
+                                    <StackPanel Spacing="6">
+                                        <TextBlock
+                                            x:Uid="ThemeModeLabel"
+                                            Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <ComboBox
+                                            x:Name="ThemeModeComboBox"
+                                            MinWidth="220"
+                                            HorizontalAlignment="Left"
+                                            SelectionChanged="OnThemeModeSelectionChanged">
+                                            <ComboBoxItem x:Uid="ThemeModeSystemItem" Tag="System" />
+                                            <ComboBoxItem x:Uid="ThemeModeLightItem" Tag="Light" />
+                                            <ComboBoxItem x:Uid="ThemeModeDarkItem" Tag="Dark" />
+                                        </ComboBox>
+                                    </StackPanel>
                                 </StackPanel>
-                            </StackPanel>
-                        </Border>
+                            </Border>
 
-                        <views:WidgetSettingsView
-                            x:Name="WidgetSettingsView"
-                            BoxTrackerEnabledChanged="OnBoxTrackerEnabledChanged"
-                            ConfigureSelectedWidgetRequested="OnConfigureSelectedWidgetRequested" />
+                            <views:WidgetSettingsView
+                                x:Name="WidgetSettingsView"
+                                BoxTrackerEnabledChanged="OnBoxTrackerEnabledChanged"
+                                ConfigureSelectedWidgetRequested="OnConfigureSelectedWidgetRequested" />
                     </StackPanel>
-                    </StackPanel>
-                </Grid>
-            </ScrollViewer>
+                </ScrollViewer>
+            </Grid>
         </Grid>
     </NavigationView>
 </Window>

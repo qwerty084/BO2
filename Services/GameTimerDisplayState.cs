@@ -14,21 +14,25 @@ namespace BO2.Services
     {
         public const string PlaceholderText = "--:--";
 
-        private TimerDisplayState(TimerDisplayKind kind, DisplayText text)
+        private TimerDisplayState(TimerDisplayKind kind, DisplayText text, TimeSpan? duration)
         {
             ArgumentNullException.ThrowIfNull(text);
 
             Kind = kind;
             Text = text;
+            Duration = duration;
         }
 
         public TimerDisplayKind Kind { get; }
 
         public DisplayText Text { get; }
 
+        public TimeSpan? Duration { get; }
+
         public static TimerDisplayState Placeholder { get; } = new(
             TimerDisplayKind.Placeholder,
-            DisplayText.Plain(PlaceholderText));
+            DisplayText.Plain(PlaceholderText),
+            null);
 
         public static TimerDisplayState Active(TimeSpan elapsed)
         {
@@ -44,7 +48,8 @@ namespace BO2.Services
         {
             return new TimerDisplayState(
                 kind,
-                DisplayText.Plain(GameTimerDurationFormatter.Format(elapsed)));
+                DisplayText.Plain(GameTimerDurationFormatter.Format(elapsed)),
+                elapsed);
         }
     }
 

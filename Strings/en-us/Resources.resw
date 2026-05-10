@@ -567,4 +567,127 @@
   <data name="Zombie0GEntityLabel" xml:space="preserve">
     <value>Zombie0 GEntity</value>
   </data>
+  <data name="GameHistoryNavigationItem.Content" xml:space="preserve">
+    <value>Game History</value>
+  </data>
+  <data name="NavigationGameHistory" xml:space="preserve">
+    <value>Game History</value>
+  </data>
+  <data name="GameHistoryEmptyTitle" xml:space="preserve">
+    <value>No saved games yet</value>
+  </data>
+  <data name="GameHistoryEmptyText" xml:space="preserve">
+    <value>Completed hook-backed Town games will appear here after a trusted game-over event.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusWaitingTitle" xml:space="preserve">
+    <value>History recording idle</value>
+  </data>
+  <data name="GameHistoryRecordingStatusWaitingText" xml:space="preserve">
+    <value>Connect to Steam Zombies to evaluate whether the current Town session can be recorded.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusActiveTitle" xml:space="preserve">
+    <value>Recording game history</value>
+  </data>
+  <data name="GameHistoryRecordingStatusActiveText" xml:space="preserve">
+    <value>Recording is active for this hook-backed Town session. The game will save after a trusted game-over event.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusActiveMapFormat" xml:space="preserve">
+    <value>Recording is active for this hook-backed {0} session. The game will save after a trusted game-over event.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusActiveRoundFormat" xml:space="preserve">
+    <value>Recording is active for this hook-backed Town session on round {0}. The game will save after a trusted game-over event.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusWaitingForRoundOneText" xml:space="preserve">
+    <value>Town and hook-backed Event Monitor capture are ready. Recording will start from an observed round 1 start event.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusSavedTitle" xml:space="preserve">
+    <value>Game saved</value>
+  </data>
+  <data name="GameHistoryRecordingStatusSavedText" xml:space="preserve">
+    <value>The completed Town game was saved to Game History.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusRequiresTownTitle" xml:space="preserve">
+    <value>Town required</value>
+  </data>
+  <data name="GameHistoryRecordingStatusRequiresTownText" xml:space="preserve">
+    <value>Game History v1 saves completed Town games only. Non-Town or unknown map sessions are not saved.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusRequiresHookTitle" xml:space="preserve">
+    <value>Hook-backed Event Monitor required</value>
+  </data>
+  <data name="GameHistoryRecordingStatusRequiresHookText" xml:space="preserve">
+    <value>Recording requires BO2Monitor hook-backed Event Monitor capture. Polling fallback, disabled capture, unsupported monitor state, or missing monitor data will not save history.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusDiscardedTitle" xml:space="preserve">
+    <value>Last candidate discarded</value>
+  </data>
+  <data name="GameHistoryRecordingStatusDiscardedSequenceText" xml:space="preserve">
+    <value>The candidate session was discarded because lifecycle order became untrusted, sequence data had gaps, or lifecycle-relevant Event Monitor events were dropped.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusDiscardedMissingStatsText" xml:space="preserve">
+    <value>The candidate session was discarded because required points, kills, downs, revives, or headshots were missing from a round baseline or close.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusDiscardedConnectionEndedText" xml:space="preserve">
+    <value>The candidate session was discarded because the detected game changed, the session disconnected, or the app shut down before a trusted game-over save.</value>
+  </data>
+  <data name="GameHistoryFinalRoundFormat" xml:space="preserve">
+    <value>Round {0}</value>
+  </data>
+  <data name="GameHistoryRoundTitleFormat" xml:space="preserve">
+    <value>Round {0}</value>
+  </data>
+  <data name="GameHistoryFinalRoundLabel.Text" xml:space="preserve">
+    <value>Final round</value>
+  </data>
+  <data name="GameHistoryDurationLabel.Text" xml:space="preserve">
+    <value>Duration</value>
+  </data>
+  <data name="GameHistoryBackButtonText.Text" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="GameHistoryDateLabel.Text" xml:space="preserve">
+    <value>Date</value>
+  </data>
+  <data name="GameHistoryMapLabel.Text" xml:space="preserve">
+    <value>Map</value>
+  </data>
+  <data name="GameHistoryFinalStatsTitle.Text" xml:space="preserve">
+    <value>Final stats</value>
+  </data>
+  <data name="GameHistoryRoundsTitle.Text" xml:space="preserve">
+    <value>Rounds</value>
+  </data>
+  <data name="GameHistoryCumulativeStatsLabel.Text" xml:space="preserve">
+    <value>Cumulative</value>
+  </data>
+  <data name="GameHistoryDeltaStatsLabel.Text" xml:space="preserve">
+    <value>Delta</value>
+  </data>
+  <data name="GameHistoryBoxEventsTitle.Text" xml:space="preserve">
+    <value>Box events</value>
+  </data>
+  <data name="GameHistoryBoxEventsDescription.Text" xml:space="preserve">
+    <value>Saved Mystery Box activity for this game. Raw weapon tokens remain visible for unknown weapons.</value>
+  </data>
+  <data name="GameHistoryBoxEventsEmpty" xml:space="preserve">
+    <value>No box events were saved for this game.</value>
+  </data>
+  <data name="GameHistoryBoxEventUnknownWeapon" xml:space="preserve">
+    <value>Unknown weapon</value>
+  </data>
+  <data name="GameHistoryBoxEventPrimaryFormat" xml:space="preserve">
+    <value>{0} - {1}: {2}</value>
+  </data>
+  <data name="GameHistoryBoxEventReceivedLabel.Text" xml:space="preserve">
+    <value>Received</value>
+  </data>
+  <data name="GameHistoryBoxEventEventLabel.Text" xml:space="preserve">
+    <value>Event</value>
+  </data>
+  <data name="GameHistoryBoxEventRawWeaponLabel.Text" xml:space="preserve">
+    <value>Raw weapon</value>
+  </data>
+  <data name="GameHistoryBoxEventStringValueLabel.Text" xml:space="preserve">
+    <value>Value</value>
+  </data>
 </root>

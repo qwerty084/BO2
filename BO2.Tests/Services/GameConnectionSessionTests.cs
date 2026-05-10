@@ -290,16 +290,19 @@ namespace BO2.Tests.Services
                 Status = CreateCompatibleStatus()
             };
             FakeProcessMemoryAccessor memoryAccessor = new();
+            FakeGameMapIdentityReader mapIdentityReader = new();
             GameConnectionSession session = CreateStartedSession(
                 eventMonitor,
                 detectedGame,
-                memoryAccessor: memoryAccessor);
+                memoryAccessor: memoryAccessor,
+                mapIdentityReader: mapIdentityReader);
 
             GameConnectionSnapshot snapshot = session.Read();
 
             Assert.Same(detectedGame, snapshot.CurrentGame);
             Assert.Equal(GameConnectionPhase.Detected, snapshot.ConnectionPhase);
             Assert.Null(snapshot.ReadResult);
+            Assert.Null(snapshot.MapIdentityResult);
             AssertCommandAvailability(
                 snapshot,
                 connectEnabled: true,
@@ -307,8 +310,66 @@ namespace BO2.Tests.Services
                 disconnectEnabled: false,
                 disconnectVisible: false);
             Assert.Equal(0, memoryAccessor.AttachCallCount);
+            Assert.Equal(0, mapIdentityReader.ReadCallCount);
             Assert.Equal(0, eventMonitor.ReadStatusCallCount);
             Assert.Equal(snapshot, session.Snapshot);
+        }
+
+        [Fact]
+        public void Connect_WhenCurrentGameSupported_PublishesMapIdentityResultAfterConnectOnly()
+        {
+            DetectedGame detectedGame = CreateSupportedGame(processId: 1001);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeGameMapIdentityReader mapIdentityReader = new()
+            {
+                ResultFactory = CreateTownMapIdentityResult
+            };
+            GameConnectionSession session = CreateStartedSession(
+                eventMonitor,
+                detectedGame,
+                mapIdentityReader: mapIdentityReader);
+
+            Assert.Null(session.Snapshot.MapIdentityResult);
+
+            GameConnectionSnapshot snapshot = CompleteConnectWithLoadedMonitor(session);
+
+            Assert.NotNull(snapshot.MapIdentityResult);
+            Assert.True(snapshot.MapIdentityResult!.IsConfirmedTown);
+            Assert.Equal("Town", snapshot.MapIdentityResult.Identity!.DisplayName);
+            Assert.Equal(1, mapIdentityReader.ReadCallCount);
+            Assert.Same(detectedGame, mapIdentityReader.LastDetectedGame);
+        }
+
+        [Fact]
+        public void Read_WhenDisconnectingOrDetectedGameChanges_DoesNotReadMapIdentity()
+        {
+            DetectedGame originalGame = CreateSupportedGame(processId: 1001);
+            DetectedGame changedGame = CreateSupportedGame(processId: 2002);
+            FakeGameEventMonitor eventMonitor = new()
+            {
+                Status = CreateCompatibleStatus()
+            };
+            FakeGameMapIdentityReader mapIdentityReader = new()
+            {
+                ResultFactory = CreateTownMapIdentityResult
+            };
+            SessionContext context = CreateSessionContext(
+                eventMonitor,
+                detectedGame: originalGame,
+                mapIdentityReader: mapIdentityReader);
+            context.Session.Start();
+            _ = CompleteConnectWithLoadedMonitor(context.Session);
+            int readCountAfterConnect = mapIdentityReader.ReadCallCount;
+            _ = context.Session.Disconnect();
+            context.EventDetector.Result = changedGame;
+            context.LifecycleEventSource.RaiseStarted(changedGame.ProcessName, changedGame.ProcessId);
+            _ = context.Session.Read();
+
+            Assert.Equal(readCountAfterConnect, mapIdentityReader.ReadCallCount);
+            Assert.True(mapIdentityReader.ClearAttachedGameCallCount > 0);
         }
 
         [Fact]
@@ -1958,7 +2019,8 @@ namespace BO2.Tests.Services
             FakeProcessMemoryAccessor? memoryAccessor = null,
             DllInjector? dllInjector = null,
             IGameTimerState? timerState = null,
-            IGameTimingReader? timingReader = null)
+            IGameTimingReader? timingReader = null,
+            IGameMapIdentityReader? mapIdentityReader = null)
         {
             SessionContext context = CreateSessionContext(
                 eventMonitor,
@@ -1967,7 +2029,8 @@ namespace BO2.Tests.Services
                 memoryAccessor: memoryAccessor,
                 dllInjector: dllInjector,
                 timerState: timerState,
-                timingReader: timingReader);
+                timingReader: timingReader,
+                mapIdentityReader: mapIdentityReader);
             context.Session.Start();
             return context.Session;
         }
@@ -1981,7 +2044,8 @@ namespace BO2.Tests.Services
             FakeProcessLifecycleEventSource? lifecycleEventSource = null,
             DllInjector? dllInjector = null,
             IGameTimerState? timerState = null,
-            IGameTimingReader? timingReader = null)
+            IGameTimingReader? timingReader = null,
+            IGameMapIdentityReader? mapIdentityReader = null)
         {
             FakeGameProcessDetector eventDetector = new()
             {
@@ -1997,6 +2061,7 @@ namespace BO2.Tests.Services
             GameConnectionSession session = new(
                 new GameMemoryReader(memoryAccessor),
                 timingReader ?? new FakeGameTimingReader(),
+                mapIdentityReader ?? new FakeGameMapIdentityReader(),
                 new GameProcessDetectionService(eventDetector, lifecycleEventSource),
                 pollingProcessDetector,
                 dllInjector ?? CreateDllInjector(),
@@ -2061,6 +2126,13 @@ namespace BO2.Tests.Services
                 0,
                 1,
                 recentEvents);
+        }
+
+        private static GameMapIdentityReadResult CreateTownMapIdentityResult(DetectedGame detectedGame)
+        {
+            return GameMapIdentityReadResult.ConfirmedTown(
+                detectedGame,
+                new GameMapIdentity("zm_transit", "town", "zm_transit_gump_town", "Town"));
         }
 
         private static GameTimingReadResult CreateTimingRead(
@@ -2206,6 +2278,38 @@ namespace BO2.Tests.Services
                 LastDetectedGame = detectedGame;
 
                 return Result ?? GameTimingReadResult.InvalidTimingSourceState(detectedGame);
+            }
+
+            public void ClearAttachedGame()
+            {
+                ClearAttachedGameCallCount++;
+            }
+
+            public void Dispose()
+            {
+                DisposeCallCount++;
+            }
+        }
+
+        private sealed class FakeGameMapIdentityReader : IGameMapIdentityReader
+        {
+            public Func<DetectedGame, GameMapIdentityReadResult>? ResultFactory { get; set; }
+
+            public int ReadCallCount { get; private set; }
+
+            public int ClearAttachedGameCallCount { get; private set; }
+
+            public int DisposeCallCount { get; private set; }
+
+            public DetectedGame? LastDetectedGame { get; private set; }
+
+            public GameMapIdentityReadResult ReadMapIdentity(DetectedGame detectedGame)
+            {
+                ReadCallCount++;
+                LastDetectedGame = detectedGame;
+
+                return ResultFactory?.Invoke(detectedGame)
+                    ?? GameMapIdentityReadResult.MissingMapIdentity(detectedGame);
             }
 
             public void ClearAttachedGame()

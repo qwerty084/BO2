@@ -15,9 +15,13 @@ namespace BO2.ViewModels
 
         private readonly DispatcherQueue _dispatcherQueue;
         private readonly GameConnectionSession _connectionSession;
+        private readonly GameHistoryStore _gameHistoryStore;
+        private readonly GameHistoryRecorder _gameHistoryRecorder;
         private readonly ShellConnectionDisplayProjector _shellDisplayProjector;
         private readonly CurrentGamePageViewModel _currentGamePage = new();
+        private readonly GameHistoryPageViewModel _gameHistoryPage = new();
         private readonly SemaphoreSlim _operationSemaphore = new(1, 1);
+        private string? _lastLoadedSavedHistoryId;
         private bool _disposed;
         private string _detectedGameText = AppStrings.Get("NoGameDetected");
         private string _eventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForMonitor");
@@ -44,15 +48,27 @@ namespace BO2.ViewModels
         }
 
         internal MainWindowViewModel(DispatcherQueue dispatcherQueue, GameConnectionSession connectionSession)
+            : this(dispatcherQueue, connectionSession, GameHistoryStore.CreateDefault())
+        {
+        }
+
+        internal MainWindowViewModel(
+            DispatcherQueue dispatcherQueue,
+            GameConnectionSession connectionSession,
+            GameHistoryStore gameHistoryStore)
         {
             ArgumentNullException.ThrowIfNull(dispatcherQueue);
             ArgumentNullException.ThrowIfNull(connectionSession);
+            ArgumentNullException.ThrowIfNull(gameHistoryStore);
 
             _dispatcherQueue = dispatcherQueue;
             _connectionSession = connectionSession;
+            _gameHistoryStore = gameHistoryStore;
+            _gameHistoryRecorder = new GameHistoryRecorder(_gameHistoryStore);
             _shellDisplayProjector = new ShellConnectionDisplayProjector();
             _connectionSession.SnapshotChanged += OnSnapshotChanged;
 
+            ReloadGameHistory();
             _connectionSession.Start();
             ApplyRefreshSnapshot(_connectionSession.GetStatusSnapshot());
         }
@@ -64,6 +80,8 @@ namespace BO2.ViewModels
         public event EventHandler? RefreshRequested;
 
         public CurrentGamePageViewModel CurrentGamePage => _currentGamePage;
+
+        public GameHistoryPageViewModel GameHistoryPage => _gameHistoryPage;
 
         public string StatusText
         {
@@ -253,6 +271,7 @@ namespace BO2.ViewModels
         {
             _disposed = true;
             _connectionSession.SnapshotChanged -= OnSnapshotChanged;
+            _gameHistoryRecorder.DiscardForAppClose();
             _connectionSession.Dispose();
             _operationSemaphore.Dispose();
         }
@@ -341,7 +360,28 @@ namespace BO2.ViewModels
         private void ApplyRefreshSnapshot(GameConnectionSnapshot snapshot)
         {
             _currentGamePage.ApplySnapshot(snapshot);
+            _gameHistoryRecorder.ObserveSnapshot(snapshot);
+            ApplyGameHistoryRecordingStatus(_gameHistoryRecorder.Status);
             ApplyShellDisplayState(_shellDisplayProjector.Project(snapshot));
+        }
+
+        private void ApplyGameHistoryRecordingStatus(GameHistoryRecordingStatus status)
+        {
+            _gameHistoryPage.ApplyRecordingStatus(status);
+            if (status.LastSavedHistoryId is not string historyId
+                || string.Equals(_lastLoadedSavedHistoryId, historyId, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            ReloadGameHistory();
+            _lastLoadedSavedHistoryId = historyId;
+        }
+
+        private void ReloadGameHistory()
+        {
+            GameHistoryDocument document = _gameHistoryStore.Load();
+            _gameHistoryPage.ReplaceSavedGames(document.Entries);
         }
 
         private void ApplyShellDisplayState(ShellConnectionDisplayState state)
