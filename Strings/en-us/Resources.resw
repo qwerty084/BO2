@@ -645,6 +645,9 @@
   <data name="GameHistoryBackButtonText.Text" xml:space="preserve">
     <value>Back</value>
   </data>
+  <data name="GameHistorySavedGamesTitle.Text" xml:space="preserve">
+    <value>Saved games</value>
+  </data>
   <data name="GameHistoryDateLabel.Text" xml:space="preserve">
     <value>Date</value>
   </data>
@@ -656,6 +659,12 @@
   </data>
   <data name="GameHistoryRoundsTitle.Text" xml:space="preserve">
     <value>Rounds</value>
+  </data>
+  <data name="GameHistoryRoundColumnRound.Text" xml:space="preserve">
+    <value>Round</value>
+  </data>
+  <data name="GameHistoryRoundColumnTime.Text" xml:space="preserve">
+    <value>Time</value>
   </data>
   <data name="GameHistoryCumulativeStatsLabel.Text" xml:space="preserve">
     <value>Cumulative</value>

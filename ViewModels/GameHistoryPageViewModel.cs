@@ -15,6 +15,7 @@ namespace BO2.ViewModels
 
         private readonly StatFormatter _statFormatter = new(MissingValueText);
         private GameHistoryDetailViewModel? _selectedGame;
+        private GameHistorySummaryViewModel? _selectedGameSummary;
         private string _recordingStatusTitle = AppStrings.Get("GameHistoryRecordingStatusWaitingTitle");
         private string _recordingStatusText = AppStrings.Get("GameHistoryRecordingStatusWaitingText");
 
@@ -37,6 +38,32 @@ namespace BO2.ViewModels
                 OnPropertyChanged(nameof(IsListVisible));
                 OnPropertyChanged(nameof(IsDetailVisible));
                 OnPropertyChanged(nameof(IsEmptyVisible));
+            }
+        }
+
+        public GameHistorySummaryViewModel? SelectedGameSummary
+        {
+            get => _selectedGameSummary;
+            set
+            {
+                if (ReferenceEquals(_selectedGameSummary, value))
+                {
+                    return;
+                }
+
+                if (_selectedGameSummary is not null)
+                {
+                    _selectedGameSummary.IsSelected = false;
+                }
+
+                _selectedGameSummary = value;
+                if (_selectedGameSummary is not null)
+                {
+                    _selectedGameSummary.IsSelected = true;
+                }
+
+                OnPropertyChanged();
+                SelectedGame = _selectedGameSummary?.CreateDetail();
             }
         }
 
@@ -68,7 +95,8 @@ namespace BO2.ViewModels
         {
             ArgumentNullException.ThrowIfNull(savedGames);
 
-            string? selectedId = SelectedGame?.Id;
+            string? selectedId = SelectedGameSummary?.Id ?? SelectedGame?.Id;
+            bool hadSavedGames = HasSavedGames;
 
             GameHistorySummaryViewModel[] summaries = [.. savedGames
                 .OrderByDescending(static game => game.EndedAt)
@@ -85,17 +113,25 @@ namespace BO2.ViewModels
             OnPropertyChanged(nameof(HasSavedGames));
             OnPropertyChanged(nameof(IsEmptyVisible));
 
+            GameHistorySummaryViewModel? summaryToSelect = null;
             if (selectedId is not null)
             {
-                SelectGameById(selectedId);
+                summaryToSelect = SavedGames.FirstOrDefault(
+                    game => string.Equals(game.Id, selectedId, StringComparison.Ordinal));
             }
+            else if (!hadSavedGames && summaries.Length > 0)
+            {
+                summaryToSelect = summaries[0];
+            }
+
+            SelectedGameSummary = summaryToSelect;
         }
 
         public void SelectGame(GameHistorySummaryViewModel summary)
         {
             ArgumentNullException.ThrowIfNull(summary);
 
-            SelectedGame = summary.CreateDetail();
+            SelectedGameSummary = summary;
         }
 
         public void SelectGameById(string id)
@@ -104,12 +140,12 @@ namespace BO2.ViewModels
 
             GameHistorySummaryViewModel? summary = SavedGames.FirstOrDefault(
                 game => string.Equals(game.Id, id, StringComparison.Ordinal));
-            SelectedGame = summary?.CreateDetail();
+            SelectedGameSummary = summary;
         }
 
         public void ShowList()
         {
-            SelectedGame = null;
+            SelectedGameSummary = null;
         }
 
         internal void ApplyRecordingStatus(GameHistoryRecordingStatus status)
@@ -347,9 +383,10 @@ namespace BO2.ViewModels
         }
     }
 
-    public sealed class GameHistorySummaryViewModel
+    public sealed class GameHistorySummaryViewModel : INotifyPropertyChanged
     {
         private readonly GameHistoryDetailViewModel _detail;
+        private bool _isSelected;
 
         internal GameHistorySummaryViewModel(
             GameHistoryEntry source,
@@ -377,6 +414,8 @@ namespace BO2.ViewModels
             _detail = detail;
         }
 
+        public event PropertyChangedEventHandler? PropertyChanged;
+
         public string Id => Source.Id;
 
         public string DateText { get; }
@@ -396,6 +435,21 @@ namespace BO2.ViewModels
         public string RevivesText { get; }
 
         public string HeadshotsText { get; }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            internal set
+            {
+                if (_isSelected == value)
+                {
+                    return;
+                }
+
+                _isSelected = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+            }
+        }
 
         internal GameHistoryEntry Source { get; }
 

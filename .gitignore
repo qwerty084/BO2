@@ -13,3 +13,4 @@ TestResults/
 .act-dotnet/
 .act-toolcache/
 artifacts/reverse/ghidra/project/
+artifacts/*

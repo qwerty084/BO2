@@ -20,6 +20,9 @@ namespace BO2.Tests.ViewModels
             viewModel.ReplaceSavedGames([oldest, newest, middle]);
 
             Assert.Equal(["newest", "middle", "oldest"], viewModel.SavedGames.Select(game => game.Id));
+            Assert.Equal("newest", viewModel.SelectedGameSummary?.Id);
+            Assert.True(viewModel.SavedGames[0].IsSelected);
+            Assert.False(viewModel.SavedGames[1].IsSelected);
         }
 
         [Fact]
@@ -43,12 +46,29 @@ namespace BO2.Tests.ViewModels
             viewModel.SelectGame(viewModel.SavedGames[0]);
 
             Assert.True(viewModel.IsDetailVisible);
+            Assert.Same(viewModel.SavedGames[0], viewModel.SelectedGameSummary);
+            Assert.True(viewModel.SavedGames[0].IsSelected);
             Assert.Equal("town-run", Assert.IsType<GameHistoryDetailViewModel>(viewModel.SelectedGame).Id);
 
             viewModel.ShowList();
 
             Assert.True(viewModel.IsListVisible);
+            Assert.Null(viewModel.SelectedGameSummary);
+            Assert.False(viewModel.SavedGames[0].IsSelected);
             Assert.Null(viewModel.SelectedGame);
+        }
+
+        [Fact]
+        public void SelectGame_MovesSelectionMarkerBetweenSummaries()
+        {
+            var viewModel = new GameHistoryPageViewModel();
+            viewModel.ReplaceSavedGames([CreateDetailedGame("first"), CreateDetailedGame("second")]);
+
+            viewModel.SelectGame(viewModel.SavedGames[1]);
+
+            Assert.False(viewModel.SavedGames[0].IsSelected);
+            Assert.True(viewModel.SavedGames[1].IsSelected);
+            Assert.Same(viewModel.SavedGames[1], viewModel.SelectedGameSummary);
         }
 
         [Fact]
