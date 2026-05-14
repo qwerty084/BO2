@@ -24,9 +24,14 @@ namespace BO2.Views
             }
         }
 
-        private void OnBackButtonClick(object sender, RoutedEventArgs e)
+        private void OnHideHistoryRailButtonClick(object sender, RoutedEventArgs e)
         {
-            ViewModel?.ShowList();
+            ViewModel?.HideHistoryRail();
+        }
+
+        private void OnShowHistoryRailButtonClick(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.ShowHistoryRail();
         }
     }
 
@@ -43,6 +48,22 @@ namespace BO2.Views
             }
 
             return isVisible ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    public sealed class BooleanToGridLengthConverter : IValueConverter
+    {
+        public double VisibleLength { get; set; }
+
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            bool isVisible = value is bool boolValue && boolValue;
+            return isVisible ? new GridLength(VisibleLength) : new GridLength(0);
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, string language)

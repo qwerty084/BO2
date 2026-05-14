@@ -16,6 +16,7 @@ namespace BO2.ViewModels
         public const string MissingValueText = "--";
 
         private readonly StatFormatter _statFormatter = new(MissingValueText);
+        private bool _isHistoryRailOpen = true;
         private GameHistoryDetailViewModel? _selectedGame;
         private GameHistorySummaryViewModel? _selectedGameSummary;
         private string _recordingStatusTitle = AppStrings.Get("GameHistoryRecordingStatusWaitingTitle");
@@ -40,6 +41,8 @@ namespace BO2.ViewModels
                 OnPropertyChanged(nameof(IsListVisible));
                 OnPropertyChanged(nameof(IsDetailVisible));
                 OnPropertyChanged(nameof(IsEmptyVisible));
+                OnPropertyChanged(nameof(IsHistoryRailVisible));
+                OnPropertyChanged(nameof(IsHistoryRailReopenButtonVisible));
             }
         }
 
@@ -89,6 +92,10 @@ namespace BO2.ViewModels
 
         public bool IsDetailVisible => SelectedGame is not null;
 
+        public bool IsHistoryRailVisible => IsDetailVisible && _isHistoryRailOpen;
+
+        public bool IsHistoryRailReopenButtonVisible => IsDetailVisible && !_isHistoryRailOpen;
+
         public string EmptyStateTitle => AppStrings.Get("GameHistoryEmptyTitle");
 
         public string EmptyStateText => AppStrings.Get("GameHistoryEmptyText");
@@ -133,6 +140,7 @@ namespace BO2.ViewModels
         {
             ArgumentNullException.ThrowIfNull(summary);
 
+            SetHistoryRailOpen(true);
             SelectedGameSummary = summary;
         }
 
@@ -142,12 +150,23 @@ namespace BO2.ViewModels
 
             GameHistorySummaryViewModel? summary = SavedGames.FirstOrDefault(
                 game => string.Equals(game.Id, id, StringComparison.Ordinal));
+            SetHistoryRailOpen(true);
             SelectedGameSummary = summary;
         }
 
         public void ShowList()
         {
             SelectedGameSummary = null;
+        }
+
+        public void HideHistoryRail()
+        {
+            SetHistoryRailOpen(false);
+        }
+
+        public void ShowHistoryRail()
+        {
+            SetHistoryRailOpen(true);
         }
 
         internal void ApplyRecordingStatus(GameHistoryRecordingStatus status)
@@ -444,6 +463,18 @@ namespace BO2.ViewModels
 
             storage = value;
             OnPropertyChanged(propertyName);
+        }
+
+        private void SetHistoryRailOpen(bool isOpen)
+        {
+            if (_isHistoryRailOpen == isOpen)
+            {
+                return;
+            }
+
+            _isHistoryRailOpen = isOpen;
+            OnPropertyChanged(nameof(IsHistoryRailVisible));
+            OnPropertyChanged(nameof(IsHistoryRailReopenButtonVisible));
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

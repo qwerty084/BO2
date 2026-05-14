@@ -46,6 +46,8 @@ namespace BO2.Tests.ViewModels
             viewModel.SelectGame(viewModel.SavedGames[0]);
 
             Assert.True(viewModel.IsDetailVisible);
+            Assert.True(viewModel.IsHistoryRailVisible);
+            Assert.False(viewModel.IsHistoryRailReopenButtonVisible);
             Assert.Same(viewModel.SavedGames[0], viewModel.SelectedGameSummary);
             Assert.True(viewModel.SavedGames[0].IsSelected);
             Assert.Equal("town-run", Assert.IsType<GameHistoryDetailViewModel>(viewModel.SelectedGame).Id);
@@ -56,6 +58,29 @@ namespace BO2.Tests.ViewModels
             Assert.Null(viewModel.SelectedGameSummary);
             Assert.False(viewModel.SavedGames[0].IsSelected);
             Assert.Null(viewModel.SelectedGame);
+        }
+
+        [Fact]
+        public void HistoryRail_CanBeHiddenAndReopenedWithoutClearingSelectedGame()
+        {
+            var viewModel = new GameHistoryPageViewModel();
+            viewModel.ReplaceSavedGames([CreateDetailedGame("town-run")]);
+
+            viewModel.SelectGame(viewModel.SavedGames[0]);
+            viewModel.HideHistoryRail();
+
+            Assert.True(viewModel.IsDetailVisible);
+            Assert.False(viewModel.IsHistoryRailVisible);
+            Assert.True(viewModel.IsHistoryRailReopenButtonVisible);
+            Assert.Same(viewModel.SavedGames[0], viewModel.SelectedGameSummary);
+            Assert.Equal("town-run", Assert.IsType<GameHistoryDetailViewModel>(viewModel.SelectedGame).Id);
+
+            viewModel.ShowHistoryRail();
+
+            Assert.True(viewModel.IsDetailVisible);
+            Assert.True(viewModel.IsHistoryRailVisible);
+            Assert.False(viewModel.IsHistoryRailReopenButtonVisible);
+            Assert.Same(viewModel.SavedGames[0], viewModel.SelectedGameSummary);
         }
 
         [Fact]
