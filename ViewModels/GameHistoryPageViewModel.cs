@@ -180,15 +180,13 @@ namespace BO2.ViewModels
             {
                 GameHistoryRecordingState.Recording => (
                     AppStrings.Get("GameHistoryRecordingStatusActiveTitle"),
-                    status.ActiveRoundNumber is int roundNumber
-                        ? AppStrings.Format("GameHistoryRecordingStatusActiveRoundFormat", roundNumber)
-                        : AppStrings.Get("GameHistoryRecordingStatusActiveText")),
+                    ProjectActiveRecordingText(status)),
                 GameHistoryRecordingState.WaitingForRoundOne => (
                     AppStrings.Get("GameHistoryRecordingStatusActiveTitle"),
-                    AppStrings.Get("GameHistoryRecordingStatusWaitingForRoundOneText")),
+                    ProjectWaitingForRoundOneText(status.MapName)),
                 GameHistoryRecordingState.Saved => (
                     AppStrings.Get("GameHistoryRecordingStatusSavedTitle"),
-                    AppStrings.Get("GameHistoryRecordingStatusSavedText")),
+                    ProjectSavedText(status.MapName)),
                 GameHistoryRecordingState.Discarded => ProjectDiscardedStatus(status.DiscardReason),
                 GameHistoryRecordingState.Unavailable => ProjectUnavailableStatus(status.UnavailableReason),
                 _ => (
@@ -221,14 +219,59 @@ namespace BO2.ViewModels
                 return;
             }
 
-            if (snapshot.MapIdentityResult?.IsConfirmedTown == true)
+            if (snapshot.MapIdentityResult?.IsSupportedMap == true
+                && snapshot.MapIdentityResult.Identity is GameMapIdentity identity
+                && !string.IsNullOrWhiteSpace(identity.DisplayName))
             {
-                ApplyRecordingStatus(GameHistoryRecordingStatus.WaitingForRoundOne);
+                ApplyRecordingStatus(GameHistoryRecordingStatus.WaitingForRoundOne(identity.DisplayName));
                 return;
             }
 
             ApplyRecordingStatus(GameHistoryRecordingStatus.Unavailable(
-                GameHistoryRecordingUnavailableReason.RequiresTown));
+                ProjectUnavailableReason(snapshot.MapIdentityResult)));
+        }
+
+        private static string ProjectActiveRecordingText(GameHistoryRecordingStatus status)
+        {
+            string? mapName = NormalizeMapName(status.MapName);
+            if (status.ActiveRoundNumber is int roundNumber)
+            {
+                return mapName is null
+                    ? AppStrings.Format("GameHistoryRecordingStatusActiveRoundFormat", roundNumber)
+                    : AppStrings.Format("GameHistoryRecordingStatusActiveMapRoundFormat", mapName, roundNumber);
+            }
+
+            return mapName is null
+                ? AppStrings.Get("GameHistoryRecordingStatusActiveText")
+                : AppStrings.Format("GameHistoryRecordingStatusActiveMapFormat", mapName);
+        }
+
+        private static string ProjectWaitingForRoundOneText(string? mapName)
+        {
+            string? normalizedMapName = NormalizeMapName(mapName);
+            return normalizedMapName is null
+                ? AppStrings.Get("GameHistoryRecordingStatusWaitingForRoundOneText")
+                : AppStrings.Format("GameHistoryRecordingStatusWaitingForRoundOneMapFormat", normalizedMapName);
+        }
+
+        private static string ProjectSavedText(string? mapName)
+        {
+            string? normalizedMapName = NormalizeMapName(mapName);
+            return normalizedMapName is null
+                ? AppStrings.Get("GameHistoryRecordingStatusSavedText")
+                : AppStrings.Format("GameHistoryRecordingStatusSavedMapFormat", normalizedMapName);
+        }
+
+        private static GameHistoryRecordingUnavailableReason ProjectUnavailableReason(
+            GameMapIdentityReadResult? mapIdentityResult)
+        {
+            return mapIdentityResult?.Status switch
+            {
+                GameMapIdentityReadStatus.SupportedMap => GameHistoryRecordingUnavailableReason.MissingFriendlyMapName,
+                GameMapIdentityReadStatus.UnsupportedMapIdentity
+                    or GameMapIdentityReadStatus.UnsupportedVariant => GameHistoryRecordingUnavailableReason.RequiresSupportedMap,
+                _ => GameHistoryRecordingUnavailableReason.MissingMapIdentity
+            };
         }
 
         private static (string Title, string Text) ProjectUnavailableStatus(
@@ -239,11 +282,11 @@ namespace BO2.ViewModels
                 GameHistoryRecordingUnavailableReason.RequiresHookBackedEventMonitor => (
                     AppStrings.Get("GameHistoryRecordingStatusRequiresHookTitle"),
                     AppStrings.Get("GameHistoryRecordingStatusRequiresHookText")),
-                GameHistoryRecordingUnavailableReason.RequiresTown
+                GameHistoryRecordingUnavailableReason.RequiresSupportedMap
                     or GameHistoryRecordingUnavailableReason.MissingMapIdentity
                     or GameHistoryRecordingUnavailableReason.MissingFriendlyMapName => (
-                        AppStrings.Get("GameHistoryRecordingStatusRequiresTownTitle"),
-                        AppStrings.Get("GameHistoryRecordingStatusRequiresTownText")),
+                        AppStrings.Get("GameHistoryRecordingStatusRequiresSupportedMapTitle"),
+                        AppStrings.Get("GameHistoryRecordingStatusRequiresSupportedMapText")),
                 _ => (
                     AppStrings.Get("GameHistoryRecordingStatusWaitingTitle"),
                     AppStrings.Get("GameHistoryRecordingStatusWaitingText"))
@@ -271,12 +314,19 @@ namespace BO2.ViewModels
                 GameHistoryRecordingDiscardReason.MissingMapIdentity
                     or GameHistoryRecordingDiscardReason.UnsupportedMapIdentity
                     or GameHistoryRecordingDiscardReason.MissingFriendlyMapName => (
-                        AppStrings.Get("GameHistoryRecordingStatusRequiresTownTitle"),
-                        AppStrings.Get("GameHistoryRecordingStatusRequiresTownText")),
+                        AppStrings.Get("GameHistoryRecordingStatusRequiresSupportedMapTitle"),
+                        AppStrings.Get("GameHistoryRecordingStatusRequiresSupportedMapText")),
                 _ => (
                     AppStrings.Get("GameHistoryRecordingStatusDiscardedTitle"),
                     AppStrings.Get("GameHistoryRecordingStatusDiscardedSequenceText"))
             };
+        }
+
+        private static string? NormalizeMapName(string? mapName)
+        {
+            return string.IsNullOrWhiteSpace(mapName)
+                ? null
+                : mapName.Trim();
         }
 
         private GameHistorySummaryViewModel CreateSummary(GameHistoryEntry game)

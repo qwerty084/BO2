@@ -337,7 +337,7 @@ namespace BO2.Tests.Services
             GameConnectionSnapshot snapshot = CompleteConnectWithLoadedMonitor(session);
 
             Assert.NotNull(snapshot.MapIdentityResult);
-            Assert.True(snapshot.MapIdentityResult!.IsConfirmedTown);
+            Assert.True(snapshot.MapIdentityResult!.IsSupportedMap);
             Assert.Equal("Town", snapshot.MapIdentityResult.Identity!.DisplayName);
             Assert.Equal(1, mapIdentityReader.ReadCallCount);
             Assert.Same(detectedGame, mapIdentityReader.LastDetectedGame);
@@ -2130,7 +2130,7 @@ namespace BO2.Tests.Services
 
         private static GameMapIdentityReadResult CreateTownMapIdentityResult(DetectedGame detectedGame)
         {
-            return GameMapIdentityReadResult.ConfirmedTown(
+            return GameMapIdentityReadResult.SupportedMap(
                 detectedGame,
                 new GameMapIdentity("zm_transit", "town", "zm_transit_gump_town", "Town"));
         }

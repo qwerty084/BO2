@@ -12,7 +12,7 @@ namespace BO2.Tests.Services
         private const int PointerSize = sizeof(int);
 
         [Fact]
-        public void ReadMapIdentity_WhenTownDvarsArePresent_ReturnsConfirmedTown()
+        public void ReadMapIdentity_WhenTownDvarsArePresent_ReturnsSupportedTown()
         {
             DetectedGame detectedGame = CreateSteamZombiesGame();
             FakeProcessMemoryAccessor memory = new();
@@ -22,8 +22,8 @@ namespace BO2.Tests.Services
 
             GameMapIdentityReadResult result = reader.ReadMapIdentity(detectedGame);
 
-            Assert.Equal(GameMapIdentityReadStatus.ConfirmedTown, result.Status);
-            Assert.True(result.IsConfirmedTown);
+            Assert.Equal(GameMapIdentityReadStatus.SupportedMap, result.Status);
+            Assert.True(result.IsSupportedMap);
             Assert.NotNull(result.Identity);
             Assert.Equal("zm_transit", result.Identity!.BaseMapToken);
             Assert.Equal("town", result.Identity.StartLocationToken);
@@ -33,17 +33,38 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void ReadMapIdentity_WhenStartLocationIsFarm_ReturnsUnsupportedMapIdentity()
+        public void ReadMapIdentity_WhenStartLocationIsFarm_ReturnsSupportedFarm()
+        {
+            DetectedGame detectedGame = CreateSteamZombiesGame();
+            FakeProcessMemoryAccessor memory = new();
+            WriteDvarString(memory, "mapname", 0x02A32AA8U, 0x03000000U, " ZM_TRANSIT ");
+            WriteDvarString(memory, "ui_zm_mapstartlocation", 0x02A0A308U, 0x03000100U, " Farm ");
+            var reader = new GameMapIdentityReader(memory);
+
+            GameMapIdentityReadResult result = reader.ReadMapIdentity(detectedGame);
+
+            Assert.Equal(GameMapIdentityReadStatus.SupportedMap, result.Status);
+            Assert.True(result.IsSupportedMap);
+            Assert.NotNull(result.Identity);
+            Assert.Equal("zm_transit", result.Identity!.BaseMapToken);
+            Assert.Equal("farm", result.Identity.StartLocationToken);
+            Assert.Equal("zm_transit_gump_farm", result.Identity.InternalMapToken);
+            Assert.Equal("Farm", result.Identity.DisplayName);
+        }
+
+        [Fact]
+        public void ReadMapIdentity_WhenGreenRunStartLocationIsUnsupported_ReturnsUnsupportedMapIdentity()
         {
             DetectedGame detectedGame = CreateSteamZombiesGame();
             FakeProcessMemoryAccessor memory = new();
             WriteDvarString(memory, "mapname", 0x02A32AA8U, 0x03000000U, "zm_transit");
-            WriteDvarString(memory, "ui_zm_mapstartlocation", 0x02A0A308U, 0x03000100U, "farm");
+            WriteDvarString(memory, "ui_zm_mapstartlocation", 0x02A0A308U, 0x03000100U, "bus_depot");
             var reader = new GameMapIdentityReader(memory);
 
             GameMapIdentityReadResult result = reader.ReadMapIdentity(detectedGame);
 
             Assert.Equal(GameMapIdentityReadStatus.UnsupportedMapIdentity, result.Status);
+            Assert.False(result.IsSupportedMap);
             Assert.Null(result.Identity);
         }
 

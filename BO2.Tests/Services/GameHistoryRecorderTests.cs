@@ -75,6 +75,53 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void ObserveSnapshot_WhenFarmGameCompletes_SavesSummaryRoundsDurationsAndBoxEvents()
+        {
+            List<GameHistoryEntry> savedEntries = [];
+            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            DetectedGame detectedGame = CreateGame();
+            DateTimeOffset startedAt = new(2026, 5, 14, 13, 44, 0, TimeSpan.Zero);
+
+            recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(10, 0, 0, 0, 0),
+                CreateTimers(gameSeconds: 0, roundSeconds: 0),
+                CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 1)),
+                CreateFarmResult(detectedGame)));
+            recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(260, 4, 0, 0, 1),
+                CreateTimers(gameSeconds: 25, roundSeconds: 25),
+                CreateCompatibleStatus(CreateBoxEvent(startedAt.AddSeconds(25), sequence: 2, "saiga12_zm", ownerId: 9)),
+                CreateFarmResult(detectedGame)));
+            recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(500, 7, 0, 0, 2),
+                CreateTimers(gameSeconds: 60, roundSeconds: 60),
+                CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(60), sequence: 3)),
+                CreateFarmResult(detectedGame)));
+
+            GameHistoryEntry saved = Assert.Single(savedEntries);
+            Assert.Equal("zm_transit", saved.MapIdentity.BaseMapToken);
+            Assert.Equal("farm", saved.MapIdentity.StartLocationToken);
+            Assert.Equal("zm_transit_gump_farm", saved.MapIdentity.InternalMapToken);
+            Assert.Equal("Farm", saved.MapIdentity.FriendlyName);
+            Assert.Equal(1, saved.FinalRound);
+            Assert.Equal(500, saved.FinalStats.Points);
+            Assert.Equal(TimeSpan.FromSeconds(60), saved.GameDuration);
+            GameHistoryRound round = Assert.Single(saved.Rounds);
+            Assert.Equal(1, round.RoundNumber);
+            Assert.Equal(490, round.DeltaStats.Points);
+            Assert.Equal(7, round.DeltaStats.Kills);
+            Assert.Equal(TimeSpan.FromSeconds(60), round.RoundDuration);
+            GameHistoryBoxEvent boxEvent = Assert.Single(saved.BoxEvents);
+            Assert.Equal("saiga12_zm", boxEvent.RawWeaponToken);
+            Assert.Equal("S12", boxEvent.WeaponDisplayName);
+            Assert.Equal(GameHistoryRecordingState.Saved, recorder.Status.State);
+            Assert.Equal("Farm", recorder.Status.MapName);
+        }
+
+        [Fact]
         public void ObserveSnapshot_IgnoresEventsBeforeRoundOneAndAfterGameOver()
         {
             List<GameHistoryEntry> savedEntries = [];
@@ -112,7 +159,9 @@ namespace BO2.Tests.Services
         [InlineData(GameHistoryRecordingDiscardReason.SequenceGap)]
         [InlineData(GameHistoryRecordingDiscardReason.DroppedLifecycleData)]
         [InlineData(GameHistoryRecordingDiscardReason.MissingRequiredStats)]
+        [InlineData(GameHistoryRecordingDiscardReason.MissingMapIdentity)]
         [InlineData(GameHistoryRecordingDiscardReason.UnsupportedMapIdentity)]
+        [InlineData(GameHistoryRecordingDiscardReason.MissingFriendlyMapName)]
         [InlineData(GameHistoryRecordingDiscardReason.Disconnected)]
         [InlineData(GameHistoryRecordingDiscardReason.DetectedGameChanged)]
         public void ObserveSnapshot_WhenCandidateBecomesUntrusted_DiscardsWithoutSaving(
@@ -133,6 +182,50 @@ namespace BO2.Tests.Services
             Assert.Empty(savedEntries);
             Assert.Equal(GameHistoryRecordingState.Discarded, recorder.Status.State);
             Assert.Equal(reason, recorder.Status.DiscardReason);
+        }
+
+        [Fact]
+        public void DiscardForAppClose_WhenCandidateActive_DiscardsWithoutSaving()
+        {
+            List<GameHistoryEntry> savedEntries = [];
+            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            DetectedGame detectedGame = CreateGame();
+            DateTimeOffset startedAt = new(2026, 5, 10, 12, 0, 0, TimeSpan.Zero);
+            recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(0, 0, 0, 0, 0),
+                CreateTimers(0, 0),
+                CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 1))));
+
+            recorder.DiscardForAppClose();
+
+            Assert.Empty(savedEntries);
+            Assert.Equal(GameHistoryRecordingState.Discarded, recorder.Status.State);
+            Assert.Equal(GameHistoryRecordingDiscardReason.AppClosed, recorder.Status.DiscardReason);
+        }
+
+        [Theory]
+        [InlineData(GameHistoryRecordingUnavailableReason.MissingMapIdentity)]
+        [InlineData(GameHistoryRecordingUnavailableReason.RequiresSupportedMap)]
+        [InlineData(GameHistoryRecordingUnavailableReason.MissingFriendlyMapName)]
+        public void ObserveSnapshot_WhenMapIdentityUnavailableBeforeRoundOne_BlocksCandidate(
+            GameHistoryRecordingUnavailableReason reason)
+        {
+            List<GameHistoryEntry> savedEntries = [];
+            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            DetectedGame detectedGame = CreateGame();
+            DateTimeOffset startedAt = new(2026, 5, 10, 12, 0, 0, TimeSpan.Zero);
+
+            recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(0, 0, 0, 0, 0),
+                CreateTimers(0, 0),
+                CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 1)),
+                CreateUnavailableMapIdentityResult(reason, detectedGame)));
+
+            Assert.Empty(savedEntries);
+            Assert.Equal(GameHistoryRecordingState.Unavailable, recorder.Status.State);
+            Assert.Equal(reason, recorder.Status.UnavailableReason);
         }
 
         [Fact]
@@ -202,12 +295,24 @@ namespace BO2.Tests.Services
                     null,
                     CreateTimers(1, 1),
                     CreateCompatibleStatus(CreateEvent(GameEventType.EndOfRound, 1, startedAt.AddSeconds(1), sequence: 2))),
+                GameHistoryRecordingDiscardReason.MissingMapIdentity => CreateSnapshot(
+                    detectedGame,
+                    CreateStats(0, 0, 0, 0, 0),
+                    CreateTimers(1, 1),
+                    CreateCompatibleStatus(),
+                    mapIdentityResult: GameMapIdentityReadResult.MissingMapIdentity(detectedGame)),
                 GameHistoryRecordingDiscardReason.UnsupportedMapIdentity => CreateSnapshot(
                     detectedGame,
                     CreateStats(0, 0, 0, 0, 0),
                     CreateTimers(1, 1),
                     CreateCompatibleStatus(),
                     mapIdentityResult: GameMapIdentityReadResult.UnsupportedMapIdentity(detectedGame)),
+                GameHistoryRecordingDiscardReason.MissingFriendlyMapName => CreateSnapshot(
+                    detectedGame,
+                    CreateStats(0, 0, 0, 0, 0),
+                    CreateTimers(1, 1),
+                    CreateCompatibleStatus(),
+                    mapIdentityResult: CreateBlankFriendlyMapResult(detectedGame)),
                 GameHistoryRecordingDiscardReason.Disconnected => CreateSnapshot(
                     detectedGame,
                     CreateStats(0, 0, 0, 0, 0),
@@ -318,9 +423,39 @@ namespace BO2.Tests.Services
 
         private static GameMapIdentityReadResult CreateTownResult(DetectedGame detectedGame)
         {
-            return GameMapIdentityReadResult.ConfirmedTown(
+            return GameMapIdentityReadResult.SupportedMap(
                 detectedGame,
                 new GameMapIdentity("zm_transit", "town", "zm_transit_gump_town", "Town"));
+        }
+
+        private static GameMapIdentityReadResult CreateFarmResult(DetectedGame detectedGame)
+        {
+            return GameMapIdentityReadResult.SupportedMap(
+                detectedGame,
+                new GameMapIdentity("zm_transit", "farm", "zm_transit_gump_farm", "Farm"));
+        }
+
+        private static GameMapIdentityReadResult CreateBlankFriendlyMapResult(DetectedGame detectedGame)
+        {
+            return GameMapIdentityReadResult.SupportedMap(
+                detectedGame,
+                new GameMapIdentity("zm_transit", "farm", "zm_transit_gump_farm", " "));
+        }
+
+        private static GameMapIdentityReadResult CreateUnavailableMapIdentityResult(
+            GameHistoryRecordingUnavailableReason reason,
+            DetectedGame detectedGame)
+        {
+            return reason switch
+            {
+                GameHistoryRecordingUnavailableReason.MissingMapIdentity =>
+                    GameMapIdentityReadResult.MissingMapIdentity(detectedGame),
+                GameHistoryRecordingUnavailableReason.RequiresSupportedMap =>
+                    GameMapIdentityReadResult.UnsupportedMapIdentity(detectedGame),
+                GameHistoryRecordingUnavailableReason.MissingFriendlyMapName =>
+                    CreateBlankFriendlyMapResult(detectedGame),
+                _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, null)
+            };
         }
 
         private static DetectedGame CreateGame(int processId = 1001)

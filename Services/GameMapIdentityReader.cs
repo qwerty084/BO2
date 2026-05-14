@@ -77,7 +77,7 @@ namespace BO2.Services
 
                 if (!string.Equals(baseMap.Value?.Trim(), "zm_transit", StringComparison.OrdinalIgnoreCase))
                 {
-                    return GameMapIdentityResolver.ResolveTownOnly(
+                    return GameMapIdentityResolver.ResolveSupportedMap(
                         detectedGame,
                         baseMap.Value,
                         null);
@@ -89,7 +89,7 @@ namespace BO2.Services
                     return ToMapIdentityReadResult(detectedGame, startLocation.Status);
                 }
 
-                return GameMapIdentityResolver.ResolveTownOnly(
+                return GameMapIdentityResolver.ResolveSupportedMap(
                     detectedGame,
                     baseMap.Value,
                     startLocation.Value);

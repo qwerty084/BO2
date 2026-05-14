@@ -4,7 +4,7 @@ namespace BO2.Services
 {
     internal enum GameMapIdentityReadStatus
     {
-        ConfirmedTown,
+        SupportedMap,
         UnsupportedVariant,
         MissingMapIdentity,
         UnsupportedMapIdentity,
@@ -38,10 +38,10 @@ namespace BO2.Services
 
         public GameMapIdentity? Identity { get; }
 
-        public bool IsConfirmedTown => Status == GameMapIdentityReadStatus.ConfirmedTown
-            && string.Equals(Identity?.DisplayName, "Town", StringComparison.Ordinal);
+        public bool IsSupportedMap => Status == GameMapIdentityReadStatus.SupportedMap
+            && Identity is not null;
 
-        public static GameMapIdentityReadResult ConfirmedTown(
+        public static GameMapIdentityReadResult SupportedMap(
             DetectedGame detectedGame,
             GameMapIdentity identity)
         {
@@ -49,7 +49,7 @@ namespace BO2.Services
 
             return new GameMapIdentityReadResult(
                 detectedGame,
-                GameMapIdentityReadStatus.ConfirmedTown,
+                GameMapIdentityReadStatus.SupportedMap,
                 identity);
         }
 
@@ -88,7 +88,15 @@ namespace BO2.Services
 
     internal static class GameMapIdentityResolver
     {
-        public static GameMapIdentityReadResult ResolveTownOnly(
+        private const string GreenRunBaseMapToken = "zm_transit";
+
+        private static readonly SupportedGreenRunMap[] GreenRunMaps =
+        [
+            new("town", "zm_transit_gump_town", "Town"),
+            new("farm", "zm_transit_gump_farm", "Farm")
+        ];
+
+        public static GameMapIdentityReadResult ResolveSupportedMap(
             DetectedGame detectedGame,
             string? baseMapToken,
             string? startLocationToken)
@@ -101,7 +109,7 @@ namespace BO2.Services
                 return GameMapIdentityReadResult.MissingMapIdentity(detectedGame);
             }
 
-            if (!string.Equals(normalizedBaseToken, "zm_transit", StringComparison.Ordinal))
+            if (!string.Equals(normalizedBaseToken, GreenRunBaseMapToken, StringComparison.Ordinal))
             {
                 return GameMapIdentityReadResult.UnsupportedMapIdentity(detectedGame);
             }
@@ -112,18 +120,21 @@ namespace BO2.Services
                 return GameMapIdentityReadResult.MissingMapIdentity(detectedGame);
             }
 
-            if (!string.Equals(normalizedStartLocation, "town", StringComparison.Ordinal))
+            foreach (SupportedGreenRunMap map in GreenRunMaps)
             {
-                return GameMapIdentityReadResult.UnsupportedMapIdentity(detectedGame);
+                if (string.Equals(normalizedStartLocation, map.StartLocationToken, StringComparison.Ordinal))
+                {
+                    return GameMapIdentityReadResult.SupportedMap(
+                        detectedGame,
+                        new GameMapIdentity(
+                            normalizedBaseToken,
+                            normalizedStartLocation,
+                            map.InternalMapToken,
+                            map.DisplayName));
+                }
             }
 
-            return GameMapIdentityReadResult.ConfirmedTown(
-                detectedGame,
-                new GameMapIdentity(
-                    normalizedBaseToken,
-                    normalizedStartLocation,
-                    "zm_transit_gump_town",
-                    "Town"));
+            return GameMapIdentityReadResult.UnsupportedMapIdentity(detectedGame);
         }
 
         private static string? NormalizeToken(string? token)
@@ -135,5 +146,10 @@ namespace BO2.Services
 
             return token.Trim().ToLowerInvariant();
         }
+
+        private sealed record SupportedGreenRunMap(
+            string StartLocationToken,
+            string InternalMapToken,
+            string DisplayName);
     }
 }

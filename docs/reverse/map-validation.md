@@ -40,9 +40,10 @@ Prior live behavior:
 - The 2026-05-14 live lobby continuation connected the packaged BO2 app to Steam Zombies Farm and confirmed `Monitor compatible`, `ui_mapname=zm_transit`, and `ui_zm_mapstartlocation=farm`. During the observed poll window, the app stayed in lobby state with `--:--` timers and no Event Monitor records.
 - The 2026-05-14 live Farm completion captured active identity, lifecycle, Player Stats Read, Game Timing Read, box events with aliases, and `end_game`. Event Monitor shared memory reported snapshot version `6`, compatibility state `2`, no dropped events/notifies, and published notify count `9` by the final `end_game` capture.
 
-Open risks:
+Promotion result:
+
+- Farm has been promoted in managed map identity and Game History recording policy. `ui_zm_mapstartlocation=farm` now resolves to supported internal token `zm_transit_gump_farm` with friendly name `Farm`.
+
+Open risk:
 
 - `mapname` can be empty/null in a Farm lobby; active-match validation should use the post-spawn value.
-- Farm support still requires a code change to recognize `ui_zm_mapstartlocation=farm`; this validation only proves that promotion is safe.
-
-Farm can be promoted after implementation updates the supported map table and adds tests for `zm_transit_gump_farm`.

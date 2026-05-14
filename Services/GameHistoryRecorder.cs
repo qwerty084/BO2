@@ -18,7 +18,7 @@ namespace BO2.Services
     {
         WaitingForConnection,
         ActiveRecording,
-        RequiresTown,
+        RequiresSupportedMap,
         RequiresHookBackedEventMonitor,
         DiscardedSequenceOrDroppedLifecycle,
         DiscardedMissingStats,
@@ -29,7 +29,7 @@ namespace BO2.Services
     {
         None,
         NotConnected,
-        RequiresTown,
+        RequiresSupportedMap,
         MissingMapIdentity,
         MissingFriendlyMapName,
         RequiresHookBackedEventMonitor
@@ -72,9 +72,9 @@ namespace BO2.Services
             GameHistoryRecordingState.Unavailable => UnavailableReason switch
             {
                 GameHistoryRecordingUnavailableReason.RequiresHookBackedEventMonitor => GameHistoryRecordingStatusKind.RequiresHookBackedEventMonitor,
-                GameHistoryRecordingUnavailableReason.RequiresTown
+                GameHistoryRecordingUnavailableReason.RequiresSupportedMap
                     or GameHistoryRecordingUnavailableReason.MissingMapIdentity
-                    or GameHistoryRecordingUnavailableReason.MissingFriendlyMapName => GameHistoryRecordingStatusKind.RequiresTown,
+                    or GameHistoryRecordingUnavailableReason.MissingFriendlyMapName => GameHistoryRecordingStatusKind.RequiresSupportedMap,
                 _ => GameHistoryRecordingStatusKind.WaitingForConnection
             },
             _ => GameHistoryRecordingStatusKind.WaitingForConnection
@@ -83,8 +83,8 @@ namespace BO2.Services
         public static GameHistoryRecordingStatus WaitingForConnection { get; } =
             Unavailable(GameHistoryRecordingUnavailableReason.NotConnected);
 
-        public static GameHistoryRecordingStatus RequiresTown { get; } =
-            Unavailable(GameHistoryRecordingUnavailableReason.RequiresTown);
+        public static GameHistoryRecordingStatus RequiresSupportedMap { get; } =
+            Unavailable(GameHistoryRecordingUnavailableReason.RequiresSupportedMap);
 
         public static GameHistoryRecordingStatus RequiresHookBackedEventMonitor { get; } =
             Unavailable(GameHistoryRecordingUnavailableReason.RequiresHookBackedEventMonitor);
@@ -120,13 +120,16 @@ namespace BO2.Services
                 null);
         }
 
-        public static GameHistoryRecordingStatus WaitingForRoundOne { get; } = new(
-            GameHistoryRecordingState.WaitingForRoundOne,
-            GameHistoryRecordingUnavailableReason.None,
-            GameHistoryRecordingDiscardReason.None,
-            null,
-            null,
-            null);
+        public static GameHistoryRecordingStatus WaitingForRoundOne(string? mapName = null)
+        {
+            return new GameHistoryRecordingStatus(
+                GameHistoryRecordingState.WaitingForRoundOne,
+                GameHistoryRecordingUnavailableReason.None,
+                GameHistoryRecordingDiscardReason.None,
+                null,
+                null,
+                mapName);
+        }
 
         public static GameHistoryRecordingStatus Recording(int activeRoundNumber, string? mapName = null)
         {
@@ -150,7 +153,7 @@ namespace BO2.Services
                 null);
         }
 
-        public static GameHistoryRecordingStatus Saved(string historyId)
+        public static GameHistoryRecordingStatus Saved(string historyId, string? mapName = null)
         {
             return new GameHistoryRecordingStatus(
                 GameHistoryRecordingState.Saved,
@@ -158,7 +161,7 @@ namespace BO2.Services
                 GameHistoryRecordingDiscardReason.None,
                 null,
                 historyId,
-                null);
+                mapName);
         }
     }
 
@@ -243,7 +246,7 @@ namespace BO2.Services
                 return;
             }
 
-            if (!TryGetConfirmedTown(
+            if (!TryGetSupportedMap(
                 snapshot.MapIdentityResult,
                 out GameMapIdentity? mapIdentity,
                 out GameHistoryRecordingUnavailableReason unavailableReason,
@@ -313,7 +316,7 @@ namespace BO2.Services
             }
             else if (Status.State != GameHistoryRecordingState.Saved)
             {
-                Status = GameHistoryRecordingStatus.WaitingForRoundOne;
+                Status = GameHistoryRecordingStatus.WaitingForRoundOne(mapIdentity.DisplayName);
             }
         }
 
@@ -438,7 +441,7 @@ namespace BO2.Services
                 gameDuration ?? _candidate.LatestGameDuration);
             _saveEntry(entry);
             _candidate = null;
-            Status = GameHistoryRecordingStatus.Saved(entry.Id);
+            Status = GameHistoryRecordingStatus.Saved(entry.Id, entry.MapIdentity.FriendlyName);
         }
 
         private void HandleBoxEvent(GameEvent gameEvent)
@@ -537,7 +540,7 @@ namespace BO2.Services
                 || !string.Equals(_observedGame.ProcessName, currentGame.ProcessName, StringComparison.Ordinal);
         }
 
-        private static bool TryGetConfirmedTown(
+        private static bool TryGetSupportedMap(
             GameMapIdentityReadResult? mapIdentityResult,
             out GameMapIdentity mapIdentity,
             out GameHistoryRecordingUnavailableReason unavailableReason,
@@ -552,7 +555,7 @@ namespace BO2.Services
                 return false;
             }
 
-            if (mapIdentityResult.Status == GameMapIdentityReadStatus.ConfirmedTown
+            if (mapIdentityResult.Status == GameMapIdentityReadStatus.SupportedMap
                 && mapIdentityResult.Identity is GameMapIdentity identity)
             {
                 if (string.IsNullOrWhiteSpace(identity.DisplayName))
@@ -570,7 +573,7 @@ namespace BO2.Services
             {
                 case GameMapIdentityReadStatus.UnsupportedMapIdentity:
                 case GameMapIdentityReadStatus.UnsupportedVariant:
-                    unavailableReason = GameHistoryRecordingUnavailableReason.RequiresTown;
+                    unavailableReason = GameHistoryRecordingUnavailableReason.RequiresSupportedMap;
                     discardReason = GameHistoryRecordingDiscardReason.UnsupportedMapIdentity;
                     break;
                 case GameMapIdentityReadStatus.Malformed:

@@ -123,6 +123,24 @@ namespace BO2.Tests.ViewModels
         }
 
         [Fact]
+        public void SavedMapProjection_ShowsFarmNameInSummaryAndDetail()
+        {
+            var viewModel = new GameHistoryPageViewModel();
+            viewModel.ReplaceSavedGames([CreateDetailedGame(
+                "farm-run",
+                "farm",
+                "zm_transit_gump_farm",
+                "Farm")]);
+
+            Assert.Equal("Farm", viewModel.SavedGames[0].MapNameText);
+
+            viewModel.SelectGame(viewModel.SavedGames[0]);
+
+            GameHistoryDetailViewModel detail = Assert.IsType<GameHistoryDetailViewModel>(viewModel.SelectedGame);
+            Assert.Equal("Farm", detail.MapNameText);
+        }
+
+        [Fact]
         public void DetailProjection_TracksMysteryBoxAveragesWithoutInternalEventNames()
         {
             var viewModel = new GameHistoryPageViewModel();
@@ -167,13 +185,19 @@ namespace BO2.Tests.ViewModels
         {
             var viewModel = new GameHistoryPageViewModel();
 
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Recording(3));
+            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Recording(3, "Farm"));
             Assert.Equal("GameHistoryRecordingStatusActiveTitle", viewModel.RecordingStatusTitle);
-            Assert.Equal("GameHistoryRecordingStatusActiveRoundFormat(3)", viewModel.RecordingStatusText);
+            Assert.Equal("GameHistoryRecordingStatusActiveMapRoundFormat(Farm, 3)", viewModel.RecordingStatusText);
+
+            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.WaitingForRoundOne("Farm"));
+            Assert.Equal("GameHistoryRecordingStatusWaitingForRoundOneMapFormat(Farm)", viewModel.RecordingStatusText);
+
+            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Saved("farm-run", "Farm"));
+            Assert.Equal("GameHistoryRecordingStatusSavedMapFormat(Farm)", viewModel.RecordingStatusText);
 
             viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Unavailable(
-                GameHistoryRecordingUnavailableReason.RequiresTown));
-            Assert.Equal("GameHistoryRecordingStatusRequiresTownText", viewModel.RecordingStatusText);
+                GameHistoryRecordingUnavailableReason.RequiresSupportedMap));
+            Assert.Equal("GameHistoryRecordingStatusRequiresSupportedMapText", viewModel.RecordingStatusText);
 
             viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Unavailable(
                 GameHistoryRecordingUnavailableReason.RequiresHookBackedEventMonitor));
@@ -193,9 +217,38 @@ namespace BO2.Tests.ViewModels
             Assert.Equal("GameHistoryRecordingStatusDiscardedConnectionEndedText", viewModel.RecordingStatusText);
         }
 
-        private static GameHistoryEntry CreateDetailedGame(string id)
+        [Fact]
+        public void ApplySnapshot_WhenSupportedFarmMapIsReady_ShowsFarmRecordingStatus()
         {
-            GameHistoryEntry game = CreateGame(id, 2026, 5, 10, 14, 30);
+            var viewModel = new GameHistoryPageViewModel();
+            DetectedGame detectedGame = CreateDetectedGame();
+
+            viewModel.ApplySnapshot(CreateConnectedSnapshot(
+                detectedGame,
+                GameMapIdentityReadResult.SupportedMap(
+                    detectedGame,
+                    new GameMapIdentity("zm_transit", "farm", "zm_transit_gump_farm", "Farm"))));
+
+            Assert.Equal("GameHistoryRecordingStatusActiveTitle", viewModel.RecordingStatusTitle);
+            Assert.Equal("GameHistoryRecordingStatusWaitingForRoundOneMapFormat(Farm)", viewModel.RecordingStatusText);
+        }
+
+        private static GameHistoryEntry CreateDetailedGame(
+            string id,
+            string startLocationToken = "town",
+            string internalMapToken = "zm_transit_gump_town",
+            string friendlyName = "Town")
+        {
+            GameHistoryEntry game = CreateGame(
+                id,
+                2026,
+                5,
+                10,
+                14,
+                30,
+                startLocationToken,
+                internalMapToken,
+                friendlyName);
             game.FinalRound = 12;
             game.FinalStats = CreateStats(12345, 98, 2, 4, 55);
             game.GameDuration = TimeSpan.FromSeconds(3723);
@@ -268,7 +321,10 @@ namespace BO2.Tests.ViewModels
             int month,
             int day,
             int hour,
-            int minute)
+            int minute,
+            string startLocationToken = "town",
+            string internalMapToken = "zm_transit_gump_town",
+            string friendlyName = "Town")
         {
             DateTimeOffset startedAt = CreateLocalDate(year, month, day, hour, minute);
             return new GameHistoryEntry
@@ -276,11 +332,43 @@ namespace BO2.Tests.ViewModels
                 Id = id,
                 StartedAt = startedAt,
                 EndedAt = startedAt.AddMinutes(30),
-                MapIdentity = new GameHistoryMapIdentity("zm_transit", "town", "zm_transit_gump_town", "Town"),
+                MapIdentity = new GameHistoryMapIdentity(
+                    "zm_transit",
+                    startLocationToken,
+                    internalMapToken,
+                    friendlyName),
                 FinalRound = 5,
                 FinalStats = CreateStats(1000, 20, 1, 0, 8),
                 GameDuration = TimeSpan.FromMinutes(30)
             };
+        }
+
+        private static GameConnectionSnapshot CreateConnectedSnapshot(
+            DetectedGame detectedGame,
+            GameMapIdentityReadResult? mapIdentityResult)
+        {
+            return new GameConnectionSnapshot(
+                detectedGame,
+                GameConnectionPhase.Connected,
+                null,
+                new GameConnectionEventMonitorSummary(
+                    GameConnectionEventMonitorState.Ready,
+                    new GameEventMonitorStatus(GameCompatibilityState.Compatible, 0, 0, 1, [])),
+                null,
+                GameConnectionCommandAvailability.Hidden,
+                GameConnectionCommandAvailability.VisibleEnabled,
+                mapIdentityResult);
+        }
+
+        private static DetectedGame CreateDetectedGame()
+        {
+            return new DetectedGame(
+                GameVariant.SteamZombies,
+                "Steam Zombies",
+                "t6zm",
+                1001,
+                PlayerStatAddressMap.SteamZombies,
+                null);
         }
 
         private static GameHistoryStats CreateStats(
