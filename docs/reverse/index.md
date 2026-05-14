@@ -9,6 +9,7 @@ These docs describe the current Steam Zombies `t6zm.exe` build used by BO2. All 
 - [Player stats and local player state](player-stats.md): managed read addresses and candidate field status.
 - [In-game and round timers](timers.md): solo v1 timer model, timing addresses, lifecycle behavior, and validation limits.
 - [Event pipeline and snapshot bridge](event-pipeline.md): native notify capture, polling fallback, snapshot v6, and stable read rules.
+- [Map support validation](map-validation.md): per-map promotion evidence and support decisions.
 - [Script VM, strings, and child variables](script-vm.md): `vm_notify`, script string resolution, and child-variable layout.
 - [Mystery-box and weapon alias tracking](box-weapon-tracking.md): current broad owner-scoped alias scan and remaining evidence gaps.
 - [Dvars and map identity](dvars-and-map-identity.md): read-only dvar lookup evidence, map tokens, and future configurator boundaries.
