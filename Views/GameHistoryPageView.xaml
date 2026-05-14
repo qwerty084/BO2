@@ -497,60 +497,94 @@
                         </StackPanel>
 
                         <Border Style="{StaticResource BO2CardBorderStyle}">
-                            <StackPanel Spacing="0">
+                            <StackPanel Spacing="18">
                                 <TextBlock
                                     Style="{StaticResource BO2CaptionTextBlockStyle}"
                                     Text="{Binding SelectedGame.BoxEventsEmptyText, Mode=OneWay}"
                                     Visibility="{Binding SelectedGame.IsBoxEventsEmpty, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
 
-                                <ItemsControl
-                                    ItemsSource="{Binding SelectedGame.BoxEvents, Mode=OneWay}"
+                                <StackPanel
+                                    Spacing="18"
                                     Visibility="{Binding SelectedGame.HasBoxEvents, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border
-                                                Padding="0,10"
-                                                BorderBrush="{ThemeResource BO2BorderBrush}"
-                                                BorderThickness="0,1,0,0">
-                                                <Grid ColumnSpacing="18" RowSpacing="6">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="2*" />
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="*" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Grid.RowDefinitions>
-                                                        <RowDefinition Height="Auto" />
-                                                        <RowDefinition Height="Auto" />
-                                                    </Grid.RowDefinitions>
+                                    <Grid ColumnSpacing="18">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="1.3*" />
+                                        </Grid.ColumnDefinitions>
 
-                                                    <TextBlock
-                                                        Grid.ColumnSpan="4"
-                                                        Style="{StaticResource BO2StatValueTextBlockStyle}"
-                                                        Text="{Binding PrimaryText, Mode=OneWay}"
-                                                        TextWrapping="WrapWholeWords" />
+                                        <StackPanel Spacing="2">
+                                            <TextBlock x:Uid="GameHistoryBoxRollsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                            <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding SelectedGame.BoxRollCountText, Mode=OneWay}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock x:Uid="GameHistoryBoxUniqueWeaponsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                            <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding SelectedGame.BoxUniqueWeaponCountText, Mode=OneWay}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Spacing="2">
+                                            <TextBlock x:Uid="GameHistoryBoxAveragePerRoundLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                            <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding SelectedGame.BoxAverageRollsPerRoundText, Mode=OneWay}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="3" Spacing="2">
+                                            <TextBlock x:Uid="GameHistoryBoxMostSeenLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                            <TextBlock
+                                                Style="{StaticResource BO2StatValueTextBlockStyle}"
+                                                Text="{Binding SelectedGame.BoxMostSeenWeaponText, Mode=OneWay}"
+                                                TextWrapping="WrapWholeWords" />
+                                        </StackPanel>
+                                    </Grid>
 
-                                                    <StackPanel Grid.Row="1" Spacing="2">
-                                                        <TextBlock x:Uid="GameHistoryBoxEventReceivedLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                                                        <TextBlock Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding ReceivedAtText, Mode=OneWay}" />
-                                                    </StackPanel>
-                                                    <StackPanel Grid.Row="1" Grid.Column="1" Spacing="2">
-                                                        <TextBlock x:Uid="GameHistoryBoxEventEventLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                                                        <TextBlock Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding EventNameText, Mode=OneWay}" TextWrapping="WrapWholeWords" />
-                                                    </StackPanel>
-                                                    <StackPanel Grid.Row="1" Grid.Column="2" Spacing="2">
-                                                        <TextBlock x:Uid="GameHistoryBoxEventRawWeaponLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                                                        <TextBlock Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding RawWeaponTokenText, Mode=OneWay}" TextWrapping="WrapWholeWords" />
-                                                    </StackPanel>
-                                                    <StackPanel Grid.Row="1" Grid.Column="3" Spacing="2">
-                                                        <TextBlock x:Uid="GameHistoryBoxEventStringValueLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                                                        <TextBlock Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding StringValueText, Mode=OneWay}" />
-                                                    </StackPanel>
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                    <Rectangle Height="1" Fill="{ThemeResource BO2BorderBrush}" />
+
+                                    <StackPanel Spacing="10">
+                                        <TextBlock
+                                            x:Uid="GameHistoryBoxAveragesTitle"
+                                            Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+
+                                        <Grid ColumnSpacing="18">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock x:Uid="GameHistoryBoxWeaponColumn" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                            <TextBlock Grid.Column="1" x:Uid="GameHistoryBoxRollsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                            <TextBlock Grid.Column="2" x:Uid="GameHistoryBoxAverageRoundColumn" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                            <TextBlock Grid.Column="3" x:Uid="GameHistoryBoxShareColumn" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        </Grid>
+
+                                        <ItemsControl ItemsSource="{Binding SelectedGame.BoxWeaponAverages, Mode=OneWay}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border
+                                                        Padding="0,10"
+                                                        BorderBrush="{ThemeResource BO2BorderBrush}"
+                                                        BorderThickness="0,1,0,0">
+                                                        <Grid ColumnSpacing="18">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="2*" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <TextBlock
+                                                                Style="{StaticResource BO2StatValueTextBlockStyle}"
+                                                                Text="{Binding WeaponText, Mode=OneWay}"
+                                                                TextWrapping="WrapWholeWords" />
+                                                            <TextBlock Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding RollCountText, Mode=OneWay}" />
+                                                            <TextBlock Grid.Column="2" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding AverageRoundText, Mode=OneWay}" />
+                                                            <TextBlock Grid.Column="3" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding ShareText, Mode=OneWay}" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
                     </StackPanel>

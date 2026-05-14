@@ -11,6 +11,8 @@ namespace BO2.ViewModels
 {
     public sealed class GameHistoryPageViewModel : INotifyPropertyChanged
     {
+        private const string CompletedBoxRollEventName = "randomization_done";
+
         public const string MissingValueText = "--";
 
         private readonly StatFormatter _statFormatter = new(MissingValueText);
@@ -273,6 +275,14 @@ namespace BO2.ViewModels
 
         private GameHistoryDetailViewModel CreateDetail(GameHistoryEntry game)
         {
+            IReadOnlyList<GameHistoryBoxEvent> boxRolls =
+            [
+                .. game.BoxEvents
+                    .Where(IsCompletedBoxRoll)
+                    .OrderBy(static boxEvent => boxEvent.ReceivedAt)
+            ];
+            IReadOnlyList<GameHistoryBoxWeaponAverageViewModel> boxWeaponAverages = CreateBoxWeaponAverages(boxRolls);
+
             return new GameHistoryDetailViewModel(
                 game.Id,
                 FormatDate(game.EndedAt),
@@ -283,9 +293,12 @@ namespace BO2.ViewModels
                 [.. game.Rounds
                     .OrderBy(static round => round.RoundNumber)
                     .Select(CreateRound)],
-                [.. game.BoxEvents
-                    .OrderBy(static boxEvent => boxEvent.ReceivedAt)
-                    .Select(CreateBoxEvent)]);
+                [.. boxRolls.Select(CreateBoxRoll)],
+                boxWeaponAverages,
+                FormatCount(boxRolls.Count),
+                FormatCount(boxWeaponAverages.Count),
+                FormatAverageRollsPerRound(boxRolls.Count, game.FinalRound),
+                boxWeaponAverages.Count == 0 ? MissingValueText : boxWeaponAverages[0].WeaponText);
         }
 
         private GameHistoryRoundViewModel CreateRound(GameHistoryRound round)
@@ -298,32 +311,63 @@ namespace BO2.ViewModels
                 CreateStatsDisplay(round.DeltaStats, isDelta: true));
         }
 
-        private GameHistoryBoxEventViewModel CreateBoxEvent(GameHistoryBoxEvent boxEvent)
+        private GameHistoryBoxEventViewModel CreateBoxRoll(GameHistoryBoxEvent boxEvent)
         {
             string receivedAtText = FormatDate(boxEvent.ReceivedAt);
             string roundText = AppStrings.Format("GameHistoryRoundTitleFormat", boxEvent.RoundNumber);
-            string weaponText = string.IsNullOrWhiteSpace(boxEvent.WeaponDisplayName)
-                ? AppStrings.Get("GameHistoryBoxEventUnknownWeapon")
-                : boxEvent.WeaponDisplayName!;
-            string rawWeaponTokenText = string.IsNullOrWhiteSpace(boxEvent.RawWeaponToken)
-                ? MissingValueText
-                : boxEvent.RawWeaponToken!;
-            string stringValueText = boxEvent.StringValue.ToString(CultureInfo.CurrentCulture);
+            string weaponText = FormatBoxWeapon(boxEvent);
             string primaryText = AppStrings.Format(
-                "GameHistoryBoxEventPrimaryFormat",
+                "GameHistoryBoxRollPrimaryFormat",
                 roundText,
-                boxEvent.EventName,
                 weaponText);
 
             return new GameHistoryBoxEventViewModel(
                 receivedAtText,
                 roundText,
-                boxEvent.EventName,
                 weaponText,
-                rawWeaponTokenText,
-                stringValueText,
-                boxEvent.OwnerId,
                 primaryText);
+        }
+
+        private IReadOnlyList<GameHistoryBoxWeaponAverageViewModel> CreateBoxWeaponAverages(
+            IReadOnlyList<GameHistoryBoxEvent> boxRolls)
+        {
+            int totalRolls = boxRolls.Count;
+            if (totalRolls == 0)
+            {
+                return [];
+            }
+
+            return
+            [
+                .. boxRolls
+                    .GroupBy(FormatBoxWeapon, StringComparer.CurrentCultureIgnoreCase)
+                    .Select(group => new
+                    {
+                        WeaponText = group.Key,
+                        RollCount = group.Count(),
+                        AverageRound = group.Average(static boxEvent => boxEvent.RoundNumber),
+                        Share = (double)group.Count() / totalRolls
+                    })
+                    .OrderByDescending(group => group.RollCount)
+                    .ThenBy(group => group.WeaponText, StringComparer.CurrentCultureIgnoreCase)
+                    .Select(group => new GameHistoryBoxWeaponAverageViewModel(
+                        group.WeaponText,
+                        FormatCount(group.RollCount),
+                        FormatAverageRound(group.AverageRound),
+                        FormatPercent(group.Share)))
+            ];
+        }
+
+        private static bool IsCompletedBoxRoll(GameHistoryBoxEvent boxEvent)
+        {
+            return string.Equals(boxEvent.EventName, CompletedBoxRollEventName, StringComparison.Ordinal);
+        }
+
+        private static string FormatBoxWeapon(GameHistoryBoxEvent boxEvent)
+        {
+            return string.IsNullOrWhiteSpace(boxEvent.WeaponDisplayName)
+                ? AppStrings.Get("GameHistoryBoxEventUnknownWeapon")
+                : boxEvent.WeaponDisplayName!;
         }
 
         private GameHistoryStatsDisplayViewModel CreateStatsDisplay(GameHistoryStats stats, bool isDelta)
@@ -341,6 +385,31 @@ namespace BO2.ViewModels
             return isDelta
                 ? value.ToString("+#,0;-#,0;0", CultureInfo.CurrentCulture)
                 : _statFormatter.FormatStat(value);
+        }
+
+        private static string FormatCount(int value)
+        {
+            return value.ToString("N0", CultureInfo.CurrentCulture);
+        }
+
+        private static string FormatAverageRound(double value)
+        {
+            return value.ToString("0.#", CultureInfo.CurrentCulture);
+        }
+
+        private static string FormatAverageRollsPerRound(int rollCount, int finalRound)
+        {
+            if (rollCount == 0 || finalRound <= 0)
+            {
+                return MissingValueText;
+            }
+
+            return ((double)rollCount / finalRound).ToString("0.#", CultureInfo.CurrentCulture);
+        }
+
+        private static string FormatPercent(double value)
+        {
+            return value.ToString("P0", CultureInfo.CurrentCulture);
         }
 
         private static string FormatDate(DateTimeOffset date)
@@ -466,7 +535,12 @@ namespace BO2.ViewModels
             string gameDurationText,
             GameHistoryStatsDisplayViewModel finalStats,
             IReadOnlyList<GameHistoryRoundViewModel> rounds,
-            IReadOnlyList<GameHistoryBoxEventViewModel> boxEvents)
+            IReadOnlyList<GameHistoryBoxEventViewModel> boxEvents,
+            IReadOnlyList<GameHistoryBoxWeaponAverageViewModel> boxWeaponAverages,
+            string boxRollCountText,
+            string boxUniqueWeaponCountText,
+            string boxAverageRollsPerRoundText,
+            string boxMostSeenWeaponText)
         {
             Id = id;
             DateText = dateText;
@@ -478,6 +552,12 @@ namespace BO2.ViewModels
                 new ObservableCollection<GameHistoryRoundViewModel>(rounds));
             BoxEvents = new ReadOnlyObservableCollection<GameHistoryBoxEventViewModel>(
                 new ObservableCollection<GameHistoryBoxEventViewModel>(boxEvents));
+            BoxWeaponAverages = new ReadOnlyObservableCollection<GameHistoryBoxWeaponAverageViewModel>(
+                new ObservableCollection<GameHistoryBoxWeaponAverageViewModel>(boxWeaponAverages));
+            BoxRollCountText = boxRollCountText;
+            BoxUniqueWeaponCountText = boxUniqueWeaponCountText;
+            BoxAverageRollsPerRoundText = boxAverageRollsPerRoundText;
+            BoxMostSeenWeaponText = boxMostSeenWeaponText;
         }
 
         public string Id { get; }
@@ -495,6 +575,16 @@ namespace BO2.ViewModels
         public ReadOnlyObservableCollection<GameHistoryRoundViewModel> Rounds { get; }
 
         public ReadOnlyObservableCollection<GameHistoryBoxEventViewModel> BoxEvents { get; }
+
+        public ReadOnlyObservableCollection<GameHistoryBoxWeaponAverageViewModel> BoxWeaponAverages { get; }
+
+        public string BoxRollCountText { get; }
+
+        public string BoxUniqueWeaponCountText { get; }
+
+        public string BoxAverageRollsPerRoundText { get; }
+
+        public string BoxMostSeenWeaponText { get; }
 
         public bool HasBoxEvents => BoxEvents.Count > 0;
 
@@ -551,27 +641,30 @@ namespace BO2.ViewModels
     public sealed class GameHistoryBoxEventViewModel(
         string receivedAtText,
         string roundText,
-        string eventNameText,
         string weaponText,
-        string rawWeaponTokenText,
-        string stringValueText,
-        uint ownerId,
         string primaryText)
     {
         public string ReceivedAtText { get; } = receivedAtText;
 
         public string RoundText { get; } = roundText;
 
-        public string EventNameText { get; } = eventNameText;
-
         public string WeaponText { get; } = weaponText;
 
-        public string RawWeaponTokenText { get; } = rawWeaponTokenText;
-
-        public string StringValueText { get; } = stringValueText;
-
-        public uint OwnerId { get; } = ownerId;
-
         public string PrimaryText { get; } = primaryText;
+    }
+
+    public sealed class GameHistoryBoxWeaponAverageViewModel(
+        string weaponText,
+        string rollCountText,
+        string averageRoundText,
+        string shareText)
+    {
+        public string WeaponText { get; } = weaponText;
+
+        public string RollCountText { get; } = rollCountText;
+
+        public string AverageRoundText { get; } = averageRoundText;
+
+        public string ShareText { get; } = shareText;
     }
 }

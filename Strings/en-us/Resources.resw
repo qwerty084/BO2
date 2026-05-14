@@ -673,30 +673,42 @@
     <value>Delta</value>
   </data>
   <data name="GameHistoryBoxEventsTitle.Text" xml:space="preserve">
-    <value>Box events</value>
+    <value>Mystery Box</value>
   </data>
   <data name="GameHistoryBoxEventsDescription.Text" xml:space="preserve">
-    <value>Saved Mystery Box activity for this game. Raw weapon tokens remain visible for unknown weapons.</value>
+    <value>Completed Mystery Box rolls for this game. Averages update from captured roll results.</value>
   </data>
   <data name="GameHistoryBoxEventsEmpty" xml:space="preserve">
-    <value>No box events were saved for this game.</value>
+    <value>No completed Mystery Box rolls were saved for this game.</value>
   </data>
   <data name="GameHistoryBoxEventUnknownWeapon" xml:space="preserve">
     <value>Unknown weapon</value>
   </data>
-  <data name="GameHistoryBoxEventPrimaryFormat" xml:space="preserve">
-    <value>{0} - {1}: {2}</value>
+  <data name="GameHistoryBoxRollPrimaryFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
   </data>
-  <data name="GameHistoryBoxEventReceivedLabel.Text" xml:space="preserve">
-    <value>Received</value>
+  <data name="GameHistoryBoxRollsLabel.Text" xml:space="preserve">
+    <value>Rolls</value>
   </data>
-  <data name="GameHistoryBoxEventEventLabel.Text" xml:space="preserve">
-    <value>Event</value>
+  <data name="GameHistoryBoxUniqueWeaponsLabel.Text" xml:space="preserve">
+    <value>Weapons</value>
   </data>
-  <data name="GameHistoryBoxEventRawWeaponLabel.Text" xml:space="preserve">
-    <value>Raw weapon</value>
+  <data name="GameHistoryBoxAveragePerRoundLabel.Text" xml:space="preserve">
+    <value>Avg rolls/round</value>
   </data>
-  <data name="GameHistoryBoxEventStringValueLabel.Text" xml:space="preserve">
-    <value>Value</value>
+  <data name="GameHistoryBoxMostSeenLabel.Text" xml:space="preserve">
+    <value>Most seen</value>
+  </data>
+  <data name="GameHistoryBoxAveragesTitle.Text" xml:space="preserve">
+    <value>Weapon averages</value>
+  </data>
+  <data name="GameHistoryBoxWeaponColumn.Text" xml:space="preserve">
+    <value>Weapon</value>
+  </data>
+  <data name="GameHistoryBoxAverageRoundColumn.Text" xml:space="preserve">
+    <value>Avg round</value>
+  </data>
+  <data name="GameHistoryBoxShareColumn.Text" xml:space="preserve">
+    <value>Share</value>
   </data>
 </root>

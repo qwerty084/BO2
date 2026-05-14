@@ -96,7 +96,7 @@ namespace BO2.Tests.ViewModels
         }
 
         [Fact]
-        public void DetailProjection_KeepsBoxEventOwnerSecondaryAndRawUnknownWeaponInspectable()
+        public void DetailProjection_TracksMysteryBoxAveragesWithoutInternalEventNames()
         {
             var viewModel = new GameHistoryPageViewModel();
             viewModel.ReplaceSavedGames([CreateDetailedGame("town-run")]);
@@ -105,17 +105,34 @@ namespace BO2.Tests.ViewModels
             GameHistoryDetailViewModel detail = Assert.IsType<GameHistoryDetailViewModel>(viewModel.SelectedGame);
 
             Assert.True(detail.HasBoxEvents);
-            Assert.Equal(2, detail.BoxEvents.Count);
-            Assert.Equal("Ray Gun", detail.BoxEvents[0].WeaponText);
-            Assert.Equal("ray_gun_zm", detail.BoxEvents[0].RawWeaponTokenText);
-            Assert.Equal((uint)7, detail.BoxEvents[0].OwnerId);
-            Assert.DoesNotContain("7", detail.BoxEvents[0].PrimaryText, StringComparison.Ordinal);
+            Assert.Equal(3, detail.BoxEvents.Count);
+            Assert.Equal("3", detail.BoxRollCountText);
+            Assert.Equal("2", detail.BoxUniqueWeaponCountText);
+            Assert.Equal((3d / 12).ToString("0.#", CultureInfo.CurrentCulture), detail.BoxAverageRollsPerRoundText);
+            Assert.Equal("Ray Gun", detail.BoxMostSeenWeaponText);
 
-            Assert.Equal("GameHistoryBoxEventUnknownWeapon", detail.BoxEvents[1].WeaponText);
-            Assert.Equal("zm_weap_future", detail.BoxEvents[1].RawWeaponTokenText);
-            Assert.Equal((uint)42, detail.BoxEvents[1].OwnerId);
-            Assert.DoesNotContain("42", detail.BoxEvents[1].PrimaryText, StringComparison.Ordinal);
-            Assert.DoesNotContain("zm_weap_future", detail.BoxEvents[1].PrimaryText, StringComparison.Ordinal);
+            Assert.Equal("Ray Gun", detail.BoxEvents[0].WeaponText);
+            Assert.Equal("Ray Gun", detail.BoxEvents[1].WeaponText);
+            Assert.Equal("GameHistoryBoxEventUnknownWeapon", detail.BoxEvents[2].WeaponText);
+
+            Assert.Equal(2, detail.BoxWeaponAverages.Count);
+            Assert.Equal("Ray Gun", detail.BoxWeaponAverages[0].WeaponText);
+            Assert.Equal("2", detail.BoxWeaponAverages[0].RollCountText);
+            Assert.Equal(2.5.ToString("0.#", CultureInfo.CurrentCulture), detail.BoxWeaponAverages[0].AverageRoundText);
+            Assert.Equal((2d / 3).ToString("P0", CultureInfo.CurrentCulture), detail.BoxWeaponAverages[0].ShareText);
+
+            Assert.Equal("GameHistoryBoxEventUnknownWeapon", detail.BoxWeaponAverages[1].WeaponText);
+            Assert.Equal("1", detail.BoxWeaponAverages[1].RollCountText);
+            Assert.Equal("4", detail.BoxWeaponAverages[1].AverageRoundText);
+            Assert.Equal((1d / 3).ToString("P0", CultureInfo.CurrentCulture), detail.BoxWeaponAverages[1].ShareText);
+
+            Assert.All(detail.BoxEvents, boxEvent =>
+            {
+                Assert.DoesNotContain("randomization_done", boxEvent.PrimaryText, StringComparison.Ordinal);
+                Assert.DoesNotContain("user_grabbed_weapon", boxEvent.PrimaryText, StringComparison.Ordinal);
+                Assert.DoesNotContain("ray_gun_zm", boxEvent.PrimaryText, StringComparison.Ordinal);
+                Assert.DoesNotContain("zm_weap_future", boxEvent.PrimaryText, StringComparison.Ordinal);
+            });
         }
 
         [Fact]
@@ -188,11 +205,31 @@ namespace BO2.Tests.ViewModels
                 {
                     ReceivedAt = CreateLocalDate(2026, 5, 10, 14, 46),
                     RoundNumber = 2,
+                    EventName = "user_grabbed_weapon",
+                    RawWeaponToken = "ray_gun_zm",
+                    WeaponDisplayName = "Ray Gun",
+                    OwnerId = 7,
+                    StringValue = 200
+                },
+                new GameHistoryBoxEvent
+                {
+                    ReceivedAt = CreateLocalDate(2026, 5, 10, 14, 47),
+                    RoundNumber = 3,
+                    EventName = "randomization_done",
+                    RawWeaponToken = "ray_gun_zm",
+                    WeaponDisplayName = "Ray Gun",
+                    OwnerId = 7,
+                    StringValue = 101
+                },
+                new GameHistoryBoxEvent
+                {
+                    ReceivedAt = CreateLocalDate(2026, 5, 10, 14, 48),
+                    RoundNumber = 4,
                     EventName = "randomization_done",
                     RawWeaponToken = "zm_weap_future",
                     WeaponDisplayName = null,
                     OwnerId = 42,
-                    StringValue = 101
+                    StringValue = 102
                 }
             ];
             return game;
