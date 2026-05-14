@@ -102,6 +102,25 @@
                 ItemsSource="{Binding SavedGames, Mode=OneWay}"
                 SelectionMode="None"
                 Visibility="{Binding HasSavedGames, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                <ListView.Header>
+                    <Grid
+                        Margin="0,0,0,10"
+                        ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            x:Uid="GameHistorySavedGamesTitle"
+                            AutomationProperties.HeadingLevel="Level2"
+                            Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                        <TextBlock
+                            Grid.Column="1"
+                            HorizontalAlignment="Right"
+                            Style="{StaticResource BO2CaptionTextBlockStyle}"
+                            Text="{Binding DataContext.TrackedGameCountText, ElementName=Root, Mode=OneWay}" />
+                    </Grid>
+                </ListView.Header>
                 <ListView.ItemTemplate>
                     <DataTemplate>
                         <Border
@@ -214,10 +233,15 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock
-                            x:Uid="GameHistorySavedGamesTitle"
-                            AutomationProperties.HeadingLevel="Level2"
-                            Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                x:Uid="GameHistorySavedGamesTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                            <TextBlock
+                                Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                Text="{Binding TrackedGameCountText, Mode=OneWay}" />
+                        </StackPanel>
                         <Button
                             Grid.Column="1"
                             AutomationProperties.Name="Hide saved games sidebar"

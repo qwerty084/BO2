@@ -96,6 +96,8 @@ namespace BO2.ViewModels
 
         public bool IsHistoryRailReopenButtonVisible => IsDetailVisible && !_isHistoryRailOpen;
 
+        public string TrackedGameCountText => AppStrings.Format("GameHistoryTrackedGameCountFormat", SavedGames.Count);
+
         public string EmptyStateTitle => AppStrings.Get("GameHistoryEmptyTitle");
 
         public string EmptyStateText => AppStrings.Get("GameHistoryEmptyText");
@@ -121,6 +123,7 @@ namespace BO2.ViewModels
 
             OnPropertyChanged(nameof(HasSavedGames));
             OnPropertyChanged(nameof(IsEmptyVisible));
+            OnPropertyChanged(nameof(TrackedGameCountText));
 
             GameHistorySummaryViewModel? summaryToSelect = null;
             if (selectedId is not null)

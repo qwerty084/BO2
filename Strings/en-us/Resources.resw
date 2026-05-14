@@ -648,6 +648,9 @@
   <data name="GameHistorySavedGamesTitle.Text" xml:space="preserve">
     <value>Saved games</value>
   </data>
+  <data name="GameHistoryTrackedGameCountFormat" xml:space="preserve">
+    <value>Tracked games: {0}</value>
+  </data>
   <data name="GameHistoryDateLabel.Text" xml:space="preserve">
     <value>Date</value>
   </data>

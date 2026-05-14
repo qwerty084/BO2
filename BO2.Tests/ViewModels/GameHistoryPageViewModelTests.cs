@@ -21,6 +21,7 @@ namespace BO2.Tests.ViewModels
 
             Assert.Equal(["newest", "middle", "oldest"], viewModel.SavedGames.Select(game => game.Id));
             Assert.Equal("newest", viewModel.SelectedGameSummary?.Id);
+            Assert.Equal("GameHistoryTrackedGameCountFormat(3)", viewModel.TrackedGameCountText);
             Assert.True(viewModel.SavedGames[0].IsSelected);
             Assert.False(viewModel.SavedGames[1].IsSelected);
         }
@@ -34,6 +35,7 @@ namespace BO2.Tests.ViewModels
             Assert.True(viewModel.IsListVisible);
             Assert.True(viewModel.IsEmptyVisible);
             Assert.Equal("GameHistoryEmptyTitle", viewModel.EmptyStateTitle);
+            Assert.Equal("GameHistoryTrackedGameCountFormat(0)", viewModel.TrackedGameCountText);
             Assert.Equal("GameHistoryRecordingStatusWaitingTitle", viewModel.RecordingStatusTitle);
         }
 
