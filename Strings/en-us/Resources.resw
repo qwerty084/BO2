@@ -577,7 +577,7 @@
     <value>No saved games yet</value>
   </data>
   <data name="GameHistoryEmptyText" xml:space="preserve">
-    <value>Completed games on every identified round-based Black Ops II Zombies map appear here after hook-backed Event Monitor data reports a trusted game-over event.</value>
+    <value>Completed games from supported Black Ops II Zombies maps will appear here after they end.</value>
   </data>
   <data name="GameHistoryRecordingStatusWaitingTitle" xml:space="preserve">
     <value>History recording idle</value>
@@ -589,22 +589,22 @@
     <value>Recording game history</value>
   </data>
   <data name="GameHistoryRecordingStatusActiveText" xml:space="preserve">
-    <value>Recording is active for this hook-backed round-based map session. The game will save after a trusted game-over event.</value>
+    <value>This game is being recorded. It will appear in Game History after the game ends.</value>
   </data>
   <data name="GameHistoryRecordingStatusActiveMapFormat" xml:space="preserve">
-    <value>Recording is active for this hook-backed {0} session. The game will save after a trusted game-over event.</value>
+    <value>{0} is being recorded. It will appear in Game History after the game ends.</value>
   </data>
   <data name="GameHistoryRecordingStatusActiveRoundFormat" xml:space="preserve">
-    <value>Recording is active for this hook-backed round-based map session on round {0}. The game will save after a trusted game-over event.</value>
+    <value>This game is being recorded. It will appear in Game History after the game ends.</value>
   </data>
   <data name="GameHistoryRecordingStatusActiveMapRoundFormat" xml:space="preserve">
-    <value>Recording is active for this hook-backed {0} session on round {1}. The game will save after a trusted game-over event.</value>
+    <value>{0} is being recorded. It will appear in Game History after the game ends.</value>
   </data>
   <data name="GameHistoryRecordingStatusWaitingForRoundOneText" xml:space="preserve">
-    <value>Identified round-based map and hook-backed Event Monitor capture are ready. Recording will start from an observed round 1 start event.</value>
+    <value>Ready to record. Start round 1 and this game will be tracked.</value>
   </data>
   <data name="GameHistoryRecordingStatusWaitingForRoundOneMapFormat" xml:space="preserve">
-    <value>{0} and hook-backed Event Monitor capture are ready. Recording will start from an observed round 1 start event.</value>
+    <value>{0} is ready to record. Start round 1 and this game will be tracked.</value>
   </data>
   <data name="GameHistoryRecordingStatusSavedTitle" xml:space="preserve">
     <value>Game saved</value>
@@ -619,25 +619,25 @@
     <value>Identified map required</value>
   </data>
   <data name="GameHistoryRecordingStatusRequiresSupportedMapText" xml:space="preserve">
-    <value>Game History records completed games on every round-based Black Ops II Zombies map only when the current map is identified and hook-backed Event Monitor data is trusted. Unsupported or unknown map sessions are not saved.</value>
+    <value>Game History saves completed games on supported Zombies maps. Unknown or unsupported maps are not saved.</value>
   </data>
   <data name="GameHistoryRecordingStatusRequiresHookTitle" xml:space="preserve">
-    <value>Hook-backed Event Monitor required</value>
+    <value>Live game data required</value>
   </data>
   <data name="GameHistoryRecordingStatusRequiresHookText" xml:space="preserve">
-    <value>Recording requires BO2Monitor hook-backed Event Monitor capture. Polling fallback, disabled capture, unsupported monitor state, or missing monitor data will not save history.</value>
+    <value>Game History needs live game data from BO2Monitor. If tracking is off or unavailable, this game will not be saved.</value>
   </data>
   <data name="GameHistoryRecordingStatusDiscardedTitle" xml:space="preserve">
-    <value>Last candidate discarded</value>
+    <value>Game was not saved</value>
   </data>
   <data name="GameHistoryRecordingStatusDiscardedSequenceText" xml:space="preserve">
-    <value>The candidate session was discarded because lifecycle order became untrusted, sequence data had gaps, or lifecycle-relevant Event Monitor events were dropped.</value>
+    <value>This game could not be saved because some live game events were missed.</value>
   </data>
   <data name="GameHistoryRecordingStatusDiscardedMissingStatsText" xml:space="preserve">
-    <value>The candidate session was discarded because required points, kills, downs, revives, or headshots were missing from a round baseline or close.</value>
+    <value>This game could not be saved because some round stats were missing.</value>
   </data>
   <data name="GameHistoryRecordingStatusDiscardedConnectionEndedText" xml:space="preserve">
-    <value>The candidate session was discarded because the detected game changed, the session disconnected, or the app shut down before a trusted game-over save.</value>
+    <value>This game could not be saved because tracking stopped before the game ended.</value>
   </data>
   <data name="GameHistoryFinalRoundFormat" xml:space="preserve">
     <value>Round {0}</value>
