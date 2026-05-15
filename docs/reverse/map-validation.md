@@ -14,6 +14,37 @@ Before a map can be added to the supported map table:
 - Box events must publish, and weapon alias capture must be recorded as present or absent, when a map-specific box spin is part of the validation scope. Remaining standalone map validation after the 2026-05-15 plan does not require a per-map mystery-box spin unless map-specific notify differences are found.
 - Open risks must be explicit.
 
+## Nuketown
+
+Status: validated
+Support decision: Nuketown is ready to add to the supported map table as a base-map-token-only standalone identity.
+Validation package: `../../.scratch/all-bo2-map-tracking/nuketown-validation.md`
+
+Nuketown is the third remaining standalone target from the remaining round-based Black Ops II Zombies map plan. The local Steam install contains `zone\all\zm_nuked.ff` and `zone\all\zm_nuked_patch.ff`.
+
+Current evidence:
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Target selection | confirmed | Nuketown was selected as the next standalone target and local fastfiles `zm_nuked.ff` and `zm_nuked_patch.ff` were present. |
+| Map identity | confirmed | Lobby capture observed `ui_mapname=zm_nuked` while `mapname=zm_prison` was stale from the prior Mob of the Dead run. Active-match captures observed `mapname=zm_nuked` and `ui_mapname=zm_nuked`. `ui_zm_mapstartlocation` was present as `nuked`, but it did not vary and should not participate in standalone identity resolution. |
+| Mode dvars | confirmed irrelevant | Active captures observed `g_gametype=zstandard`, `ui_gametype=zstandard`, and `party_gametype=Survival`. These values are corroborating evidence only and should not be required as standalone discriminators. |
+| Lifecycle events | confirmed | Nuketown published `start_of_round` value `1`, `end_of_round` value `2`, next `start_of_round` value `2`, and final `end_game` through Event Monitor shared memory. |
+| Player stats | confirmed | Current Game UI read plausible required stats during Nuketown: points changed `600` -> `1,250` -> `1,430`, kills changed `1` -> `5` -> `6`, downs changed `0` -> `2`, revives changed `0` -> `1`, and headshots remained readable at `0`. |
+| Timing | confirmed | Current Game UI showed active plausible timing: round 1 `0:21` / `0:21`, later round 1 `1:14` / `1:14`, round 2 `2:00` / `0:20`, and game over `2:34` / `0:53`. |
+| Event Monitor health | confirmed | Final shared-memory capture reported snapshot version `6`, compatibility state `2`, no dropped events, no dropped notifies, published notify count `13`, and event count `17`. The first 13 records were retained from the prior run; Nuketown evidence starts at sequence `14`. |
+
+Promotion result:
+
+- Nuketown is ready for the implementation slice that adds a supported map identity from active `mapname=zm_nuked` to internal token `zm_nuked` and friendly name `Nuketown`.
+- The resolver should not require a Green Run start-location token or mode discriminator for Nuketown.
+
+Open risks:
+
+- `mapname` was stale as `zm_prison` in the Nuketown lobby before spawn, while `ui_mapname=zm_nuked` identified the lobby target. Active-match `mapname=zm_nuked` is the promotion evidence.
+- The Event Monitor ring still contained retained Mob of the Dead records from the prior validation run. Nuketown evidence is isolated to sequence `14` and later, with no dropped event or notify counters.
+- This validation does not promote Origins (`zm_tomb`).
+
 ## Mob of the Dead
 
 Status: validated
@@ -43,7 +74,7 @@ Open risks:
 
 - `mapname` was stale as `zm_highrise` in the Mob of the Dead lobby before spawn, while `ui_mapname=zm_prison` identified the lobby target. Active-match `mapname=zm_prison` is the promotion evidence.
 - `party_gametype` remained stale as `TranZit` during the Mob of the Dead validation run, so it must not be used as a standalone map discriminator.
-- This validation does not promote other remaining standalone maps such as Nuketown (`zm_nuked`) or Origins (`zm_tomb`).
+- This validation does not promote other remaining standalone maps such as Origins (`zm_tomb`).
 
 ## Die Rise
 
@@ -74,7 +105,7 @@ Open risks:
 
 - `mapname` was empty in the Die Rise lobby before spawn, while `ui_mapname=zm_highrise` identified the lobby target. Active-match `mapname=zm_highrise` is the promotion evidence.
 - `party_gametype` remained stale as `TranZit` during the Die Rise validation run, so it must not be used as a standalone map discriminator.
-- This validation does not promote other remaining standalone maps such as Nuketown (`zm_nuked`) or Origins (`zm_tomb`).
+- This validation does not promote other remaining standalone maps such as Mob of the Dead (`zm_prison`), Nuketown (`zm_nuked`), or Origins (`zm_tomb`).
 
 ## Buried
 
