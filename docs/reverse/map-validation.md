@@ -50,22 +50,26 @@ Open risk:
 
 ## Remaining Green Run
 
-Status: in progress
+Status: completed
 Validation package: `../../.scratch/all-bo2-map-tracking/green-run-validation.md`
 
-Remaining Green Run validation has not promoted any additional maps yet. A static pass on 2026-05-14 inspected the local Steam install at `C:\Program Files (x86)\Steam\steamapps\common\Call of Duty Black Ops II` and found Green Run fastfile candidates in `zone\all`.
+Remaining app-relevant Green Run validation has not promoted any additional maps yet. A static pass on 2026-05-14 inspected the local Steam install at `C:\Program Files (x86)\Steam\steamapps\common\Call of Duty Black Ops II` and found Green Run fastfile candidates in `zone\all`.
 
 Current target candidates:
 
-| Target | Expected base map token | Expected start-location token | Candidate internal token | Status |
+| Target | Observed base map token | Observed start-location token | Mode discriminator | Status |
 | --- | --- | --- | --- | --- |
-| Bus Depot Survival | `zm_transit` | observed `transit` | unresolved; do not assume `zm_transit_gump_busstation` | runtime validated, identity blocked by TranZit comparison |
-| TranZit | `zm_transit` | unknown; must be observed | `zm_transit` unless live evidence proves otherwise | pending live validation |
-| Diner | `zm_transit` | likely `diner` if exposed as a selectable session | `zm_transit_gump_diner` | conditional, pending live validation |
+| Bus Depot Survival | `zm_transit` | `transit` | `ui_gametype=zstandard`; `ui_zm_gamemodegroup=zsurvival`; `party_gametype=Survival` | runtime validated; promote only with mode-aware identity |
+| TranZit | `zm_transit` | `transit` | `ui_gametype=zclassic`; `ui_zm_gamemodegroup=zclassic`; `party_gametype=TranZit` | runtime validated by prior live run; promote only with mode-aware identity |
+| Diner | not applicable | not applicable | Turned-only | out of scope; do not promote for this app |
 
 Open risks:
 
 - Static fastfile names are not promotion evidence. Each map still needs live identity, lifecycle, Player Stats Read, Game Timing Read, box event, and weapon alias validation.
 - The 2026-05-14 Bus Depot Survival live run observed `mapname=zm_transit`, `ui_mapname=zm_transit`, and `ui_zm_mapstartlocation=transit` in lobby, active rounds, and post-game. Lifecycle, stats, timing, box aliases, and `end_game` worked with no dropped counters.
-- Bus Depot Survival is not ready to promote because the identity token `transit` may be shared with full TranZit. Validate full TranZit next before assigning a friendly name to `transit`.
+- The 2026-05-15 TranZit re-check observed the same `zm_transit` / `transit` identity tokens, with `g_gametype=zclassic`, `ui_gametype=zclassic`, and `party_gametype=TranZit`.
+- The 2026-05-15 Bus Depot Survival lobby and active round 1 captures observed the same `zm_transit` / `transit` identity tokens, with `g_gametype=zstandard`, `ui_gametype=zstandard`, and `party_gametype=Survival`.
+- `ui_zm_gamemodegroup` is a type `7` enum dvar, not a string dvar. Its observed enum domain is `0=zclassic`, `1=zsurvival`, `2=zencounter`; Bus Depot Survival observed current index `1`, while the TranZit string-reader capture observed current slot `0x00000000`, consistent with index `0`.
+- Bus Depot Survival and TranZit must not be promoted from static fastfile names or from `zm_transit` / `transit` alone. Issue 4 needs a mode-aware identity resolver before assigning the correct friendly name.
 - `bus_depot` is only a previous test placeholder. `busstation` was a static fastfile hypothesis, but it was not the observed dvar value for the live Bus Depot Survival run.
+- Diner is Turned-only and not relevant to this Game History app, so the `zm_transit_gump_diner.ff` static fastfile candidate is not a support target.
