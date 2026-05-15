@@ -577,7 +577,7 @@
     <value>No saved games yet</value>
   </data>
   <data name="GameHistoryEmptyText" xml:space="preserve">
-    <value>Completed hook-backed games on supported maps will appear here after a trusted game-over event.</value>
+    <value>Completed games on every identified round-based Black Ops II Zombies map appear here after hook-backed Event Monitor data reports a trusted game-over event.</value>
   </data>
   <data name="GameHistoryRecordingStatusWaitingTitle" xml:space="preserve">
     <value>History recording idle</value>
@@ -589,19 +589,19 @@
     <value>Recording game history</value>
   </data>
   <data name="GameHistoryRecordingStatusActiveText" xml:space="preserve">
-    <value>Recording is active for this hook-backed supported-map session. The game will save after a trusted game-over event.</value>
+    <value>Recording is active for this hook-backed round-based map session. The game will save after a trusted game-over event.</value>
   </data>
   <data name="GameHistoryRecordingStatusActiveMapFormat" xml:space="preserve">
     <value>Recording is active for this hook-backed {0} session. The game will save after a trusted game-over event.</value>
   </data>
   <data name="GameHistoryRecordingStatusActiveRoundFormat" xml:space="preserve">
-    <value>Recording is active for this hook-backed supported-map session on round {0}. The game will save after a trusted game-over event.</value>
+    <value>Recording is active for this hook-backed round-based map session on round {0}. The game will save after a trusted game-over event.</value>
   </data>
   <data name="GameHistoryRecordingStatusActiveMapRoundFormat" xml:space="preserve">
     <value>Recording is active for this hook-backed {0} session on round {1}. The game will save after a trusted game-over event.</value>
   </data>
   <data name="GameHistoryRecordingStatusWaitingForRoundOneText" xml:space="preserve">
-    <value>Supported map and hook-backed Event Monitor capture are ready. Recording will start from an observed round 1 start event.</value>
+    <value>Identified round-based map and hook-backed Event Monitor capture are ready. Recording will start from an observed round 1 start event.</value>
   </data>
   <data name="GameHistoryRecordingStatusWaitingForRoundOneMapFormat" xml:space="preserve">
     <value>{0} and hook-backed Event Monitor capture are ready. Recording will start from an observed round 1 start event.</value>
@@ -610,16 +610,16 @@
     <value>Game saved</value>
   </data>
   <data name="GameHistoryRecordingStatusSavedText" xml:space="preserve">
-    <value>The completed supported-map game was saved to Game History.</value>
+    <value>The completed round-based map game was saved to Game History.</value>
   </data>
   <data name="GameHistoryRecordingStatusSavedMapFormat" xml:space="preserve">
     <value>The completed {0} game was saved to Game History.</value>
   </data>
   <data name="GameHistoryRecordingStatusRequiresSupportedMapTitle" xml:space="preserve">
-    <value>Supported map required</value>
+    <value>Identified map required</value>
   </data>
   <data name="GameHistoryRecordingStatusRequiresSupportedMapText" xml:space="preserve">
-    <value>Game History saves completed games only when the current Zombies map is supported and identified. Unsupported or unknown map sessions are not saved.</value>
+    <value>Game History records completed games on every round-based Black Ops II Zombies map only when the current map is identified and hook-backed Event Monitor data is trusted. Unsupported or unknown map sessions are not saved.</value>
   </data>
   <data name="GameHistoryRecordingStatusRequiresHookTitle" xml:space="preserve">
     <value>Hook-backed Event Monitor required</value>
