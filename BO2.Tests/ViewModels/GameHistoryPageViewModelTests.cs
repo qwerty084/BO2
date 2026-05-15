@@ -123,20 +123,23 @@ namespace BO2.Tests.ViewModels
         }
 
         [Theory]
-        [InlineData("farm", "zm_transit_gump_farm", "Farm")]
-        [InlineData("transit", "zm_transit_gump_transit_zclassic", "TranZit")]
-        [InlineData("transit", "zm_transit_gump_transit_zstandard", "Bus Depot")]
-        public void SavedMapProjection_ShowsGreenRunNameInSummaryAndDetail(
-            string startLocationToken,
+        [InlineData("zm_transit", "farm", "zm_transit_gump_farm", "Farm")]
+        [InlineData("zm_transit", "transit", "zm_transit_gump_transit_zclassic", "TranZit")]
+        [InlineData("zm_transit", "transit", "zm_transit_gump_transit_zstandard", "Bus Depot")]
+        [InlineData("zm_buried", null, "zm_buried", "Buried")]
+        public void SavedMapProjection_ShowsMapNameInSummaryAndDetail(
+            string baseMapToken,
+            string? startLocationToken,
             string internalMapToken,
             string friendlyName)
         {
             var viewModel = new GameHistoryPageViewModel();
             viewModel.ReplaceSavedGames([CreateDetailedGame(
-                "green-run",
+                "saved-run",
                 startLocationToken,
                 internalMapToken,
-                friendlyName)]);
+                friendlyName,
+                baseMapToken)]);
 
             Assert.Equal(friendlyName, viewModel.SavedGames[0].MapNameText);
 
@@ -224,11 +227,13 @@ namespace BO2.Tests.ViewModels
         }
 
         [Theory]
-        [InlineData("farm", "zm_transit_gump_farm", "Farm")]
-        [InlineData("transit", "zm_transit_gump_transit_zclassic", "TranZit")]
-        [InlineData("transit", "zm_transit_gump_transit_zstandard", "Bus Depot")]
-        public void ApplySnapshot_WhenSupportedGreenRunMapIsReady_ShowsMapRecordingStatus(
-            string startLocationToken,
+        [InlineData("zm_transit", "farm", "zm_transit_gump_farm", "Farm")]
+        [InlineData("zm_transit", "transit", "zm_transit_gump_transit_zclassic", "TranZit")]
+        [InlineData("zm_transit", "transit", "zm_transit_gump_transit_zstandard", "Bus Depot")]
+        [InlineData("zm_buried", null, "zm_buried", "Buried")]
+        public void ApplySnapshot_WhenSupportedMapIsReady_ShowsMapRecordingStatus(
+            string baseMapToken,
+            string? startLocationToken,
             string internalMapToken,
             string friendlyName)
         {
@@ -239,7 +244,7 @@ namespace BO2.Tests.ViewModels
                 detectedGame,
                 GameMapIdentityReadResult.SupportedMap(
                     detectedGame,
-                    new GameMapIdentity("zm_transit", startLocationToken, internalMapToken, friendlyName))));
+                    new GameMapIdentity(baseMapToken, startLocationToken, internalMapToken, friendlyName))));
 
             Assert.Equal("GameHistoryRecordingStatusActiveTitle", viewModel.RecordingStatusTitle);
             Assert.Equal(
@@ -249,9 +254,10 @@ namespace BO2.Tests.ViewModels
 
         private static GameHistoryEntry CreateDetailedGame(
             string id,
-            string startLocationToken = "town",
+            string? startLocationToken = "town",
             string internalMapToken = "zm_transit_gump_town",
-            string friendlyName = "Town")
+            string friendlyName = "Town",
+            string baseMapToken = "zm_transit")
         {
             GameHistoryEntry game = CreateGame(
                 id,
@@ -262,7 +268,8 @@ namespace BO2.Tests.ViewModels
                 30,
                 startLocationToken,
                 internalMapToken,
-                friendlyName);
+                friendlyName,
+                baseMapToken);
             game.FinalRound = 12;
             game.FinalStats = CreateStats(12345, 98, 2, 4, 55);
             game.GameDuration = TimeSpan.FromSeconds(3723);
@@ -336,9 +343,10 @@ namespace BO2.Tests.ViewModels
             int day,
             int hour,
             int minute,
-            string startLocationToken = "town",
+            string? startLocationToken = "town",
             string internalMapToken = "zm_transit_gump_town",
-            string friendlyName = "Town")
+            string friendlyName = "Town",
+            string baseMapToken = "zm_transit")
         {
             DateTimeOffset startedAt = CreateLocalDate(year, month, day, hour, minute);
             return new GameHistoryEntry
@@ -347,7 +355,7 @@ namespace BO2.Tests.ViewModels
                 StartedAt = startedAt,
                 EndedAt = startedAt.AddMinutes(30),
                 MapIdentity = new GameHistoryMapIdentity(
-                    "zm_transit",
+                    baseMapToken,
                     startLocationToken,
                     internalMapToken,
                     friendlyName),

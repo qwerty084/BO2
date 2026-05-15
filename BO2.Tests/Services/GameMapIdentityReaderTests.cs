@@ -52,6 +52,25 @@ namespace BO2.Tests.Services
             Assert.Equal("Farm", result.Identity.DisplayName);
         }
 
+        [Fact]
+        public void ReadMapIdentity_WhenBaseMapIsBuried_ReturnsSupportedBuriedWithoutStartLocation()
+        {
+            DetectedGame detectedGame = CreateSteamZombiesGame();
+            FakeProcessMemoryAccessor memory = new();
+            WriteDvarString(memory, "mapname", 0x02A32AA8U, 0x03000000U, " ZM_BURIED ");
+            var reader = new GameMapIdentityReader(memory);
+
+            GameMapIdentityReadResult result = reader.ReadMapIdentity(detectedGame);
+
+            Assert.Equal(GameMapIdentityReadStatus.SupportedMap, result.Status);
+            Assert.True(result.IsSupportedMap);
+            Assert.NotNull(result.Identity);
+            Assert.Equal("zm_buried", result.Identity!.BaseMapToken);
+            Assert.Null(result.Identity.StartLocationToken);
+            Assert.Equal("zm_buried", result.Identity.InternalMapToken);
+            Assert.Equal("Buried", result.Identity.DisplayName);
+        }
+
         [Theory]
         [InlineData("zclassic", "zm_transit_gump_transit_zclassic", "TranZit")]
         [InlineData(" ZSTANDARD ", "zm_transit_gump_transit_zstandard", "Bus Depot")]
@@ -89,6 +108,24 @@ namespace BO2.Tests.Services
             FakeProcessMemoryAccessor memory = new();
             WriteDvarString(memory, "mapname", 0x02A32AA8U, 0x03000000U, "zm_transit");
             WriteDvarString(memory, "ui_zm_mapstartlocation", 0x02A0A308U, 0x03000100U, startLocationToken);
+            var reader = new GameMapIdentityReader(memory);
+
+            GameMapIdentityReadResult result = reader.ReadMapIdentity(detectedGame);
+
+            Assert.Equal(GameMapIdentityReadStatus.UnsupportedMapIdentity, result.Status);
+            Assert.False(result.IsSupportedMap);
+            Assert.Null(result.Identity);
+        }
+
+        [Theory]
+        [InlineData("zm_tomb")]
+        [InlineData("zm_unknown_standalone")]
+        public void ReadMapIdentity_WhenStandaloneBaseMapIsUnsupported_ReturnsUnsupportedMapIdentity(
+            string baseMapToken)
+        {
+            DetectedGame detectedGame = CreateSteamZombiesGame();
+            FakeProcessMemoryAccessor memory = new();
+            WriteDvarString(memory, "mapname", 0x02A32AA8U, 0x03000000U, baseMapToken);
             var reader = new GameMapIdentityReader(memory);
 
             GameMapIdentityReadResult result = reader.ReadMapIdentity(detectedGame);

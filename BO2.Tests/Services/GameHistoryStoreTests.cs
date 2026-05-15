@@ -70,6 +70,24 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void SaveAndLoad_PreservesStandaloneMapIdentity()
+        {
+            string historyPath = CreateHistoryPath();
+            var store = new GameHistoryStore(historyPath);
+            GameHistoryEntry entry = CreateEntry("buried-run", daysOffset: 0);
+            entry.MapIdentity = new GameHistoryMapIdentity("zm_buried", null, "zm_buried", "Buried");
+
+            store.Save(new GameHistoryDocument { Entries = [entry] });
+            GameHistoryDocument loaded = store.Load();
+
+            GameHistoryEntry loadedEntry = Assert.Single(loaded.Entries);
+            Assert.Equal("zm_buried", loadedEntry.MapIdentity.BaseMapToken);
+            Assert.Null(loadedEntry.MapIdentity.StartLocationToken);
+            Assert.Equal("zm_buried", loadedEntry.MapIdentity.InternalMapToken);
+            Assert.Equal("Buried", loadedEntry.MapIdentity.FriendlyName);
+        }
+
+        [Fact]
         public void Load_WhenJsonIsInvalid_MovesBadFileToBackup()
         {
             string historyPath = CreateHistoryPath();

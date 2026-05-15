@@ -98,6 +98,11 @@ namespace BO2.Services
             new("transit", "zstandard", "zm_transit_gump_transit_zstandard", "Bus Depot")
         ];
 
+        private static readonly SupportedStandaloneMap[] StandaloneMaps =
+        [
+            new("zm_buried", "zm_buried", "Buried")
+        ];
+
         public static GameMapIdentityReadResult ResolveSupportedMap(
             DetectedGame detectedGame,
             string? baseMapToken,
@@ -114,7 +119,7 @@ namespace BO2.Services
 
             if (!string.Equals(normalizedBaseToken, GreenRunBaseMapToken, StringComparison.Ordinal))
             {
-                return GameMapIdentityReadResult.UnsupportedMapIdentity(detectedGame);
+                return ResolveStandaloneMap(detectedGame, normalizedBaseToken);
             }
 
             string? normalizedStartLocation = NormalizeToken(startLocationToken);
@@ -158,6 +163,29 @@ namespace BO2.Services
             return GameMapIdentityReadResult.UnsupportedMapIdentity(detectedGame);
         }
 
+        private static GameMapIdentityReadResult ResolveStandaloneMap(
+            DetectedGame detectedGame,
+            string normalizedBaseToken)
+        {
+            foreach (SupportedStandaloneMap map in StandaloneMaps)
+            {
+                if (!string.Equals(normalizedBaseToken, map.BaseMapToken, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                return GameMapIdentityReadResult.SupportedMap(
+                    detectedGame,
+                    new GameMapIdentity(
+                        normalizedBaseToken,
+                        null,
+                        map.InternalMapToken,
+                        map.DisplayName));
+            }
+
+            return GameMapIdentityReadResult.UnsupportedMapIdentity(detectedGame);
+        }
+
         private static string? NormalizeToken(string? token)
         {
             if (string.IsNullOrWhiteSpace(token))
@@ -171,6 +199,11 @@ namespace BO2.Services
         private sealed record SupportedGreenRunMap(
             string StartLocationToken,
             string? ModeToken,
+            string InternalMapToken,
+            string DisplayName);
+
+        private sealed record SupportedStandaloneMap(
+            string BaseMapToken,
             string InternalMapToken,
             string DisplayName);
     }

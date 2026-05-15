@@ -121,6 +121,49 @@ namespace BO2.Tests.Services
             Assert.Equal("Farm", recorder.Status.MapName);
         }
 
+        [Fact]
+        public void ObserveSnapshot_WhenBuriedGameCompletes_SavesStandaloneMapIdentity()
+        {
+            List<GameHistoryEntry> savedEntries = [];
+            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            DetectedGame detectedGame = CreateGame();
+            DateTimeOffset startedAt = new(2026, 5, 15, 15, 23, 0, TimeSpan.Zero);
+            GameMapIdentityReadResult mapIdentityResult = CreateBuriedResult(detectedGame);
+
+            recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(0, 0, 0, 0, 0),
+                CreateTimers(gameSeconds: 0, roundSeconds: 0),
+                CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 1)),
+                mapIdentityResult));
+            recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(720, 13, 0, 0, 6),
+                CreateTimers(gameSeconds: 143, roundSeconds: 80),
+                CreateCompatibleStatus(CreateBoxEvent(startedAt.AddSeconds(80), sequence: 2, "tar21_zm", ownerId: 11)),
+                mapIdentityResult));
+            recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(720, 13, 0, 0, 6),
+                CreateTimers(gameSeconds: 145, roundSeconds: 82),
+                CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(145), sequence: 3)),
+                mapIdentityResult));
+
+            GameHistoryEntry saved = Assert.Single(savedEntries);
+            Assert.Equal("zm_buried", saved.MapIdentity.BaseMapToken);
+            Assert.Null(saved.MapIdentity.StartLocationToken);
+            Assert.Equal("zm_buried", saved.MapIdentity.InternalMapToken);
+            Assert.Equal("Buried", saved.MapIdentity.FriendlyName);
+            Assert.Equal(1, saved.FinalRound);
+            Assert.Equal(720, saved.FinalStats.Points);
+            Assert.Equal(TimeSpan.FromSeconds(145), saved.GameDuration);
+            GameHistoryBoxEvent boxEvent = Assert.Single(saved.BoxEvents);
+            Assert.Equal("tar21_zm", boxEvent.RawWeaponToken);
+            Assert.Equal("MTAR", boxEvent.WeaponDisplayName);
+            Assert.Equal(GameHistoryRecordingState.Saved, recorder.Status.State);
+            Assert.Equal("Buried", recorder.Status.MapName);
+        }
+
         [Theory]
         [InlineData("zm_transit_gump_transit_zclassic", "TranZit")]
         [InlineData("zm_transit_gump_transit_zstandard", "Bus Depot")]
@@ -481,6 +524,13 @@ namespace BO2.Tests.Services
             return GameMapIdentityReadResult.SupportedMap(
                 detectedGame,
                 new GameMapIdentity("zm_transit", "transit", internalMapToken, friendlyName));
+        }
+
+        private static GameMapIdentityReadResult CreateBuriedResult(DetectedGame detectedGame)
+        {
+            return GameMapIdentityReadResult.SupportedMap(
+                detectedGame,
+                new GameMapIdentity("zm_buried", null, "zm_buried", "Buried"));
         }
 
         private static GameMapIdentityReadResult CreateBlankFriendlyMapResult(DetectedGame detectedGame)
