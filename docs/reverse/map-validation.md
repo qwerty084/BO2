@@ -14,6 +14,38 @@ Before a map can be added to the supported map table:
 - Box events must publish, and weapon alias capture must be recorded as present or absent, when a map-specific box spin is part of the validation scope. Remaining standalone map validation after the 2026-05-15 plan does not require a per-map mystery-box spin unless map-specific notify differences are found.
 - Open risks must be explicit.
 
+## Origins
+
+Status: validated
+Support decision: Origins is ready to add to the supported map table as a base-map-token-only standalone identity.
+Validation package: `../../.scratch/all-bo2-map-tracking/origins-validation.md`
+
+Origins is the fourth remaining standalone target from the remaining round-based Black Ops II Zombies map plan. The local Steam install contains `zone\all\zm_tomb.ff` and `zone\all\zm_tomb_patch.ff`.
+
+Current evidence:
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Target selection | confirmed | Origins was selected as the final standalone target and local fastfiles `zm_tomb.ff` and `zm_tomb_patch.ff` were present. |
+| Map identity | confirmed | Lobby capture observed `ui_mapname=zm_tomb` while `mapname` was empty. Active-match captures observed `mapname=zm_tomb` and `ui_mapname=zm_tomb`. `ui_zm_mapstartlocation` was present as `tomb`, but it did not vary and should not participate in standalone identity resolution. |
+| Mode dvars | confirmed irrelevant | Active captures observed `g_gametype=zclassic` and `ui_gametype=zclassic`. `party_gametype` remained stale as `TranZit`, so it must not be used as a standalone discriminator. |
+| Lifecycle events | confirmed | Origins published `start_of_round` value `1`, `end_of_round` value `2`, next `start_of_round` value `2`, `end_of_round` value `3`, two `end_game` records, and a late retained `start_of_round` value `3` during the rapid game-over transition. |
+| Player stats | confirmed | Current Game UI read plausible required stats during Origins: points changed `170` -> `1,110`, kills changed `2` -> `12`, headshots changed `1` -> `6`, and downs/revives remained readable at `0`. |
+| Timing | confirmed | Current Game UI showed active plausible timing: round 1 `0:14` / `0:14`, round 2 `1:19` / `0:37`, and post-game timers returned to `--:--`. |
+| Event Monitor health | confirmed | Final shared-memory capture reported snapshot version `6`, compatibility state `2`, no dropped events, no dropped notifies, published notify count `7`, and event count `11`. The first four records were startup/candidate records; Origins lifecycle evidence starts at sequence `5`. |
+
+Promotion result:
+
+- Origins is ready for the implementation slice that adds a supported map identity from active `mapname=zm_tomb` to internal token `zm_tomb` and friendly name `Origins`.
+- The resolver should not require a Green Run start-location token or mode discriminator for Origins.
+
+Open risks:
+
+- `mapname` was empty in the Origins lobby before spawn, while `ui_mapname=zm_tomb` identified the lobby target. Active-match `mapname=zm_tomb` is the promotion evidence.
+- `party_gametype` remained stale as `TranZit` during the Origins validation run, so it must not be used as a standalone map discriminator.
+- The final ring contained two `end_game` records and a retained `start_of_round` value `3` around the rapid game-over transition. No dropped event or notify counters were observed, and the recorder should keep using existing strict lifecycle rules.
+- This validation proves Origins readiness but does not itself add `zm_tomb` to the supported map table.
+
 ## Nuketown
 
 Status: validated
