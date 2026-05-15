@@ -260,7 +260,7 @@ namespace BO2.Services
                 ConnectionState.Disconnecting => DisplayText.Resource("ConnectionCardStatusDisconnecting"),
                 ConnectionState.Unsupported => DisplayText.Resource("ConnectionCardStatusUnsupported"),
                 ConnectionState.Detected when isConnecting => DisplayText.Resource("ConnectionCardStatusConnecting"),
-                ConnectionState.Detected => DisplayText.Resource("ConnectionCardStatusMonitoring"),
+                ConnectionState.Detected => DisplayText.Resource("ConnectionCardStatusGameDetected"),
                 _ => DisplayText.Resource("ConnectionCardStatusDisconnected")
             };
         }

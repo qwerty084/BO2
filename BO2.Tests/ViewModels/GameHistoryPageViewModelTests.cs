@@ -122,6 +122,25 @@ namespace BO2.Tests.ViewModels
             Assert.Equal("+700", detail.Rounds[1].DeltaStats.PointsText);
         }
 
+        [Fact]
+        public void SavedDates_UseCurrentCultureShortDateAndTimeFormat()
+        {
+            CultureInfo culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+            culture.DateTimeFormat.ShortDatePattern = "M/d/yyyy";
+            culture.DateTimeFormat.ShortTimePattern = "HH:mm";
+            using var cultureScope = new CultureScope(culture);
+            var viewModel = new GameHistoryPageViewModel();
+
+            GameHistoryEntry game = CreateGame("town-run", 2026, 5, 15, 20, 0);
+            viewModel.ReplaceSavedGames([game]);
+            viewModel.SelectGame(viewModel.SavedGames[0]);
+
+            string expectedDateText = game.EndedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+            Assert.Equal("5/15/2026 20:30", expectedDateText);
+            Assert.Equal(expectedDateText, viewModel.SavedGames[0].DateText);
+            Assert.Equal(expectedDateText, Assert.IsType<GameHistoryDetailViewModel>(viewModel.SelectedGame).DateText);
+        }
+
         [Theory]
         [InlineData("zm_transit", "farm", "zm_transit_gump_farm", "Farm")]
         [InlineData("zm_transit", "transit", "zm_transit_gump_transit_zclassic", "TranZit")]
@@ -421,6 +440,21 @@ namespace BO2.Tests.ViewModels
         private static DateTimeOffset CreateLocalDate(int year, int month, int day, int hour, int minute)
         {
             return new DateTimeOffset(new DateTime(year, month, day, hour, minute, 0, DateTimeKind.Local));
+        }
+
+        private sealed class CultureScope : IDisposable
+        {
+            private readonly CultureInfo _originalCulture = CultureInfo.CurrentCulture;
+
+            public CultureScope(CultureInfo culture)
+            {
+                CultureInfo.CurrentCulture = culture;
+            }
+
+            public void Dispose()
+            {
+                CultureInfo.CurrentCulture = _originalCulture;
+            }
         }
     }
 }

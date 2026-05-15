@@ -82,7 +82,7 @@ namespace BO2.Tests.Services
             Assert.Equal("GameDetectedConnectPromptFormat(Steam Zombies)", state.MainStatusText);
             Assert.Equal("FooterGameDetectedFormat(Steam Zombies)", state.FooterGameStatusText);
             Assert.Equal("FooterEventsNotConnected", state.FooterEventStatusText);
-            Assert.Equal("ConnectionCardStatusMonitoring", state.ConnectionCardStatusText);
+            Assert.Equal("ConnectionCardStatusGameDetected", state.ConnectionCardStatusText);
             Assert.Equal(ShellConnectionDisplayState.EmptyText, state.ConnectionLastUpdateText);
             Assert.Equal("ConnectButtonText", state.ConnectButtonText);
             Assert.Equal("DisconnectButtonText", state.DisconnectButtonText);

@@ -486,7 +486,7 @@ namespace BO2.ViewModels
 
         private static string FormatDate(DateTimeOffset date)
         {
-            return date.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture);
+            return date.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
         }
 
         private static string FormatDuration(TimeSpan? duration)

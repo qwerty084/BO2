@@ -76,10 +76,6 @@
                     Style="{StaticResource BO2CardBorderStyle}"
                     Padding="12">
                     <StackPanel Spacing="12">
-                        <TextBlock
-                            x:Uid="GameConnectionTitle"
-                            Style="{StaticResource BO2CardTitleTextBlockStyle}" />
-
                         <Grid ColumnSpacing="8">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -134,40 +130,6 @@
                         <Rectangle
                             Height="1"
                             Fill="{ThemeResource BO2BorderBrush}" />
-
-                        <Grid ColumnSpacing="12" RowSpacing="8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <TextBlock
-                                x:Uid="LastUpdateLabel"
-                                Grid.Row="0"
-                                Grid.Column="0"
-                                Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                            <TextBlock
-                                Grid.Row="0"
-                                Grid.Column="1"
-                                Style="{StaticResource BO2CaptionTextBlockStyle}"
-                                Text="{x:Bind ViewModel.ConnectionLastUpdateText, Mode=OneWay}" />
-                            <TextBlock
-                                x:Uid="EventMonitorStatusLabel"
-                                Grid.Row="1"
-                                Grid.Column="0"
-                                Style="{StaticResource BO2CaptionTextBlockStyle}" />
-                            <TextBlock
-                                Grid.Row="1"
-                                Grid.Column="1"
-                                MaxWidth="136"
-                                Style="{StaticResource BO2CaptionTextBlockStyle}"
-                                Text="{x:Bind ViewModel.EventMonitorStatusText, Mode=OneWay}"
-                                TextAlignment="Right"
-                                TextTrimming="CharacterEllipsis" />
-                        </Grid>
 
                         <Button
                             x:Name="ConnectButton"
