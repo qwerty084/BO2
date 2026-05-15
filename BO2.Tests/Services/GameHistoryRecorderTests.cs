@@ -164,6 +164,40 @@ namespace BO2.Tests.Services
             Assert.Equal("Buried", recorder.Status.MapName);
         }
 
+        [Fact]
+        public void ObserveSnapshot_WhenDieRiseGameCompletes_SavesStandaloneMapIdentity()
+        {
+            List<GameHistoryEntry> savedEntries = [];
+            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            DetectedGame detectedGame = CreateGame();
+            DateTimeOffset startedAt = new(2026, 5, 15, 16, 8, 0, TimeSpan.Zero);
+            GameMapIdentityReadResult mapIdentityResult = CreateDieRiseResult(detectedGame);
+
+            recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(0, 0, 0, 0, 0),
+                CreateTimers(gameSeconds: 0, roundSeconds: 0),
+                CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 1)),
+                mapIdentityResult));
+            recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(1080, 14, 0, 0, 5),
+                CreateTimers(gameSeconds: 180, roundSeconds: 180),
+                CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(180), sequence: 2)),
+                mapIdentityResult));
+
+            GameHistoryEntry saved = Assert.Single(savedEntries);
+            Assert.Equal("zm_highrise", saved.MapIdentity.BaseMapToken);
+            Assert.Null(saved.MapIdentity.StartLocationToken);
+            Assert.Equal("zm_highrise", saved.MapIdentity.InternalMapToken);
+            Assert.Equal("Die Rise", saved.MapIdentity.FriendlyName);
+            Assert.Equal(1, saved.FinalRound);
+            Assert.Equal(1080, saved.FinalStats.Points);
+            Assert.Equal(TimeSpan.FromSeconds(180), saved.GameDuration);
+            Assert.Equal(GameHistoryRecordingState.Saved, recorder.Status.State);
+            Assert.Equal("Die Rise", recorder.Status.MapName);
+        }
+
         [Theory]
         [InlineData("zm_transit_gump_transit_zclassic", "TranZit")]
         [InlineData("zm_transit_gump_transit_zstandard", "Bus Depot")]
@@ -531,6 +565,13 @@ namespace BO2.Tests.Services
             return GameMapIdentityReadResult.SupportedMap(
                 detectedGame,
                 new GameMapIdentity("zm_buried", null, "zm_buried", "Buried"));
+        }
+
+        private static GameMapIdentityReadResult CreateDieRiseResult(DetectedGame detectedGame)
+        {
+            return GameMapIdentityReadResult.SupportedMap(
+                detectedGame,
+                new GameMapIdentity("zm_highrise", null, "zm_highrise", "Die Rise"));
         }
 
         private static GameMapIdentityReadResult CreateBlankFriendlyMapResult(DetectedGame detectedGame)

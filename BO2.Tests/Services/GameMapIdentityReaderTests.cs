@@ -71,6 +71,25 @@ namespace BO2.Tests.Services
             Assert.Equal("Buried", result.Identity.DisplayName);
         }
 
+        [Fact]
+        public void ReadMapIdentity_WhenBaseMapIsDieRise_ReturnsSupportedDieRiseWithoutStartLocation()
+        {
+            DetectedGame detectedGame = CreateSteamZombiesGame();
+            FakeProcessMemoryAccessor memory = new();
+            WriteDvarString(memory, "mapname", 0x02A32AA8U, 0x03000000U, " ZM_HIGHRISE ");
+            var reader = new GameMapIdentityReader(memory);
+
+            GameMapIdentityReadResult result = reader.ReadMapIdentity(detectedGame);
+
+            Assert.Equal(GameMapIdentityReadStatus.SupportedMap, result.Status);
+            Assert.True(result.IsSupportedMap);
+            Assert.NotNull(result.Identity);
+            Assert.Equal("zm_highrise", result.Identity!.BaseMapToken);
+            Assert.Null(result.Identity.StartLocationToken);
+            Assert.Equal("zm_highrise", result.Identity.InternalMapToken);
+            Assert.Equal("Die Rise", result.Identity.DisplayName);
+        }
+
         [Theory]
         [InlineData("zclassic", "zm_transit_gump_transit_zclassic", "TranZit")]
         [InlineData(" ZSTANDARD ", "zm_transit_gump_transit_zstandard", "Bus Depot")]

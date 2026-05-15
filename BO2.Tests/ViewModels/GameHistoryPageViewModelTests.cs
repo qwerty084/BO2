@@ -127,6 +127,7 @@ namespace BO2.Tests.ViewModels
         [InlineData("zm_transit", "transit", "zm_transit_gump_transit_zclassic", "TranZit")]
         [InlineData("zm_transit", "transit", "zm_transit_gump_transit_zstandard", "Bus Depot")]
         [InlineData("zm_buried", null, "zm_buried", "Buried")]
+        [InlineData("zm_highrise", null, "zm_highrise", "Die Rise")]
         public void SavedMapProjection_ShowsMapNameInSummaryAndDetail(
             string baseMapToken,
             string? startLocationToken,
@@ -231,6 +232,7 @@ namespace BO2.Tests.ViewModels
         [InlineData("zm_transit", "transit", "zm_transit_gump_transit_zclassic", "TranZit")]
         [InlineData("zm_transit", "transit", "zm_transit_gump_transit_zstandard", "Bus Depot")]
         [InlineData("zm_buried", null, "zm_buried", "Buried")]
+        [InlineData("zm_highrise", null, "zm_highrise", "Die Rise")]
         public void ApplySnapshot_WhenSupportedMapIsReady_ShowsMapRecordingStatus(
             string baseMapToken,
             string? startLocationToken,

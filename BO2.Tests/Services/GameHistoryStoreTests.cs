@@ -69,22 +69,27 @@ namespace BO2.Tests.Services
             Assert.Equal((uint)7, boxEvent.OwnerId);
         }
 
-        [Fact]
-        public void SaveAndLoad_PreservesStandaloneMapIdentity()
+        [Theory]
+        [InlineData("buried-run", "zm_buried", "Buried")]
+        [InlineData("die-rise-run", "zm_highrise", "Die Rise")]
+        public void SaveAndLoad_PreservesStandaloneMapIdentity(
+            string id,
+            string mapToken,
+            string friendlyName)
         {
             string historyPath = CreateHistoryPath();
             var store = new GameHistoryStore(historyPath);
-            GameHistoryEntry entry = CreateEntry("buried-run", daysOffset: 0);
-            entry.MapIdentity = new GameHistoryMapIdentity("zm_buried", null, "zm_buried", "Buried");
+            GameHistoryEntry entry = CreateEntry(id, daysOffset: 0);
+            entry.MapIdentity = new GameHistoryMapIdentity(mapToken, null, mapToken, friendlyName);
 
             store.Save(new GameHistoryDocument { Entries = [entry] });
             GameHistoryDocument loaded = store.Load();
 
             GameHistoryEntry loadedEntry = Assert.Single(loaded.Entries);
-            Assert.Equal("zm_buried", loadedEntry.MapIdentity.BaseMapToken);
+            Assert.Equal(mapToken, loadedEntry.MapIdentity.BaseMapToken);
             Assert.Null(loadedEntry.MapIdentity.StartLocationToken);
-            Assert.Equal("zm_buried", loadedEntry.MapIdentity.InternalMapToken);
-            Assert.Equal("Buried", loadedEntry.MapIdentity.FriendlyName);
+            Assert.Equal(mapToken, loadedEntry.MapIdentity.InternalMapToken);
+            Assert.Equal(friendlyName, loadedEntry.MapIdentity.FriendlyName);
         }
 
         [Fact]
