@@ -130,6 +130,7 @@ namespace BO2.Tests.ViewModels
         [InlineData("zm_highrise", null, "zm_highrise", "Die Rise")]
         [InlineData("zm_prison", null, "zm_prison", "Mob of the Dead")]
         [InlineData("zm_nuked", null, "zm_nuked", "Nuketown")]
+        [InlineData("zm_tomb", null, "zm_tomb", "Origins")]
         public void SavedMapProjection_ShowsMapNameInSummaryAndDetail(
             string baseMapToken,
             string? startLocationToken,
@@ -237,6 +238,7 @@ namespace BO2.Tests.ViewModels
         [InlineData("zm_highrise", null, "zm_highrise", "Die Rise")]
         [InlineData("zm_prison", null, "zm_prison", "Mob of the Dead")]
         [InlineData("zm_nuked", null, "zm_nuked", "Nuketown")]
+        [InlineData("zm_tomb", null, "zm_tomb", "Origins")]
         public void ApplySnapshot_WhenSupportedMapIsReady_ShowsMapRecordingStatus(
             string baseMapToken,
             string? startLocationToken,

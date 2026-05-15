@@ -103,7 +103,8 @@ namespace BO2.Services
             new("zm_buried", "zm_buried", "Buried"),
             new("zm_highrise", "zm_highrise", "Die Rise"),
             new("zm_prison", "zm_prison", "Mob of the Dead"),
-            new("zm_nuked", "zm_nuked", "Nuketown")
+            new("zm_nuked", "zm_nuked", "Nuketown"),
+            new("zm_tomb", "zm_tomb", "Origins")
         ];
 
         public static GameMapIdentityReadResult ResolveSupportedMap(

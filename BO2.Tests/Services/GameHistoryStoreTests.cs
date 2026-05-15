@@ -74,6 +74,7 @@ namespace BO2.Tests.Services
         [InlineData("die-rise-run", "zm_highrise", "Die Rise")]
         [InlineData("mob-of-the-dead-run", "zm_prison", "Mob of the Dead")]
         [InlineData("nuketown-run", "zm_nuked", "Nuketown")]
+        [InlineData("origins-run", "zm_tomb", "Origins")]
         public void SaveAndLoad_PreservesStandaloneMapIdentity(
             string id,
             string mapToken,

@@ -128,6 +128,25 @@ namespace BO2.Tests.Services
             Assert.Equal("Nuketown", result.Identity.DisplayName);
         }
 
+        [Fact]
+        public void ReadMapIdentity_WhenBaseMapIsOrigins_ReturnsSupportedOriginsWithoutStartLocation()
+        {
+            DetectedGame detectedGame = CreateSteamZombiesGame();
+            FakeProcessMemoryAccessor memory = new();
+            WriteDvarString(memory, "mapname", 0x02A32AA8U, 0x03000000U, " ZM_TOMB ");
+            var reader = new GameMapIdentityReader(memory);
+
+            GameMapIdentityReadResult result = reader.ReadMapIdentity(detectedGame);
+
+            Assert.Equal(GameMapIdentityReadStatus.SupportedMap, result.Status);
+            Assert.True(result.IsSupportedMap);
+            Assert.NotNull(result.Identity);
+            Assert.Equal("zm_tomb", result.Identity!.BaseMapToken);
+            Assert.Null(result.Identity.StartLocationToken);
+            Assert.Equal("zm_tomb", result.Identity.InternalMapToken);
+            Assert.Equal("Origins", result.Identity.DisplayName);
+        }
+
         [Theory]
         [InlineData("zclassic", "zm_transit_gump_transit_zclassic", "TranZit")]
         [InlineData(" ZSTANDARD ", "zm_transit_gump_transit_zstandard", "Bus Depot")]
@@ -174,15 +193,12 @@ namespace BO2.Tests.Services
             Assert.Null(result.Identity);
         }
 
-        [Theory]
-        [InlineData("zm_tomb")]
-        [InlineData("zm_unknown_standalone")]
-        public void ReadMapIdentity_WhenStandaloneBaseMapIsUnsupported_ReturnsUnsupportedMapIdentity(
-            string baseMapToken)
+        [Fact]
+        public void ReadMapIdentity_WhenStandaloneBaseMapIsUnsupported_ReturnsUnsupportedMapIdentity()
         {
             DetectedGame detectedGame = CreateSteamZombiesGame();
             FakeProcessMemoryAccessor memory = new();
-            WriteDvarString(memory, "mapname", 0x02A32AA8U, 0x03000000U, baseMapToken);
+            WriteDvarString(memory, "mapname", 0x02A32AA8U, 0x03000000U, "zm_unknown_standalone");
             var reader = new GameMapIdentityReader(memory);
 
             GameMapIdentityReadResult result = reader.ReadMapIdentity(detectedGame);
