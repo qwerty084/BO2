@@ -101,7 +101,8 @@ namespace BO2.Services
         private static readonly SupportedStandaloneMap[] StandaloneMaps =
         [
             new("zm_buried", "zm_buried", "Buried"),
-            new("zm_highrise", "zm_highrise", "Die Rise")
+            new("zm_highrise", "zm_highrise", "Die Rise"),
+            new("zm_prison", "zm_prison", "Mob of the Dead")
         ];
 
         public static GameMapIdentityReadResult ResolveSupportedMap(

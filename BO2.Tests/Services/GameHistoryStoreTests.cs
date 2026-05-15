@@ -72,6 +72,7 @@ namespace BO2.Tests.Services
         [Theory]
         [InlineData("buried-run", "zm_buried", "Buried")]
         [InlineData("die-rise-run", "zm_highrise", "Die Rise")]
+        [InlineData("mob-of-the-dead-run", "zm_prison", "Mob of the Dead")]
         public void SaveAndLoad_PreservesStandaloneMapIdentity(
             string id,
             string mapToken,
