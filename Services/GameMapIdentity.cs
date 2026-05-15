@@ -92,14 +92,17 @@ namespace BO2.Services
 
         private static readonly SupportedGreenRunMap[] GreenRunMaps =
         [
-            new("town", "zm_transit_gump_town", "Town"),
-            new("farm", "zm_transit_gump_farm", "Farm")
+            new("town", null, "zm_transit_gump_town", "Town"),
+            new("farm", null, "zm_transit_gump_farm", "Farm"),
+            new("transit", "zclassic", "zm_transit_gump_transit_zclassic", "TranZit"),
+            new("transit", "zstandard", "zm_transit_gump_transit_zstandard", "Bus Depot")
         ];
 
         public static GameMapIdentityReadResult ResolveSupportedMap(
             DetectedGame detectedGame,
             string? baseMapToken,
-            string? startLocationToken)
+            string? startLocationToken,
+            string? modeToken = null)
         {
             ArgumentNullException.ThrowIfNull(detectedGame);
 
@@ -115,15 +118,28 @@ namespace BO2.Services
             }
 
             string? normalizedStartLocation = NormalizeToken(startLocationToken);
+            string? normalizedMode = NormalizeToken(modeToken);
             if (normalizedStartLocation is null)
             {
                 return GameMapIdentityReadResult.MissingMapIdentity(detectedGame);
             }
 
+            bool startLocationRequiresMode = false;
             foreach (SupportedGreenRunMap map in GreenRunMaps)
             {
                 if (string.Equals(normalizedStartLocation, map.StartLocationToken, StringComparison.Ordinal))
                 {
+                    if (map.ModeToken is not null)
+                    {
+                        startLocationRequiresMode = true;
+                    }
+
+                    if (map.ModeToken is not null
+                        && !string.Equals(normalizedMode, map.ModeToken, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
                     return GameMapIdentityReadResult.SupportedMap(
                         detectedGame,
                         new GameMapIdentity(
@@ -132,6 +148,11 @@ namespace BO2.Services
                             map.InternalMapToken,
                             map.DisplayName));
                 }
+            }
+
+            if (startLocationRequiresMode && normalizedMode is null)
+            {
+                return GameMapIdentityReadResult.MissingMapIdentity(detectedGame);
             }
 
             return GameMapIdentityReadResult.UnsupportedMapIdentity(detectedGame);
@@ -149,6 +170,7 @@ namespace BO2.Services
 
         private sealed record SupportedGreenRunMap(
             string StartLocationToken,
+            string? ModeToken,
             string InternalMapToken,
             string DisplayName);
     }

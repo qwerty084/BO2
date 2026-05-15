@@ -52,18 +52,81 @@ namespace BO2.Tests.Services
             Assert.Equal("Farm", result.Identity.DisplayName);
         }
 
-        [Fact]
-        public void ReadMapIdentity_WhenGreenRunStartLocationIsUnsupported_ReturnsUnsupportedMapIdentity()
+        [Theory]
+        [InlineData("zclassic", "zm_transit_gump_transit_zclassic", "TranZit")]
+        [InlineData(" ZSTANDARD ", "zm_transit_gump_transit_zstandard", "Bus Depot")]
+        public void ReadMapIdentity_WhenTransitStartLocationHasValidatedMode_ReturnsSupportedMap(
+            string modeToken,
+            string expectedInternalMapToken,
+            string expectedDisplayName)
         {
             DetectedGame detectedGame = CreateSteamZombiesGame();
             FakeProcessMemoryAccessor memory = new();
             WriteDvarString(memory, "mapname", 0x02A32AA8U, 0x03000000U, "zm_transit");
-            WriteDvarString(memory, "ui_zm_mapstartlocation", 0x02A0A308U, 0x03000100U, "bus_depot");
+            WriteDvarString(memory, "ui_zm_mapstartlocation", 0x02A0A308U, 0x03000100U, "transit");
+            WriteDvarString(memory, "ui_gametype", 0x02A0A588U, 0x03000200U, modeToken);
+            var reader = new GameMapIdentityReader(memory);
+
+            GameMapIdentityReadResult result = reader.ReadMapIdentity(detectedGame);
+
+            Assert.Equal(GameMapIdentityReadStatus.SupportedMap, result.Status);
+            Assert.True(result.IsSupportedMap);
+            Assert.NotNull(result.Identity);
+            Assert.Equal("zm_transit", result.Identity!.BaseMapToken);
+            Assert.Equal("transit", result.Identity.StartLocationToken);
+            Assert.Equal(expectedInternalMapToken, result.Identity.InternalMapToken);
+            Assert.Equal(expectedDisplayName, result.Identity.DisplayName);
+        }
+
+        [Theory]
+        [InlineData("bus_depot")]
+        [InlineData("busstation")]
+        [InlineData("diner")]
+        public void ReadMapIdentity_WhenGreenRunStartLocationIsUnsupported_ReturnsUnsupportedMapIdentity(
+            string startLocationToken)
+        {
+            DetectedGame detectedGame = CreateSteamZombiesGame();
+            FakeProcessMemoryAccessor memory = new();
+            WriteDvarString(memory, "mapname", 0x02A32AA8U, 0x03000000U, "zm_transit");
+            WriteDvarString(memory, "ui_zm_mapstartlocation", 0x02A0A308U, 0x03000100U, startLocationToken);
             var reader = new GameMapIdentityReader(memory);
 
             GameMapIdentityReadResult result = reader.ReadMapIdentity(detectedGame);
 
             Assert.Equal(GameMapIdentityReadStatus.UnsupportedMapIdentity, result.Status);
+            Assert.False(result.IsSupportedMap);
+            Assert.Null(result.Identity);
+        }
+
+        [Fact]
+        public void ReadMapIdentity_WhenTransitModeIsUnsupported_ReturnsUnsupportedMapIdentity()
+        {
+            DetectedGame detectedGame = CreateSteamZombiesGame();
+            FakeProcessMemoryAccessor memory = new();
+            WriteDvarString(memory, "mapname", 0x02A32AA8U, 0x03000000U, "zm_transit");
+            WriteDvarString(memory, "ui_zm_mapstartlocation", 0x02A0A308U, 0x03000100U, "transit");
+            WriteDvarString(memory, "ui_gametype", 0x02A0A588U, 0x03000200U, "zencounter");
+            var reader = new GameMapIdentityReader(memory);
+
+            GameMapIdentityReadResult result = reader.ReadMapIdentity(detectedGame);
+
+            Assert.Equal(GameMapIdentityReadStatus.UnsupportedMapIdentity, result.Status);
+            Assert.False(result.IsSupportedMap);
+            Assert.Null(result.Identity);
+        }
+
+        [Fact]
+        public void ReadMapIdentity_WhenTransitModeDvarIsMissing_ReturnsMissingMapIdentity()
+        {
+            DetectedGame detectedGame = CreateSteamZombiesGame();
+            FakeProcessMemoryAccessor memory = new();
+            WriteDvarString(memory, "mapname", 0x02A32AA8U, 0x03000000U, "zm_transit");
+            WriteDvarString(memory, "ui_zm_mapstartlocation", 0x02A0A308U, 0x03000100U, "transit");
+            var reader = new GameMapIdentityReader(memory);
+
+            GameMapIdentityReadResult result = reader.ReadMapIdentity(detectedGame);
+
+            Assert.Equal(GameMapIdentityReadStatus.MissingMapIdentity, result.Status);
             Assert.False(result.IsSupportedMap);
             Assert.Null(result.Identity);
         }

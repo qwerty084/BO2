@@ -122,22 +122,28 @@ namespace BO2.Tests.ViewModels
             Assert.Equal("+700", detail.Rounds[1].DeltaStats.PointsText);
         }
 
-        [Fact]
-        public void SavedMapProjection_ShowsFarmNameInSummaryAndDetail()
+        [Theory]
+        [InlineData("farm", "zm_transit_gump_farm", "Farm")]
+        [InlineData("transit", "zm_transit_gump_transit_zclassic", "TranZit")]
+        [InlineData("transit", "zm_transit_gump_transit_zstandard", "Bus Depot")]
+        public void SavedMapProjection_ShowsGreenRunNameInSummaryAndDetail(
+            string startLocationToken,
+            string internalMapToken,
+            string friendlyName)
         {
             var viewModel = new GameHistoryPageViewModel();
             viewModel.ReplaceSavedGames([CreateDetailedGame(
-                "farm-run",
-                "farm",
-                "zm_transit_gump_farm",
-                "Farm")]);
+                "green-run",
+                startLocationToken,
+                internalMapToken,
+                friendlyName)]);
 
-            Assert.Equal("Farm", viewModel.SavedGames[0].MapNameText);
+            Assert.Equal(friendlyName, viewModel.SavedGames[0].MapNameText);
 
             viewModel.SelectGame(viewModel.SavedGames[0]);
 
             GameHistoryDetailViewModel detail = Assert.IsType<GameHistoryDetailViewModel>(viewModel.SelectedGame);
-            Assert.Equal("Farm", detail.MapNameText);
+            Assert.Equal(friendlyName, detail.MapNameText);
         }
 
         [Fact]
@@ -217,8 +223,14 @@ namespace BO2.Tests.ViewModels
             Assert.Equal("GameHistoryRecordingStatusDiscardedConnectionEndedText", viewModel.RecordingStatusText);
         }
 
-        [Fact]
-        public void ApplySnapshot_WhenSupportedFarmMapIsReady_ShowsFarmRecordingStatus()
+        [Theory]
+        [InlineData("farm", "zm_transit_gump_farm", "Farm")]
+        [InlineData("transit", "zm_transit_gump_transit_zclassic", "TranZit")]
+        [InlineData("transit", "zm_transit_gump_transit_zstandard", "Bus Depot")]
+        public void ApplySnapshot_WhenSupportedGreenRunMapIsReady_ShowsMapRecordingStatus(
+            string startLocationToken,
+            string internalMapToken,
+            string friendlyName)
         {
             var viewModel = new GameHistoryPageViewModel();
             DetectedGame detectedGame = CreateDetectedGame();
@@ -227,10 +239,12 @@ namespace BO2.Tests.ViewModels
                 detectedGame,
                 GameMapIdentityReadResult.SupportedMap(
                     detectedGame,
-                    new GameMapIdentity("zm_transit", "farm", "zm_transit_gump_farm", "Farm"))));
+                    new GameMapIdentity("zm_transit", startLocationToken, internalMapToken, friendlyName))));
 
             Assert.Equal("GameHistoryRecordingStatusActiveTitle", viewModel.RecordingStatusTitle);
-            Assert.Equal("GameHistoryRecordingStatusWaitingForRoundOneMapFormat(Farm)", viewModel.RecordingStatusText);
+            Assert.Equal(
+                $"GameHistoryRecordingStatusWaitingForRoundOneMapFormat({friendlyName})",
+                viewModel.RecordingStatusText);
         }
 
         private static GameHistoryEntry CreateDetailedGame(

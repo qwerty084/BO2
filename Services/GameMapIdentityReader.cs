@@ -36,6 +36,7 @@ namespace BO2.Services
         private const uint DvarNamePointerOffset = 0x00U;
         private const uint DvarCurrentValueOffset = 0x18U;
         private const uint DvarNextPointerOffset = 0x58U;
+        private const string GreenRunTransitStartLocationToken = "transit";
         private const int PointerSize = sizeof(int);
         private const int MaxDvarStringBytes = 128;
         private const int MaxDvarChainLength = 256;
@@ -89,10 +90,24 @@ namespace BO2.Services
                     return ToMapIdentityReadResult(detectedGame, startLocation.Status);
                 }
 
+                DvarStringReadResult mode = DvarStringReadResult.Missing;
+                if (string.Equals(
+                    startLocation.Value?.Trim(),
+                    GreenRunTransitStartLocationToken,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    mode = ReadDvarString(addressMap, "ui_gametype");
+                    if (mode.Status != DvarStringReadStatus.Found)
+                    {
+                        return ToMapIdentityReadResult(detectedGame, mode.Status);
+                    }
+                }
+
                 return GameMapIdentityResolver.ResolveSupportedMap(
                     detectedGame,
                     baseMap.Value,
-                    startLocation.Value);
+                    startLocation.Value,
+                    mode.Value);
             }
             catch (Exception ex) when (IsReadFailure(ex))
             {

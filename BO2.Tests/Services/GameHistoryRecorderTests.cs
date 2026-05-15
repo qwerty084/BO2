@@ -121,6 +121,44 @@ namespace BO2.Tests.Services
             Assert.Equal("Farm", recorder.Status.MapName);
         }
 
+        [Theory]
+        [InlineData("zm_transit_gump_transit_zclassic", "TranZit")]
+        [InlineData("zm_transit_gump_transit_zstandard", "Bus Depot")]
+        public void ObserveSnapshot_WhenRemainingGreenRunGameCompletes_SavesMapIdentity(
+            string internalMapToken,
+            string friendlyName)
+        {
+            List<GameHistoryEntry> savedEntries = [];
+            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            DetectedGame detectedGame = CreateGame();
+            DateTimeOffset startedAt = new(2026, 5, 15, 14, 30, 0, TimeSpan.Zero);
+            GameMapIdentityReadResult mapIdentityResult = CreateGreenRunTransitResult(
+                detectedGame,
+                internalMapToken,
+                friendlyName);
+
+            recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(0, 0, 0, 0, 0),
+                CreateTimers(gameSeconds: 0, roundSeconds: 0),
+                CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 1)),
+                mapIdentityResult));
+            recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(500, 7, 0, 0, 2),
+                CreateTimers(gameSeconds: 60, roundSeconds: 60),
+                CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(60), sequence: 2)),
+                mapIdentityResult));
+
+            GameHistoryEntry saved = Assert.Single(savedEntries);
+            Assert.Equal("zm_transit", saved.MapIdentity.BaseMapToken);
+            Assert.Equal("transit", saved.MapIdentity.StartLocationToken);
+            Assert.Equal(internalMapToken, saved.MapIdentity.InternalMapToken);
+            Assert.Equal(friendlyName, saved.MapIdentity.FriendlyName);
+            Assert.Equal(GameHistoryRecordingState.Saved, recorder.Status.State);
+            Assert.Equal(friendlyName, recorder.Status.MapName);
+        }
+
         [Fact]
         public void ObserveSnapshot_IgnoresEventsBeforeRoundOneAndAfterGameOver()
         {
@@ -433,6 +471,16 @@ namespace BO2.Tests.Services
             return GameMapIdentityReadResult.SupportedMap(
                 detectedGame,
                 new GameMapIdentity("zm_transit", "farm", "zm_transit_gump_farm", "Farm"));
+        }
+
+        private static GameMapIdentityReadResult CreateGreenRunTransitResult(
+            DetectedGame detectedGame,
+            string internalMapToken,
+            string friendlyName)
+        {
+            return GameMapIdentityReadResult.SupportedMap(
+                detectedGame,
+                new GameMapIdentity("zm_transit", "transit", internalMapToken, friendlyName));
         }
 
         private static GameMapIdentityReadResult CreateBlankFriendlyMapResult(DetectedGame detectedGame)
