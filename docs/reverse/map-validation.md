@@ -11,8 +11,39 @@ Before a map can be added to the supported map table:
 - `start_of_round`, `end_of_round`, and `end_game` must publish the expected Event Monitor records.
 - Required Player Stats Read fields must be readable and plausible.
 - Game Timing Read behavior must be acceptable for Game History durations.
-- Box events must publish, and weapon alias capture must be recorded as present or absent.
+- Box events must publish, and weapon alias capture must be recorded as present or absent, when a map-specific box spin is part of the validation scope. Remaining standalone map validation after the 2026-05-15 plan does not require a per-map mystery-box spin unless map-specific notify differences are found.
 - Open risks must be explicit.
+
+## Mob of the Dead
+
+Status: validated
+Support decision: Mob of the Dead is ready to add to the supported map table as a base-map-token-only standalone identity.
+Validation package: `../../.scratch/all-bo2-map-tracking/mob-of-the-dead-validation.md`
+
+Mob of the Dead is the second remaining standalone target from the remaining round-based Black Ops II Zombies map plan. The local Steam install contains `zone\all\zm_prison.ff` and `zone\all\zm_prison_patch.ff`.
+
+Current evidence:
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Target selection | confirmed | Mob of the Dead was selected as the next standalone target and local fastfiles `zm_prison.ff` and `zm_prison_patch.ff` were present. |
+| Map identity | confirmed | Lobby capture observed `ui_mapname=zm_prison` while `mapname=zm_highrise` was stale from the prior Die Rise run. Active-match captures observed `mapname=zm_prison` and `ui_mapname=zm_prison`. `ui_zm_mapstartlocation` was present as `prison`, but it did not vary and should not participate in standalone identity resolution. |
+| Mode dvars | confirmed irrelevant | Active captures observed `g_gametype=zclassic` and `ui_gametype=zclassic`. `party_gametype` remained stale as `TranZit`, so it must not be used as a standalone discriminator. |
+| Lifecycle events | confirmed | Mob of the Dead published `start_of_round` value `1`, `end_of_round` value `2`, next `start_of_round` value `2`, `end_of_round` value `3`, next `start_of_round` value `3`, and three final `end_game` records through Event Monitor shared memory. |
+| Player stats | confirmed | Current Game UI read plausible required stats during Mob of the Dead: points changed `0` -> `820` -> `1,580`, kills changed `0` -> `6` -> `14`, headshots changed `0` -> `1` -> `2`, downs changed `0` -> `5`, and revives remained readable at `0`. |
+| Timing | confirmed | Current Game UI showed active plausible timing: round 1 `0:18` / `0:18`, round 2 `1:08` / `0:15`, and game over `2:23` / `0:27`. |
+| Event Monitor health | confirmed | Final shared-memory capture reported snapshot version `6`, compatibility state `2`, no dropped events, no dropped notifies, published notify count `8`, and event count `12`. |
+
+Promotion result:
+
+- Mob of the Dead is ready for the implementation slice that adds a supported map identity from active `mapname=zm_prison` to internal token `zm_prison` and friendly name `Mob of the Dead`.
+- The resolver should not require a Green Run start-location token or mode discriminator for Mob of the Dead.
+
+Open risks:
+
+- `mapname` was stale as `zm_highrise` in the Mob of the Dead lobby before spawn, while `ui_mapname=zm_prison` identified the lobby target. Active-match `mapname=zm_prison` is the promotion evidence.
+- `party_gametype` remained stale as `TranZit` during the Mob of the Dead validation run, so it must not be used as a standalone map discriminator.
+- This validation does not promote other remaining standalone maps such as Nuketown (`zm_nuked`) or Origins (`zm_tomb`).
 
 ## Die Rise
 
@@ -43,7 +74,7 @@ Open risks:
 
 - `mapname` was empty in the Die Rise lobby before spawn, while `ui_mapname=zm_highrise` identified the lobby target. Active-match `mapname=zm_highrise` is the promotion evidence.
 - `party_gametype` remained stale as `TranZit` during the Die Rise validation run, so it must not be used as a standalone map discriminator.
-- This validation does not promote other remaining standalone maps such as Mob of the Dead (`zm_prison`), Nuketown (`zm_nuked`), or Origins (`zm_tomb`).
+- This validation does not promote other remaining standalone maps such as Nuketown (`zm_nuked`) or Origins (`zm_tomb`).
 
 ## Buried
 
