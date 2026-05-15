@@ -33,6 +33,10 @@ Examples:
 
 For maps without a start-location split, fall back to the base `mapname` value. Validate at least one non-Green-Run map before treating this as complete map support.
 
+Static local fastfile names provide candidate Green Run tokens, but they are not enough to promote support. On 2026-05-14, `zone\all` in the local Steam install contained `zm_transit_gump_busstation.ff`, `zm_transit_gump_diner.ff`, `zm_transit_gump_powerstation.ff`, `zm_transit_gump_tunnel.ff`, `zm_transit_gump_cornfield.ff`, `zm_transit_gump_labs.ff`, `zm_transit_gump_forest.ff`, `zm_transit_gump_forest2.ff`, and `zm_transit_gump_bridge.ff`. Live `ui_zm_mapstartlocation` capture still needs to prove which of those are selectable Game History map identities.
+
+On 2026-05-14, a live Green Run / Survival / Bus Depot run observed `ui_zm_mapstartlocation=transit` in lobby, active rounds, and post-game. Do not infer Bus Depot support from `zm_transit_gump_busstation.ff` until full TranZit validation proves whether `transit` is unique or shared.
+
 ## Read-Only Dvar Lookup Evidence
 
 Migrated research notes name a native dvar-by-name helper at `0x006DC400` and a dvar bucket table at `0x029F4548`. These addresses are not yet present in the repo ledger, Ghidra catalogs, tools, source, or tests. Treat the lookup model below as unverified until source-backed artifacts or runtime notes are added.
