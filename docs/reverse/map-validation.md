@@ -14,6 +14,36 @@ Before a map can be added to the supported map table:
 - Box events must publish, and weapon alias capture must be recorded as present or absent.
 - Open risks must be explicit.
 
+## Buried
+
+Status: validated
+Support decision: Buried is ready to add to the supported map table as a base-map-token-only standalone identity.
+Validation package: `../../.scratch/all-bo2-map-tracking/buried-validation.md`
+
+Buried is the selected first standalone target because it is the earliest installed non-Green-Run standalone, round-based Zombies map on this machine. The local Steam install contains `zone\all\zm_buried.ff` and `zone\all\zm_tomb.ff`, but not the earlier standalone DLC fastfiles for Nuketown Zombies, Die Rise, or Mob of the Dead.
+
+Current evidence:
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Target selection | confirmed | Buried was selected from installed standalone candidates `zm_buried.ff` and `zm_tomb.ff`. |
+| Map identity | confirmed | Active-match captures observed `mapname=zm_buried` and `ui_mapname=zm_buried`. `ui_zm_mapstartlocation` stayed present as `processing`, but it did not identify a submap and should not participate in standalone identity resolution. |
+| Lifecycle events | confirmed | Buried published `start_of_round` value `1`, `end_of_round` value `2`, next `start_of_round` value `2`, and final `end_game` records through Event Monitor shared memory. |
+| Player stats | confirmed | Current Game UI read plausible required stats during Buried: points changed `500` -> `1,430` -> `720`, kills changed `0` -> `6` -> `13`, headshots reached `6`, and downs/revives remained readable at `0`. |
+| Timing | confirmed | Current Game UI showed active plausible timing: round 1 `0:14` / `0:14`, round 2 `1:07` / `0:04`, post-box `2:23` / `1:20`, and post-game timers returned to `--:--`. |
+| Box events | confirmed | Buried published `randomization_done` and `user_grabbed_weapon` with `tar21_zm`, another `user_grabbed_weapon` with `frag_grenade_zm`, plus `closed` and `chest_accessed`; the UI rendered `tar21_zm` as MTAR. |
+
+Promotion result:
+
+- Buried is ready for the implementation slice that adds a supported map identity from active `mapname=zm_buried` to internal token `zm_buried` and friendly name `Buried`.
+- The resolver should not require a Green Run start-location token for Buried.
+
+Open risks:
+
+- `mapname` remained stale as `zm_transit` in the Buried lobby before spawn, while `ui_mapname=zm_buried` identified the lobby target. Active-match `mapname=zm_buried` is the promotion evidence.
+- `party_gametype` remained `TranZit` during the Buried validation run, so it must not be used as a standalone map discriminator.
+- This validation does not promote other standalone maps such as Origins (`zm_tomb`).
+
 ## Farm
 
 Status: validated

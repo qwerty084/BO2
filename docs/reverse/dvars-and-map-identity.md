@@ -42,7 +42,9 @@ Do not apply this derivation blindly to `ui_zm_mapstartlocation=transit`. Live v
 | TranZit | `mapname=zm_transit`, `ui_zm_mapstartlocation=transit`, `ui_gametype=zclassic`, `ui_zm_gamemodegroup=zclassic`, `party_gametype=TranZit` |
 | Bus Depot Survival | `mapname=zm_transit`, `ui_zm_mapstartlocation=transit`, `ui_gametype=zstandard`, `ui_zm_gamemodegroup=zsurvival`, `party_gametype=Survival` |
 
-For maps without a start-location split, fall back to the base `mapname` value. Validate at least one non-Green-Run map before treating this as complete map support.
+For maps without a start-location split, fall back to the base `mapname` value. Buried validation on 2026-05-15 proved the first standalone case: active gameplay observed `mapname=zm_buried` and `ui_mapname=zm_buried`, while `ui_zm_mapstartlocation` remained present as `processing` and did not identify a submap.
+
+Do not use stale lobby-only fields as standalone identity. In the same Buried run, the lobby had `ui_mapname=zm_buried` but `mapname` still held stale `zm_transit` until the match spawned, and `party_gametype` remained `TranZit` throughout the run. Active `mapname=zm_buried` is the supported promotion evidence for Buried.
 
 Static local fastfile names provide candidate Green Run tokens, but they are not enough to promote support. On 2026-05-14, `zone\all` in the local Steam install contained `zm_transit_gump_busstation.ff`, `zm_transit_gump_diner.ff`, `zm_transit_gump_powerstation.ff`, `zm_transit_gump_tunnel.ff`, `zm_transit_gump_cornfield.ff`, `zm_transit_gump_labs.ff`, `zm_transit_gump_forest.ff`, `zm_transit_gump_forest2.ff`, and `zm_transit_gump_bridge.ff`. Live `ui_zm_mapstartlocation` capture still needs to prove which of those are selectable Game History map identities. Diner is Turned-only and is not a current support target for this app.
 
