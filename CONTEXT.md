@@ -20,6 +20,14 @@ _Avoid_: refresh result, UI state
 An app page that displays round-focused stats and event context from the current **Game Connection Snapshot** without debug or candidate-address details.
 _Avoid_: home stats view, current game view
 
+**Game History**:
+A user-visible record of completed Zombies games that the app can show after a game ends.
+_Avoid_: history feature, match history, saved game log
+
+**Supported Zombies Map**:
+A round-based Black Ops II Zombies map that is eligible to appear in **Game History**.
+_Avoid_: supported map table, standalone identity, base-map-token-only support
+
 **Event Monitor**:
 The native `BO2Monitor` payload loaded into Steam Zombies to publish read-only game events through a shared snapshot.
 _Avoid_: injector, hook
@@ -52,6 +60,7 @@ _Avoid_: widget manager, overlay service
 - A **Current Game Page** displays round-focused state from the current **Game Connection Snapshot**.
 - A **Current Game Page** does not own **Game Connection Session** commands; connect and disconnect controls live in the app shell footer/sidebar.
 - A **Current Game Page** is the app's default first page; the old home stats surface no longer exists as a separate page.
+- **Game History** records completed games only for **Supported Zombies Maps**.
 - A **Player Stats Read** belongs to exactly one **Detected Game** when Steam Zombies is supported.
 - An **Event Monitor** can provide event data only after the **Game Connection Session** connects to Steam Zombies.
 - A **Game Timing Read** belongs to exactly one **Detected Game** when Steam Zombies timing support is available.
