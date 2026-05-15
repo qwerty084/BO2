@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -68,7 +69,6 @@ namespace BO2.ViewModels
             _shellDisplayProjector = new ShellConnectionDisplayProjector();
             _connectionSession.SnapshotChanged += OnSnapshotChanged;
 
-            ReloadGameHistory();
             _connectionSession.Start();
             ApplyRefreshSnapshot(_connectionSession.GetStatusSnapshot());
         }
@@ -267,12 +267,18 @@ namespace BO2.ViewModels
             return TryApplyReadErrorAsync(message, sessionAlreadyHandled: false, cancellationToken);
         }
 
+        public Task LoadGameHistoryAsync(CancellationToken cancellationToken)
+        {
+            return ReloadGameHistoryAsync(cancellationToken);
+        }
+
         public void Dispose()
         {
             _disposed = true;
             _connectionSession.SnapshotChanged -= OnSnapshotChanged;
             _gameHistoryRecorder.DiscardForAppClose();
             _connectionSession.Dispose();
+            _gameHistoryStore.Dispose();
             _operationSemaphore.Dispose();
         }
 
@@ -324,6 +330,11 @@ namespace BO2.ViewModels
 
         private static bool IsNonFatalDispatcherException(Exception exception)
         {
+            return IsNonFatalException(exception);
+        }
+
+        private static bool IsNonFatalException(Exception exception)
+        {
             return exception is not OutOfMemoryException
                 && exception is not StackOverflowException
                 && exception is not AccessViolationException
@@ -374,14 +385,31 @@ namespace BO2.ViewModels
                 return;
             }
 
-            ReloadGameHistory();
+            _ = ReloadGameHistoryAsync(CancellationToken.None);
             _lastLoadedSavedHistoryId = historyId;
         }
 
-        private void ReloadGameHistory()
+        private async Task ReloadGameHistoryAsync(CancellationToken cancellationToken)
         {
-            GameHistoryDocument document = _gameHistoryStore.Load();
-            _gameHistoryPage.ReplaceSavedGames(document.Entries);
+            try
+            {
+                IReadOnlyList<GameHistorySummary> summaries =
+                    await _gameHistoryStore.LoadSummariesNewestFirstAsync(cancellationToken);
+                await RunOnDispatcherAsync(
+                    () => _gameHistoryPage.ReplaceSummaries(summaries),
+                    cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex) when (IsNonFatalException(ex))
+            {
+                await RunOnDispatcherAsync(
+                    () => _gameHistoryPage.ShowSummaryLoadError(
+                        AppStrings.Format("GameHistoryLoadErrorTextFormat", ex.Message)),
+                    CancellationToken.None);
+            }
         }
 
         private void ApplyShellDisplayState(ShellConnectionDisplayState state)

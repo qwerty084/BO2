@@ -570,6 +570,15 @@
   <data name="GameHistoryEmptyText" xml:space="preserve">
     <value>Completed games from supported Black Ops II Zombies maps will appear here after they end.</value>
   </data>
+  <data name="GameHistoryLoadErrorTitle" xml:space="preserve">
+    <value>Game History unavailable</value>
+  </data>
+  <data name="GameHistoryLoadErrorText" xml:space="preserve">
+    <value>Saved games could not be loaded.</value>
+  </data>
+  <data name="GameHistoryLoadErrorTextFormat" xml:space="preserve">
+    <value>Saved games could not be loaded: {0}</value>
+  </data>
   <data name="GameHistoryRecordingStatusWaitingTitle" xml:space="preserve">
     <value>History recording idle</value>
   </data>

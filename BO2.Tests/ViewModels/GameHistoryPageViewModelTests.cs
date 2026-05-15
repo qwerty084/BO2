@@ -34,9 +34,40 @@ namespace BO2.Tests.ViewModels
             Assert.Empty(viewModel.SavedGames);
             Assert.True(viewModel.IsListVisible);
             Assert.True(viewModel.IsEmptyVisible);
+            Assert.False(viewModel.IsSummaryLoadErrorVisible);
+            Assert.False(viewModel.IsSavedGamesListVisible);
             Assert.Equal("GameHistoryEmptyTitle", viewModel.EmptyStateTitle);
             Assert.Equal("GameHistoryTrackedGameCountFormat(0)", viewModel.TrackedGameCountText);
             Assert.Equal("GameHistoryRecordingStatusWaitingTitle", viewModel.RecordingStatusTitle);
+        }
+
+        [Fact]
+        public void ShowSummaryLoadError_ShowsErrorInsteadOfEmptyState()
+        {
+            var viewModel = new GameHistoryPageViewModel();
+
+            viewModel.ShowSummaryLoadError("database locked");
+
+            Assert.Empty(viewModel.SavedGames);
+            Assert.True(viewModel.IsListVisible);
+            Assert.False(viewModel.IsEmptyVisible);
+            Assert.False(viewModel.IsSavedGamesListVisible);
+            Assert.True(viewModel.IsSummaryLoadErrorVisible);
+            Assert.Equal("GameHistoryLoadErrorTitle", viewModel.SummaryLoadErrorTitle);
+            Assert.Equal("database locked", viewModel.SummaryLoadErrorText);
+        }
+
+        [Fact]
+        public void ReplaceSummaries_ClearsSummaryLoadError()
+        {
+            var viewModel = new GameHistoryPageViewModel();
+            viewModel.ShowSummaryLoadError("database locked");
+
+            viewModel.ReplaceSummaries([]);
+
+            Assert.False(viewModel.IsSummaryLoadErrorVisible);
+            Assert.True(viewModel.IsEmptyVisible);
+            Assert.Equal(string.Empty, viewModel.SummaryLoadErrorText);
         }
 
         [Fact]

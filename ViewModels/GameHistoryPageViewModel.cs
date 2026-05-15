@@ -19,6 +19,7 @@ namespace BO2.ViewModels
         private bool _isHistoryRailOpen = true;
         private GameHistoryDetailViewModel? _selectedGame;
         private GameHistorySummaryViewModel? _selectedGameSummary;
+        private string? _summaryLoadErrorText;
         private string _recordingStatusTitle = AppStrings.Get("GameHistoryRecordingStatusWaitingTitle");
         private string _recordingStatusText = AppStrings.Get("GameHistoryRecordingStatusWaitingText");
 
@@ -40,7 +41,9 @@ namespace BO2.ViewModels
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsListVisible));
                 OnPropertyChanged(nameof(IsDetailVisible));
+                OnPropertyChanged(nameof(IsSavedGamesListVisible));
                 OnPropertyChanged(nameof(IsEmptyVisible));
+                OnPropertyChanged(nameof(IsSummaryLoadErrorVisible));
                 OnPropertyChanged(nameof(IsHistoryRailVisible));
                 OnPropertyChanged(nameof(IsHistoryRailReopenButtonVisible));
             }
@@ -86,11 +89,15 @@ namespace BO2.ViewModels
 
         public bool HasSavedGames => SavedGames.Count > 0;
 
-        public bool IsEmptyVisible => IsListVisible && !HasSavedGames;
+        public bool IsSavedGamesListVisible => HasSavedGames && !IsSummaryLoadErrorVisible;
+
+        public bool IsEmptyVisible => IsListVisible && !HasSavedGames && !IsSummaryLoadErrorVisible;
 
         public bool IsListVisible => SelectedGame is null;
 
         public bool IsDetailVisible => SelectedGame is not null;
+
+        public bool IsSummaryLoadErrorVisible => IsListVisible && !string.IsNullOrWhiteSpace(_summaryLoadErrorText);
 
         public bool IsHistoryRailVisible => IsDetailVisible && _isHistoryRailOpen;
 
@@ -102,9 +109,22 @@ namespace BO2.ViewModels
 
         public string EmptyStateText => AppStrings.Get("GameHistoryEmptyText");
 
+        public string SummaryLoadErrorTitle => AppStrings.Get("GameHistoryLoadErrorTitle");
+
+        public string SummaryLoadErrorText => _summaryLoadErrorText ?? string.Empty;
+
+        internal void ReplaceSummaries(IEnumerable<GameHistorySummary> summaries)
+        {
+            ArgumentNullException.ThrowIfNull(summaries);
+
+            ReplaceSavedGames(summaries.Select(CreateEntry));
+        }
+
         internal void ReplaceSavedGames(IEnumerable<GameHistoryEntry> savedGames)
         {
             ArgumentNullException.ThrowIfNull(savedGames);
+
+            ClearSummaryLoadError();
 
             string? selectedId = SelectedGameSummary?.Id ?? SelectedGame?.Id;
             bool hadSavedGames = HasSavedGames;
@@ -122,6 +142,7 @@ namespace BO2.ViewModels
             }
 
             OnPropertyChanged(nameof(HasSavedGames));
+            OnPropertyChanged(nameof(IsSavedGamesListVisible));
             OnPropertyChanged(nameof(IsEmptyVisible));
             OnPropertyChanged(nameof(TrackedGameCountText));
 
@@ -137,6 +158,22 @@ namespace BO2.ViewModels
             }
 
             SelectedGameSummary = summaryToSelect;
+        }
+
+        internal void ShowSummaryLoadError(string message)
+        {
+            SelectedGameSummary = null;
+            SavedGames.Clear();
+            _summaryLoadErrorText = string.IsNullOrWhiteSpace(message)
+                ? AppStrings.Get("GameHistoryLoadErrorText")
+                : message;
+
+            OnPropertyChanged(nameof(HasSavedGames));
+            OnPropertyChanged(nameof(IsSavedGamesListVisible));
+            OnPropertyChanged(nameof(IsEmptyVisible));
+            OnPropertyChanged(nameof(IsSummaryLoadErrorVisible));
+            OnPropertyChanged(nameof(SummaryLoadErrorText));
+            OnPropertyChanged(nameof(TrackedGameCountText));
         }
 
         public void SelectGame(GameHistorySummaryViewModel summary)
@@ -345,6 +382,27 @@ namespace BO2.ViewModels
                 CreateDetail(game));
         }
 
+        private static GameHistoryEntry CreateEntry(GameHistorySummary summary)
+        {
+            return new GameHistoryEntry
+            {
+                Id = summary.Id,
+                StartedAt = summary.StartedAt,
+                EndedAt = summary.EndedAt,
+                MapIdentity = summary.MapIdentity,
+                FinalRound = summary.FinalRound,
+                FinalStats = new GameHistoryStats
+                {
+                    Points = summary.FinalStats.Points,
+                    Kills = summary.FinalStats.Kills,
+                    Downs = summary.FinalStats.Downs,
+                    Revives = summary.FinalStats.Revives,
+                    Headshots = summary.FinalStats.Headshots
+                },
+                GameDuration = summary.GameDuration
+            };
+        }
+
         private GameHistoryDetailViewModel CreateDetail(GameHistoryEntry game)
         {
             IReadOnlyList<GameHistoryBoxEvent> boxRolls =
@@ -528,6 +586,20 @@ namespace BO2.ViewModels
             _isHistoryRailOpen = isOpen;
             OnPropertyChanged(nameof(IsHistoryRailVisible));
             OnPropertyChanged(nameof(IsHistoryRailReopenButtonVisible));
+        }
+
+        private void ClearSummaryLoadError()
+        {
+            if (_summaryLoadErrorText is null)
+            {
+                return;
+            }
+
+            _summaryLoadErrorText = null;
+            OnPropertyChanged(nameof(IsSavedGamesListVisible));
+            OnPropertyChanged(nameof(IsEmptyVisible));
+            OnPropertyChanged(nameof(IsSummaryLoadErrorVisible));
+            OnPropertyChanged(nameof(SummaryLoadErrorText));
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

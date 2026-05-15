@@ -42,6 +42,7 @@ namespace BO2
             _widgetWindowManager = new WidgetWindowManager();
             _widgetWindowManager.SettingsChanged += OnWidgetSettingsChanged;
             ViewModel.EventStatusUpdated += OnEventStatusUpdated;
+            _ = ViewModel.LoadGameHistoryAsync(_refreshCancellationTokenSource.Token);
 
             _refreshTimer = new DispatcherTimer
             {

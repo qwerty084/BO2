@@ -80,6 +80,24 @@
             Visibility="{Binding IsListVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
             <Border
                 Padding="18"
+                BorderBrush="{ThemeResource BO2ErrorBrush}"
+                Style="{StaticResource BO2CardBorderStyle}"
+                Visibility="{Binding IsSummaryLoadErrorVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel Spacing="8">
+                    <TextBlock
+                        AutomationProperties.HeadingLevel="Level2"
+                        Foreground="{ThemeResource BO2ErrorBrush}"
+                        Style="{StaticResource BO2CardTitleTextBlockStyle}"
+                        Text="{Binding SummaryLoadErrorTitle, Mode=OneWay}" />
+                    <TextBlock
+                        Style="{StaticResource BO2CaptionTextBlockStyle}"
+                        Text="{Binding SummaryLoadErrorText, Mode=OneWay}"
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Padding="18"
                 Style="{StaticResource BO2CardBorderStyle}"
                 Visibility="{Binding IsEmptyVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
                 <StackPanel Spacing="8">
@@ -101,7 +119,7 @@
                 ItemContainerStyle="{StaticResource HistoryListItemContainerStyle}"
                 ItemsSource="{Binding SavedGames, Mode=OneWay}"
                 SelectionMode="None"
-                Visibility="{Binding HasSavedGames, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                Visibility="{Binding IsSavedGamesListVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
                 <ListView.Header>
                     <Grid
                         Margin="0,0,0,10"
