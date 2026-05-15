@@ -14,6 +14,37 @@ Before a map can be added to the supported map table:
 - Box events must publish, and weapon alias capture must be recorded as present or absent.
 - Open risks must be explicit.
 
+## Die Rise
+
+Status: validated
+Support decision: Die Rise is ready to add to the supported map table as a base-map-token-only standalone identity.
+Validation package: `../../.scratch/all-bo2-map-tracking/die-rise-validation.md`
+
+Die Rise is the next standalone target from the remaining round-based Black Ops II Zombies map plan. The local Steam install contains `zone\all\zm_highrise.ff` and `zone\all\zm_highrise_patch.ff`.
+
+Current evidence:
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Target selection | confirmed | Die Rise was selected as the next standalone target and local fastfiles `zm_highrise.ff` and `zm_highrise_patch.ff` were present. |
+| Map identity | confirmed | Lobby capture observed `ui_mapname=zm_highrise` while `mapname` was empty. Active-match captures observed `mapname=zm_highrise` and `ui_mapname=zm_highrise`. `ui_zm_mapstartlocation` was present as `rooftop`, but it did not vary and should not participate in standalone identity resolution. |
+| Mode dvars | confirmed irrelevant | Active captures observed `g_gametype=zclassic` and `ui_gametype=zclassic`. `party_gametype` remained stale as `TranZit`, so it must not be used as a standalone discriminator. |
+| Lifecycle events | confirmed | Die Rise published `start_of_round` value `1`, `end_of_round` value `2`, next `start_of_round` value `2`, `end_of_round` value `3`, next `start_of_round` value `3`, and two final `end_game` records through Event Monitor shared memory. |
+| Player stats | confirmed | Current Game UI read plausible required stats during Die Rise: points changed `330` -> `1,080`, kills changed `4` -> `14`, headshots changed `2` -> `5`, and downs/revives remained readable at `0`. |
+| Timing | confirmed | Current Game UI showed active plausible timing: round 1 `0:28` / `0:28`, later `1:30` / `0:45`, and post-game timers returned to `--:--`. |
+| Event Monitor health | confirmed | Final shared-memory capture reported snapshot version `6`, compatibility state `2`, no dropped events, no dropped notifies, published notify count `7`, and event count `11`. |
+
+Promotion result:
+
+- Die Rise is ready for the implementation slice that adds a supported map identity from active `mapname=zm_highrise` to internal token `zm_highrise` and friendly name `Die Rise`.
+- The resolver should not require a Green Run start-location token or mode discriminator for Die Rise.
+
+Open risks:
+
+- `mapname` was empty in the Die Rise lobby before spawn, while `ui_mapname=zm_highrise` identified the lobby target. Active-match `mapname=zm_highrise` is the promotion evidence.
+- `party_gametype` remained stale as `TranZit` during the Die Rise validation run, so it must not be used as a standalone map discriminator.
+- This validation does not promote other remaining standalone maps such as Mob of the Dead (`zm_prison`), Nuketown (`zm_nuked`), or Origins (`zm_tomb`).
+
 ## Buried
 
 Status: validated
