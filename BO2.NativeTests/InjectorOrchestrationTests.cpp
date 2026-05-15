@@ -2,7 +2,11 @@
 
 #include "InjectorOrchestration.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -19,6 +23,149 @@ namespace BO2NativeTests
         constexpr DWORD_PTR LocalStartMonitorAddress = LocalModuleBase + 0x1234;
         constexpr DWORD_PTR ExpectedRemoteStartMonitorAddress = RemoteModuleBase + 0x1234;
         const std::wstring DllPath = L"C:\\Temp\\BO2Monitor.dll";
+
+        template<typename T>
+        void WriteStruct(std::vector<std::uint8_t>& bytes, std::size_t offset, const T& value)
+        {
+            Assert::IsTrue(offset <= bytes.size());
+            Assert::IsTrue(sizeof(T) <= bytes.size() - offset);
+            std::memcpy(bytes.data() + offset, &value, sizeof(T));
+        }
+
+        void WriteAscii(std::vector<std::uint8_t>& bytes, std::size_t offset, const char* value)
+        {
+            const std::size_t length = std::strlen(value) + 1;
+            Assert::IsTrue(offset <= bytes.size());
+            Assert::IsTrue(length <= bytes.size() - offset);
+            std::memcpy(bytes.data() + offset, value, length);
+        }
+
+        std::vector<std::uint8_t> CreatePePayload(WORD machine, const char* exportName)
+        {
+            std::vector<std::uint8_t> bytes(0x600, 0);
+
+            IMAGE_DOS_HEADER dosHeader{};
+            dosHeader.e_magic = IMAGE_DOS_SIGNATURE;
+            dosHeader.e_lfanew = 0x80;
+            WriteStruct(bytes, 0, dosHeader);
+
+            IMAGE_NT_HEADERS32 ntHeaders{};
+            ntHeaders.Signature = IMAGE_NT_SIGNATURE;
+            ntHeaders.FileHeader.Machine = machine;
+            ntHeaders.FileHeader.NumberOfSections = 1;
+            ntHeaders.FileHeader.SizeOfOptionalHeader = sizeof(IMAGE_OPTIONAL_HEADER32);
+            ntHeaders.FileHeader.Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_DLL;
+            ntHeaders.OptionalHeader.Magic = IMAGE_NT_OPTIONAL_HDR32_MAGIC;
+            ntHeaders.OptionalHeader.SectionAlignment = 0x1000;
+            ntHeaders.OptionalHeader.FileAlignment = 0x200;
+            ntHeaders.OptionalHeader.SizeOfHeaders = 0x200;
+            ntHeaders.OptionalHeader.SizeOfImage = 0x3000;
+            ntHeaders.OptionalHeader.NumberOfRvaAndSizes = IMAGE_NUMBEROF_DIRECTORY_ENTRIES;
+            ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress = 0x1000;
+            ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size = 0x100;
+            WriteStruct(bytes, 0x80, ntHeaders);
+
+            IMAGE_SECTION_HEADER sectionHeader{};
+            std::memcpy(sectionHeader.Name, ".rdata", 6);
+            sectionHeader.Misc.VirtualSize = 0x400;
+            sectionHeader.VirtualAddress = 0x1000;
+            sectionHeader.SizeOfRawData = 0x400;
+            sectionHeader.PointerToRawData = 0x200;
+            sectionHeader.Characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ;
+            WriteStruct(
+                bytes,
+                0x80 + offsetof(IMAGE_NT_HEADERS32, OptionalHeader) + sizeof(IMAGE_OPTIONAL_HEADER32),
+                sectionHeader);
+
+            IMAGE_EXPORT_DIRECTORY exportDirectory{};
+            exportDirectory.Base = 1;
+            exportDirectory.NumberOfFunctions = 1;
+            exportDirectory.NumberOfNames = 1;
+            exportDirectory.AddressOfFunctions = 0x1040;
+            exportDirectory.AddressOfNames = 0x1044;
+            exportDirectory.AddressOfNameOrdinals = 0x1048;
+            WriteStruct(bytes, 0x200, exportDirectory);
+
+            const std::uint32_t functionRva = 0x1200;
+            const std::uint32_t nameRva = 0x1060;
+            const std::uint16_t ordinal = 0;
+            WriteStruct(bytes, 0x240, functionRva);
+            WriteStruct(bytes, 0x244, nameRva);
+            WriteStruct(bytes, 0x248, ordinal);
+            WriteAscii(bytes, 0x260, exportName);
+
+            return bytes;
+        }
+
+        void WriteBytes(const std::filesystem::path& path, const std::vector<std::uint8_t>& bytes)
+        {
+            std::ofstream stream(path, std::ios::binary);
+            Assert::IsTrue(stream.good());
+            if (!bytes.empty())
+            {
+                stream.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+            }
+
+            Assert::IsTrue(stream.good());
+        }
+
+        void WritePayload(const std::filesystem::path& path, WORD machine, const char* exportName)
+        {
+            WriteBytes(path, CreatePePayload(machine, exportName));
+        }
+
+        class PayloadValidationDirectory
+        {
+        public:
+            PayloadValidationDirectory()
+            {
+                const std::filesystem::path tempDirectory = std::filesystem::temp_directory_path();
+                for (int attempt = 0; attempt < 100; ++attempt)
+                {
+                    const std::filesystem::path candidate =
+                        tempDirectory
+                        / (L"BO2InjectorHelperTests-"
+                            + std::to_wstring(GetCurrentProcessId())
+                            + L"-"
+                            + std::to_wstring(GetTickCount64())
+                            + L"-"
+                            + std::to_wstring(attempt));
+                    std::error_code error;
+                    if (std::filesystem::create_directory(candidate, error))
+                    {
+                        path_ = candidate;
+                        break;
+                    }
+                }
+
+                Assert::IsFalse(path_.empty());
+                helperPath_ = path_ / L"BO2InjectorHelper.exe";
+                WriteBytes(helperPath_, { static_cast<std::uint8_t>('M'), static_cast<std::uint8_t>('Z') });
+            }
+
+            PayloadValidationDirectory(const PayloadValidationDirectory&) = delete;
+            PayloadValidationDirectory& operator=(const PayloadValidationDirectory&) = delete;
+
+            ~PayloadValidationDirectory()
+            {
+                std::error_code error;
+                std::filesystem::remove_all(path_, error);
+            }
+
+            const std::filesystem::path& Path() const noexcept
+            {
+                return path_;
+            }
+
+            const std::filesystem::path& HelperPath() const noexcept
+            {
+                return helperPath_;
+            }
+
+        private:
+            std::filesystem::path path_;
+            std::filesystem::path helperPath_;
+        };
 
         class FakeInjectorWindowsApi final : public BO2InjectorHelper::IInjectorWindowsApi
         {
@@ -392,6 +539,92 @@ namespace BO2NativeTests
                 RemoteModuleBase);
 
             Assert::IsTrue(reinterpret_cast<DWORD_PTR>(remoteAddress) == ExpectedRemoteStartMonitorAddress);
+        }
+
+        TEST_METHOD(PayloadValidationAcceptsCanonicalX86MonitorPayloadWithStartMonitorExport)
+        {
+            PayloadValidationDirectory directory;
+            const std::filesystem::path payloadPath = directory.Path() / L"BO2Monitor.dll";
+            WritePayload(payloadPath, IMAGE_FILE_MACHINE_I386, "StartMonitor");
+            std::wstring canonicalPath;
+
+            const BO2InjectorHelper::PayloadValidationStatus status =
+                BO2InjectorHelper::ValidateMonitorPayload(
+                    payloadPath.wstring(),
+                    directory.HelperPath().wstring(),
+                    canonicalPath);
+
+            Assert::IsTrue(status == BO2InjectorHelper::PayloadValidationStatus::Success);
+            Assert::AreEqual(std::filesystem::canonical(payloadPath).wstring().c_str(), canonicalPath.c_str());
+        }
+
+        TEST_METHOD(PayloadValidationRejectsMonitorPayloadOutsideHelperDirectory)
+        {
+            PayloadValidationDirectory helperDirectory;
+            PayloadValidationDirectory outsideDirectory;
+            const std::filesystem::path payloadPath = outsideDirectory.Path() / L"BO2Monitor.dll";
+            WritePayload(payloadPath, IMAGE_FILE_MACHINE_I386, "StartMonitor");
+            std::wstring canonicalPath;
+
+            const BO2InjectorHelper::PayloadValidationStatus status =
+                BO2InjectorHelper::ValidateMonitorPayload(
+                    payloadPath.wstring(),
+                    helperDirectory.HelperPath().wstring(),
+                    canonicalPath);
+
+            Assert::IsTrue(status == BO2InjectorHelper::PayloadValidationStatus::InvalidPath);
+            Assert::IsTrue(canonicalPath.empty());
+        }
+
+        TEST_METHOD(PayloadValidationRejectsNonMonitorFileNameInsideHelperDirectory)
+        {
+            PayloadValidationDirectory directory;
+            const std::filesystem::path payloadPath = directory.Path() / L"OtherMonitor.dll";
+            WritePayload(payloadPath, IMAGE_FILE_MACHINE_I386, "StartMonitor");
+            std::wstring canonicalPath;
+
+            const BO2InjectorHelper::PayloadValidationStatus status =
+                BO2InjectorHelper::ValidateMonitorPayload(
+                    payloadPath.wstring(),
+                    directory.HelperPath().wstring(),
+                    canonicalPath);
+
+            Assert::IsTrue(status == BO2InjectorHelper::PayloadValidationStatus::InvalidFileName);
+            Assert::IsTrue(canonicalPath.empty());
+        }
+
+        TEST_METHOD(PayloadValidationRejectsNonX86MonitorPayload)
+        {
+            PayloadValidationDirectory directory;
+            const std::filesystem::path payloadPath = directory.Path() / L"BO2Monitor.dll";
+            WritePayload(payloadPath, IMAGE_FILE_MACHINE_AMD64, "StartMonitor");
+            std::wstring canonicalPath;
+
+            const BO2InjectorHelper::PayloadValidationStatus status =
+                BO2InjectorHelper::ValidateMonitorPayload(
+                    payloadPath.wstring(),
+                    directory.HelperPath().wstring(),
+                    canonicalPath);
+
+            Assert::IsTrue(status == BO2InjectorHelper::PayloadValidationStatus::InvalidPeMachine);
+            Assert::IsTrue(canonicalPath.empty());
+        }
+
+        TEST_METHOD(PayloadValidationRejectsX86MonitorPayloadWithoutStartMonitorExport)
+        {
+            PayloadValidationDirectory directory;
+            const std::filesystem::path payloadPath = directory.Path() / L"BO2Monitor.dll";
+            WritePayload(payloadPath, IMAGE_FILE_MACHINE_I386, "OtherExport");
+            std::wstring canonicalPath;
+
+            const BO2InjectorHelper::PayloadValidationStatus status =
+                BO2InjectorHelper::ValidateMonitorPayload(
+                    payloadPath.wstring(),
+                    directory.HelperPath().wstring(),
+                    canonicalPath);
+
+            Assert::IsTrue(status == BO2InjectorHelper::PayloadValidationStatus::MissingStartMonitorExport);
+            Assert::IsTrue(canonicalPath.empty());
         }
 
         TEST_METHOD(SuccessfulInjectionLoadsLibraryThenStartsMonitorAtRemoteExportAddress)
