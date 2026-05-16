@@ -30,16 +30,6 @@ namespace BO2.Services
             _schemaInitializationSemaphore.Dispose();
         }
 
-        public GameHistoryDocument Load()
-        {
-            return LoadDocumentAsync(CancellationToken.None).GetAwaiter().GetResult();
-        }
-
-        public void Save(GameHistoryDocument document)
-        {
-            ReplaceAsync(document, CancellationToken.None).GetAwaiter().GetResult();
-        }
-
         public void Append(GameHistoryEntry entry)
         {
             AppendAsync(entry, CancellationToken.None).GetAwaiter().GetResult();
@@ -164,54 +154,6 @@ namespace BO2.Services
             await EnsureInitializedAsync(cancellationToken);
             using SqliteConnection connection = await OpenConnectionAsync(cancellationToken);
             return await ReadSchemaVersionAsync(connection, cancellationToken);
-        }
-
-        private async Task<GameHistoryDocument> LoadDocumentAsync(CancellationToken cancellationToken)
-        {
-            await EnsureInitializedAsync(cancellationToken);
-
-            using SqliteConnection connection = await OpenConnectionAsync(cancellationToken);
-            List<GameHistoryEntry> entries = [];
-            foreach (GameHistorySummary summary in await LoadSummariesNewestFirstAsync(cancellationToken))
-            {
-                GameHistoryEntry entry = CreateEntry(summary);
-                entry.Rounds = await LoadRoundsAsync(connection, entry.Id, cancellationToken);
-                entry.BoxEvents = await LoadBoxEventsAsync(connection, entry.Id, cancellationToken);
-                entries.Add(entry);
-            }
-
-            return new GameHistoryDocument { Entries = entries };
-        }
-
-        private async Task ReplaceAsync(GameHistoryDocument document, CancellationToken cancellationToken)
-        {
-            ArgumentNullException.ThrowIfNull(document);
-
-            document.Normalize();
-            await EnsureInitializedAsync(cancellationToken);
-
-            using SqliteConnection connection = await OpenConnectionAsync(cancellationToken);
-            using SqliteTransaction transaction = connection.BeginTransaction();
-            try
-            {
-                await ExecuteNonQueryAsync(
-                    connection,
-                    transaction,
-                    "DELETE FROM game_history_entries;",
-                    cancellationToken);
-
-                foreach (GameHistoryEntry entry in document.Entries)
-                {
-                    await InsertEntryAsync(connection, transaction, entry, cancellationToken);
-                }
-
-                transaction.Commit();
-            }
-            catch
-            {
-                transaction.Rollback();
-                throw;
-            }
         }
 
         private async Task EnsureInitializedAsync(CancellationToken cancellationToken)

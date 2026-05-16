@@ -3,32 +3,7 @@ using System.Collections.Generic;
 
 namespace BO2.Services
 {
-    internal sealed class GameHistoryDocument
-    {
-        public const int CurrentVersion = 1;
-
-        public int Version { get; set; } = CurrentVersion;
-
-        public List<GameHistoryEntry> Entries { get; set; } = [];
-
-        public static GameHistoryDocument CreateDefault()
-        {
-            return new GameHistoryDocument();
-        }
-
-        public void Normalize()
-        {
-            Version = CurrentVersion;
-            Entries ??= [];
-
-            foreach (GameHistoryEntry entry in Entries)
-            {
-                entry.Normalize();
-            }
-        }
-    }
-
-    internal record GameHistoryEntry
+    internal sealed record GameHistoryEntry
     {
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
 
@@ -140,8 +115,6 @@ namespace BO2.Services
             };
         }
     }
-
-    internal sealed record GameHistorySavedGame : GameHistoryEntry;
 
     internal sealed class GameHistoryRound
     {

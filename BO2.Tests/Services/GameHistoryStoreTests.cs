@@ -365,56 +365,6 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void SaveAndLoad_PreservesSummaryRoundsAndBoxEventsInSQLite()
-        {
-            var store = new GameHistoryStore(CreateDatabasePath());
-            GameHistoryEntry entry = CreateEntry("saved-1", daysOffset: 0);
-            entry.Rounds =
-            [
-                new GameHistoryRound
-                {
-                    RoundNumber = 1,
-                    StartedAt = entry.StartedAt,
-                    EndedAt = entry.StartedAt.AddSeconds(45),
-                    RoundDuration = TimeSpan.FromSeconds(45),
-                    CumulativeStats = CreateStats(500, 7, 0, 0, 3),
-                    DeltaStats = CreateStats(500, 7, 0, 0, 3)
-                }
-            ];
-            entry.BoxEvents =
-            [
-                new GameHistoryBoxEvent
-                {
-                    ReceivedAt = entry.StartedAt.AddMinutes(5),
-                    RoundNumber = 1,
-                    EventName = "randomization_done",
-                    RawWeaponToken = "ray_gun_zm",
-                    WeaponDisplayName = "Ray Gun",
-                    OwnerId = 7,
-                    StringValue = 100
-                }
-            ];
-
-            store.Save(new GameHistoryDocument { Entries = [entry] });
-            GameHistoryDocument loaded = store.Load();
-
-            GameHistoryEntry loadedEntry = Assert.Single(loaded.Entries);
-            Assert.Equal("saved-1", loadedEntry.Id);
-            Assert.Equal("Town", loadedEntry.MapIdentity.FriendlyName);
-            Assert.Equal(12, loadedEntry.FinalRound);
-            Assert.Equal(12345, loadedEntry.FinalStats.Points);
-            Assert.Equal(TimeSpan.FromMinutes(62), loadedEntry.GameDuration);
-            GameHistoryRound round = Assert.Single(loadedEntry.Rounds);
-            Assert.Equal(1, round.RoundNumber);
-            Assert.Equal(TimeSpan.FromSeconds(45), round.RoundDuration);
-            Assert.Equal(500, round.DeltaStats.Points);
-            GameHistoryBoxEvent boxEvent = Assert.Single(loadedEntry.BoxEvents);
-            Assert.Equal("ray_gun_zm", boxEvent.RawWeaponToken);
-            Assert.Equal("Ray Gun", boxEvent.WeaponDisplayName);
-            Assert.Equal((uint)7, boxEvent.OwnerId);
-        }
-
-        [Fact]
         public async Task LoadSummariesNewestFirstAsync_WhenTokenIsCanceled_Throws()
         {
             var store = new GameHistoryStore(CreateDatabasePath());
