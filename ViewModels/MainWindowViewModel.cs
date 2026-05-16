@@ -573,10 +573,21 @@ namespace BO2.ViewModels
             }
             catch (Exception ex) when (IsNonFatalException(ex))
             {
-                await RunOnDispatcherAsync(
-                    () => _gameHistoryPage.ShowSummaryLoadError(
-                        AppStrings.Format("GameHistoryLoadErrorTextFormat", ex.Message)),
-                    CancellationToken.None);
+                try
+                {
+                    await RunOnDispatcherAsync(
+                        () => _gameHistoryPage.ShowSummaryLoadError(
+                            AppStrings.Format("GameHistoryLoadErrorTextFormat", ex.Message)),
+                        cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (InvalidOperationException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
             }
         }
 
