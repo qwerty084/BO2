@@ -203,6 +203,7 @@ namespace BO2.Services
         private CandidateSession? _candidate;
         private DetectedGame? _observedGame;
         private ulong? _lastObservedEventSequence;
+        private ulong _observationGeneration;
         private uint _lastDroppedEventCount;
         private uint _lastDroppedNotifyCount;
 
@@ -215,6 +216,8 @@ namespace BO2.Services
 
         public GameHistoryEntry? ObserveSnapshot(GameConnectionSnapshot snapshot)
         {
+            ulong observationGeneration = ++_observationGeneration;
+
             if (HasDetectedGameChanged(snapshot.CurrentGame))
             {
                 ResetEventTracking();
@@ -320,13 +323,20 @@ namespace BO2.Services
             if (_candidate is not null)
             {
                 _candidate.ObserveStatsAndGameDuration(observedStats, gameDuration);
-                TryCaptureActiveRoundBaseline(_candidate, observedStats);
+                TryCaptureActiveRoundBaseline(_candidate, observedStats, observationGeneration);
             }
 
             foreach (GameEvent gameEvent in eventBatch.Events)
             {
                 GameHistoryEntry? completedEntry =
-                    ProcessEvent(snapshot, gameEvent, mapIdentity, observedStats, gameDuration, roundDuration);
+                    ProcessEvent(
+                        snapshot,
+                        gameEvent,
+                        mapIdentity,
+                        observedStats,
+                        gameDuration,
+                        roundDuration,
+                        observationGeneration);
                 if (Status.State == GameHistoryRecordingState.Discarded)
                 {
                     return null;
@@ -393,18 +403,19 @@ namespace BO2.Services
             GameMapIdentity mapIdentity,
             GameHistoryStats? observedStats,
             TimeSpan? gameDuration,
-            TimeSpan? roundDuration)
+            TimeSpan? roundDuration,
+            ulong observationGeneration)
         {
             switch (gameEvent.EventType)
             {
                 case GameEventType.StartOfRound:
-                    HandleRoundStart(snapshot, gameEvent, mapIdentity, observedStats, gameDuration);
+                    HandleRoundStart(snapshot, gameEvent, mapIdentity, observedStats, gameDuration, observationGeneration);
                     break;
                 case GameEventType.EndOfRound:
-                    HandleRoundEnd(gameEvent, observedStats, roundDuration);
+                    HandleRoundEnd(gameEvent, observedStats, roundDuration, observationGeneration);
                     break;
                 case GameEventType.EndGame:
-                    return HandleEndGame(gameEvent, observedStats, gameDuration, roundDuration);
+                    return HandleEndGame(gameEvent, observedStats, gameDuration, roundDuration, observationGeneration);
                 case GameEventType.BoxEvent:
                     HandleBoxEvent(gameEvent);
                     break;
@@ -418,7 +429,8 @@ namespace BO2.Services
             GameEvent gameEvent,
             GameMapIdentity mapIdentity,
             GameHistoryStats? observedStats,
-            TimeSpan? gameDuration)
+            TimeSpan? gameDuration,
+            ulong observationGeneration)
         {
             if (gameEvent.LevelTime <= 0)
             {
@@ -438,7 +450,7 @@ namespace BO2.Services
                     gameEvent.ReceivedAt);
                 _candidate.ObserveStatsAndGameDuration(observedStats, gameDuration);
                 _candidate.StartRound(gameEvent.LevelTime, gameEvent.ReceivedAt);
-                TryCaptureActiveRoundBaseline(_candidate, observedStats);
+                TryCaptureActiveRoundBaseline(_candidate, observedStats, observationGeneration);
                 Status = GameHistoryRecordingStatus.Recording(gameEvent.LevelTime, mapIdentity.DisplayName);
                 return;
             }
@@ -450,20 +462,21 @@ namespace BO2.Services
             }
 
             _candidate.StartRound(gameEvent.LevelTime, gameEvent.ReceivedAt);
-            TryCaptureActiveRoundBaseline(_candidate, observedStats);
+            TryCaptureActiveRoundBaseline(_candidate, observedStats, observationGeneration);
         }
 
         private void HandleRoundEnd(
             GameEvent gameEvent,
             GameHistoryStats? observedStats,
-            TimeSpan? roundDuration)
+            TimeSpan? roundDuration,
+            ulong observationGeneration)
         {
             if (_candidate is null)
             {
                 return;
             }
 
-            if (!TryCloseActiveRound(gameEvent.ReceivedAt, observedStats, roundDuration))
+            if (!TryCloseActiveRound(gameEvent.ReceivedAt, observedStats, roundDuration, observationGeneration))
             {
                 Discard(GameHistoryRecordingDiscardReason.MissingRequiredStats);
             }
@@ -473,7 +486,8 @@ namespace BO2.Services
             GameEvent gameEvent,
             GameHistoryStats? observedStats,
             TimeSpan? gameDuration,
-            TimeSpan? roundDuration)
+            TimeSpan? roundDuration,
+            ulong observationGeneration)
         {
             if (_candidate is null)
             {
@@ -482,7 +496,7 @@ namespace BO2.Services
 
             GameHistoryStats? finalStats = observedStats ?? _candidate.LatestStats;
             if (_candidate.ActiveRound is not null
-                && !TryCloseActiveRound(gameEvent.ReceivedAt, finalStats, roundDuration))
+                && !TryCloseActiveRound(gameEvent.ReceivedAt, finalStats, roundDuration, observationGeneration))
             {
                 Discard(GameHistoryRecordingDiscardReason.MissingRequiredStats);
                 return null;
@@ -529,15 +543,18 @@ namespace BO2.Services
         private bool TryCloseActiveRound(
             DateTimeOffset endedAt,
             GameHistoryStats? observedStats,
-            TimeSpan? roundDuration)
+            TimeSpan? roundDuration,
+            ulong observationGeneration)
         {
             if (_candidate?.ActiveRound is not ActiveRound activeRound)
             {
                 return true;
             }
 
-            TryCaptureActiveRoundBaseline(_candidate, observedStats);
-            if (activeRound.BaselineStats is null || observedStats is null)
+            TryCaptureActiveRoundBaseline(_candidate, observedStats, observationGeneration);
+            if (activeRound.BaselineStats is null
+                || activeRound.BaselineObservationGeneration == observationGeneration
+                || observedStats is null)
             {
                 return false;
             }
@@ -558,13 +575,15 @@ namespace BO2.Services
 
         private static void TryCaptureActiveRoundBaseline(
             CandidateSession candidate,
-            GameHistoryStats? observedStats)
+            GameHistoryStats? observedStats,
+            ulong observationGeneration)
         {
             if (candidate.ActiveRound is ActiveRound activeRound
                 && activeRound.BaselineStats is null
                 && observedStats is not null)
             {
                 activeRound.BaselineStats = observedStats;
+                activeRound.BaselineObservationGeneration = observationGeneration;
             }
         }
 
@@ -784,6 +803,8 @@ namespace BO2.Services
             public DateTimeOffset StartedAt { get; } = startedAt;
 
             public GameHistoryStats? BaselineStats { get; set; }
+
+            public ulong? BaselineObservationGeneration { get; set; }
         }
     }
 }

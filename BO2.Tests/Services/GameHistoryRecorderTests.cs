@@ -368,6 +368,25 @@ namespace BO2.Tests.Services
             Assert.Empty(saved.BoxEvents);
         }
 
+        [Fact]
+        public void ObserveSnapshot_WhenRoundStartAndEndAreFirstObservedTogether_DiscardsWithoutSaving()
+        {
+            var recorder = new GameHistoryRecorder();
+            DetectedGame detectedGame = CreateGame();
+            DateTimeOffset startedAt = new(2026, 5, 10, 12, 0, 0, TimeSpan.Zero);
+
+            Assert.Null(recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(500, 7, 0, 0, 3),
+                CreateTimers(gameSeconds: 45, roundSeconds: 45),
+                CreateCompatibleStatus(
+                    CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 1),
+                    CreateEvent(GameEventType.EndOfRound, 1, startedAt.AddSeconds(45), sequence: 2)))));
+
+            Assert.Equal(GameHistoryRecordingState.Discarded, recorder.Status.State);
+            Assert.Equal(GameHistoryRecordingDiscardReason.MissingRequiredStats, recorder.Status.DiscardReason);
+        }
+
         [Theory]
         [InlineData(GameHistoryRecordingDiscardReason.PollingFallback)]
         [InlineData(GameHistoryRecordingDiscardReason.SequenceGap)]
