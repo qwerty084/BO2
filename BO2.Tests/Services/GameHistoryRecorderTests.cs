@@ -531,6 +531,43 @@ namespace BO2.Tests.Services
             Assert.Equal(250, second.FinalStats.Points);
         }
 
+        [Theory]
+        [InlineData(GameConnectionEventMonitorState.Waiting, GameCompatibilityState.WaitingForMonitor)]
+        [InlineData(GameConnectionEventMonitorState.Ready, GameCompatibilityState.UnsupportedVersion)]
+        public void ObserveSnapshot_WhenMonitorBecomesUnavailable_ResetsEventSequenceTracking(
+            GameConnectionEventMonitorState unavailableState,
+            GameCompatibilityState compatibilityState)
+        {
+            var recorder = new GameHistoryRecorder();
+            DetectedGame detectedGame = CreateGame();
+            DateTimeOffset firstStart = new(2026, 5, 10, 12, 0, 0, TimeSpan.Zero);
+            DateTimeOffset restartedStart = firstStart.AddMinutes(5);
+
+            recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(0, 0, 0, 0, 0),
+                CreateTimers(0, 0),
+                CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, firstStart, sequence: 1))));
+
+            Assert.Null(recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(0, 0, 0, 0, 0),
+                CreateTimers(1, 1),
+                new GameConnectionEventMonitorSummary(
+                    unavailableState,
+                    new GameEventMonitorStatus(compatibilityState, 0, 0, 0, [])))));
+
+            GameHistoryEntry saved = CompleteOneRoundGame(
+                recorder,
+                detectedGame,
+                restartedStart,
+                firstSequence: 1,
+                finalPoints: 250);
+
+            Assert.Equal(restartedStart, saved.StartedAt);
+            Assert.Equal(250, saved.FinalStats.Points);
+        }
+
         [Fact]
         public void MarkCompletedEntrySaveFailed_WhenAppendFails_ReportsFailedSaveInsteadOfDiscard()
         {

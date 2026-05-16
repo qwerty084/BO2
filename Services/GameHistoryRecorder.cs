@@ -261,6 +261,7 @@ namespace BO2.Services
             if (eventMonitorSummary.State != GameConnectionEventMonitorState.Ready
                 || eventMonitorSummary.Status.CompatibilityState != GameCompatibilityState.Compatible)
             {
+                ResetEventTracking();
                 if (_candidate is not null)
                 {
                     Discard(GameHistoryRecordingDiscardReason.DroppedLifecycleData);
