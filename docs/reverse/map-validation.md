@@ -1,0 +1,254 @@
+# Map Support Validation
+
+This page records map-level promotion evidence for Game History support. A map is not supported just because its identity token is known; it needs live validation for map identity, lifecycle events, player stats, timing, and box events.
+
+## Game History Support Summary
+
+Status: completed
+
+Game History covers every round-based Black Ops II Zombies map in Steam Zombies when the current map is identified and hook-backed Event Monitor data remains trusted. Unknown, unsupported, or untrusted sessions still fail closed and are not recorded.
+
+Supported targets:
+
+| Map | Identity | Validation package |
+| --- | --- | --- |
+| Town | `mapname=zm_transit`, `ui_zm_mapstartlocation=town` | [Town runtime validation](../../artifacts/reverse/runtime-validation-2026-05-09.md) |
+| Farm | `mapname=zm_transit`, `ui_zm_mapstartlocation=farm` | [Farm validation](../../.scratch/all-bo2-map-tracking/farm-validation.md) |
+| TranZit | `mapname=zm_transit`, `ui_zm_mapstartlocation=transit`, `ui_gametype=zclassic` | [Green Run validation](../../.scratch/all-bo2-map-tracking/green-run-validation.md) |
+| Bus Depot | `mapname=zm_transit`, `ui_zm_mapstartlocation=transit`, `ui_gametype=zstandard` | [Green Run validation](../../.scratch/all-bo2-map-tracking/green-run-validation.md) |
+| Buried | `mapname=zm_buried` | [Buried validation](../../.scratch/all-bo2-map-tracking/buried-validation.md) |
+| Die Rise | `mapname=zm_highrise` | [Die Rise validation](../../.scratch/all-bo2-map-tracking/die-rise-validation.md) |
+| Mob of the Dead | `mapname=zm_prison` | [Mob of the Dead validation](../../.scratch/all-bo2-map-tracking/mob-of-the-dead-validation.md) |
+| Nuketown | `mapname=zm_nuked` | [Nuketown validation](../../.scratch/all-bo2-map-tracking/nuketown-validation.md) |
+| Origins | `mapname=zm_tomb` | [Origins validation](../../.scratch/all-bo2-map-tracking/origins-validation.md) |
+
+Diner remains out of scope because it is Turned-only, not a round-based Game History target.
+
+## Promotion Rules
+
+Before a map can be treated as a Supported Zombies Map:
+
+- The live base map token must be recorded.
+- The live start-location token must be recorded when the map family uses one.
+- `start_of_round`, `end_of_round`, and `end_game` must publish the expected Event Monitor records.
+- Required Player Stats Read fields must be readable and plausible.
+- Game Timing Read behavior must be acceptable for Game History durations.
+- Box events must publish, and weapon alias capture must be recorded as present or absent, when a map-specific box spin is part of the validation scope. Remaining standalone map validation after the 2026-05-15 plan does not require a per-map mystery-box spin unless map-specific notify differences are found.
+- Open risks must be explicit.
+
+## Origins
+
+Status: supported
+Support decision: Origins is a Supported Zombies Map with a base-map-token-only standalone identity.
+Validation package: `../../.scratch/all-bo2-map-tracking/origins-validation.md`
+
+Origins was validated as the final standalone target from the 2026-05-15 round-based Black Ops II Zombies map plan. The local Steam install contains `zone\all\zm_tomb.ff` and `zone\all\zm_tomb_patch.ff`.
+
+Current evidence:
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Target selection | confirmed | Origins was selected as the final standalone target and local fastfiles `zm_tomb.ff` and `zm_tomb_patch.ff` were present. |
+| Map identity | confirmed | Lobby capture observed `ui_mapname=zm_tomb` while `mapname` was empty. Active-match captures observed `mapname=zm_tomb` and `ui_mapname=zm_tomb`. `ui_zm_mapstartlocation` was present as `tomb`, but it did not vary and should not participate in standalone identity resolution. |
+| Mode dvars | confirmed irrelevant | Active captures observed `g_gametype=zclassic` and `ui_gametype=zclassic`. `party_gametype` remained stale as `TranZit`, so it must not be used as a standalone discriminator. |
+| Lifecycle events | confirmed | Origins published `start_of_round` value `1`, `end_of_round` value `2`, next `start_of_round` value `2`, `end_of_round` value `3`, two `end_game` records, and a late retained `start_of_round` value `3` during the rapid game-over transition. |
+| Player stats | confirmed | Current Game UI read plausible required stats during Origins: points changed `170` -> `1,110`, kills changed `2` -> `12`, headshots changed `1` -> `6`, and downs/revives remained readable at `0`. |
+| Timing | confirmed | Current Game UI showed active plausible timing: round 1 `0:14` / `0:14`, round 2 `1:19` / `0:37`, and post-game timers returned to `--:--`. |
+| Event Monitor health | confirmed | Final shared-memory capture reported snapshot version `6`, compatibility state `2`, no dropped events, no dropped notifies, published notify count `7`, and event count `11`. The first four records were startup/candidate records; Origins lifecycle evidence starts at sequence `5`. |
+
+Promotion result:
+
+- Origins is supported from active `mapname=zm_tomb` to internal token `zm_tomb` and friendly name `Origins`.
+- The resolver does not require a Green Run start-location token or mode discriminator for Origins.
+
+Open risks:
+
+- `mapname` was empty in the Origins lobby before spawn, while `ui_mapname=zm_tomb` identified the lobby target. Active-match `mapname=zm_tomb` is the promotion evidence.
+- `party_gametype` remained stale as `TranZit` during the Origins validation run, so it must not be used as a standalone map discriminator.
+- The final ring contained two `end_game` records and a retained `start_of_round` value `3` around the rapid game-over transition. No dropped event or notify counters were observed, and the recorder should keep using existing strict lifecycle rules.
+- This validation package is retained as Origins support evidence.
+
+## Nuketown
+
+Status: supported
+Support decision: Nuketown is a Supported Zombies Map with a base-map-token-only standalone identity.
+Validation package: `../../.scratch/all-bo2-map-tracking/nuketown-validation.md`
+
+Nuketown was validated as the third standalone target from the 2026-05-15 round-based Black Ops II Zombies map plan. The local Steam install contains `zone\all\zm_nuked.ff` and `zone\all\zm_nuked_patch.ff`.
+
+Current evidence:
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Target selection | confirmed | Nuketown was selected as the next standalone target and local fastfiles `zm_nuked.ff` and `zm_nuked_patch.ff` were present. |
+| Map identity | confirmed | Lobby capture observed `ui_mapname=zm_nuked` while `mapname=zm_prison` was stale from the prior Mob of the Dead run. Active-match captures observed `mapname=zm_nuked` and `ui_mapname=zm_nuked`. `ui_zm_mapstartlocation` was present as `nuked`, but it did not vary and should not participate in standalone identity resolution. |
+| Mode dvars | confirmed irrelevant | Active captures observed `g_gametype=zstandard`, `ui_gametype=zstandard`, and `party_gametype=Survival`. These values are corroborating evidence only and should not be required as standalone discriminators. |
+| Lifecycle events | confirmed | Nuketown published `start_of_round` value `1`, `end_of_round` value `2`, next `start_of_round` value `2`, and final `end_game` through Event Monitor shared memory. |
+| Player stats | confirmed | Current Game UI read plausible required stats during Nuketown: points changed `600` -> `1,250` -> `1,430`, kills changed `1` -> `5` -> `6`, downs changed `0` -> `2`, revives changed `0` -> `1`, and headshots remained readable at `0`. |
+| Timing | confirmed | Current Game UI showed active plausible timing: round 1 `0:21` / `0:21`, later round 1 `1:14` / `1:14`, round 2 `2:00` / `0:20`, and game over `2:34` / `0:53`. |
+| Event Monitor health | confirmed | Final shared-memory capture reported snapshot version `6`, compatibility state `2`, no dropped events, no dropped notifies, published notify count `13`, and event count `17`. The first 13 records were retained from the prior run; Nuketown evidence starts at sequence `14`. |
+
+Promotion result:
+
+- Nuketown is supported from active `mapname=zm_nuked` to internal token `zm_nuked` and friendly name `Nuketown`.
+- The resolver does not require a Green Run start-location token or mode discriminator for Nuketown.
+
+Open risks:
+
+- `mapname` was stale as `zm_prison` in the Nuketown lobby before spawn, while `ui_mapname=zm_nuked` identified the lobby target. Active-match `mapname=zm_nuked` is the promotion evidence.
+- The Event Monitor ring still contained retained Mob of the Dead records from the prior validation run. Nuketown evidence is isolated to sequence `14` and later, with no dropped event or notify counters.
+- This validation package is retained as Nuketown support evidence.
+
+## Mob of the Dead
+
+Status: supported
+Support decision: Mob of the Dead is a Supported Zombies Map with a base-map-token-only standalone identity.
+Validation package: `../../.scratch/all-bo2-map-tracking/mob-of-the-dead-validation.md`
+
+Mob of the Dead was validated as the second standalone target from the 2026-05-15 round-based Black Ops II Zombies map plan. The local Steam install contains `zone\all\zm_prison.ff` and `zone\all\zm_prison_patch.ff`.
+
+Current evidence:
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Target selection | confirmed | Mob of the Dead was selected as the next standalone target and local fastfiles `zm_prison.ff` and `zm_prison_patch.ff` were present. |
+| Map identity | confirmed | Lobby capture observed `ui_mapname=zm_prison` while `mapname=zm_highrise` was stale from the prior Die Rise run. Active-match captures observed `mapname=zm_prison` and `ui_mapname=zm_prison`. `ui_zm_mapstartlocation` was present as `prison`, but it did not vary and should not participate in standalone identity resolution. |
+| Mode dvars | confirmed irrelevant | Active captures observed `g_gametype=zclassic` and `ui_gametype=zclassic`. `party_gametype` remained stale as `TranZit`, so it must not be used as a standalone discriminator. |
+| Lifecycle events | confirmed | Mob of the Dead published `start_of_round` value `1`, `end_of_round` value `2`, next `start_of_round` value `2`, `end_of_round` value `3`, next `start_of_round` value `3`, and three final `end_game` records through Event Monitor shared memory. |
+| Player stats | confirmed | Current Game UI read plausible required stats during Mob of the Dead: points changed `0` -> `820` -> `1,580`, kills changed `0` -> `6` -> `14`, headshots changed `0` -> `1` -> `2`, downs changed `0` -> `5`, and revives remained readable at `0`. |
+| Timing | confirmed | Current Game UI showed active plausible timing: round 1 `0:18` / `0:18`, round 2 `1:08` / `0:15`, and game over `2:23` / `0:27`. |
+| Event Monitor health | confirmed | Final shared-memory capture reported snapshot version `6`, compatibility state `2`, no dropped events, no dropped notifies, published notify count `8`, and event count `12`. |
+
+Promotion result:
+
+- Mob of the Dead is supported from active `mapname=zm_prison` to internal token `zm_prison` and friendly name `Mob of the Dead`.
+- The resolver does not require a Green Run start-location token or mode discriminator for Mob of the Dead.
+
+Open risks:
+
+- `mapname` was stale as `zm_highrise` in the Mob of the Dead lobby before spawn, while `ui_mapname=zm_prison` identified the lobby target. Active-match `mapname=zm_prison` is the promotion evidence.
+- `party_gametype` remained stale as `TranZit` during the Mob of the Dead validation run, so it must not be used as a standalone map discriminator.
+- This validation package is retained as Mob of the Dead support evidence.
+
+## Die Rise
+
+Status: supported
+Support decision: Die Rise is a Supported Zombies Map with a base-map-token-only standalone identity.
+Validation package: `../../.scratch/all-bo2-map-tracking/die-rise-validation.md`
+
+Die Rise was validated as a standalone target from the 2026-05-15 round-based Black Ops II Zombies map plan. The local Steam install contains `zone\all\zm_highrise.ff` and `zone\all\zm_highrise_patch.ff`.
+
+Current evidence:
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Target selection | confirmed | Die Rise was selected as the next standalone target and local fastfiles `zm_highrise.ff` and `zm_highrise_patch.ff` were present. |
+| Map identity | confirmed | Lobby capture observed `ui_mapname=zm_highrise` while `mapname` was empty. Active-match captures observed `mapname=zm_highrise` and `ui_mapname=zm_highrise`. `ui_zm_mapstartlocation` was present as `rooftop`, but it did not vary and should not participate in standalone identity resolution. |
+| Mode dvars | confirmed irrelevant | Active captures observed `g_gametype=zclassic` and `ui_gametype=zclassic`. `party_gametype` remained stale as `TranZit`, so it must not be used as a standalone discriminator. |
+| Lifecycle events | confirmed | Die Rise published `start_of_round` value `1`, `end_of_round` value `2`, next `start_of_round` value `2`, `end_of_round` value `3`, next `start_of_round` value `3`, and two final `end_game` records through Event Monitor shared memory. |
+| Player stats | confirmed | Current Game UI read plausible required stats during Die Rise: points changed `330` -> `1,080`, kills changed `4` -> `14`, headshots changed `2` -> `5`, and downs/revives remained readable at `0`. |
+| Timing | confirmed | Current Game UI showed active plausible timing: round 1 `0:28` / `0:28`, later `1:30` / `0:45`, and post-game timers returned to `--:--`. |
+| Event Monitor health | confirmed | Final shared-memory capture reported snapshot version `6`, compatibility state `2`, no dropped events, no dropped notifies, published notify count `7`, and event count `11`. |
+
+Promotion result:
+
+- Die Rise is supported from active `mapname=zm_highrise` to internal token `zm_highrise` and friendly name `Die Rise`.
+- The resolver does not require a Green Run start-location token or mode discriminator for Die Rise.
+
+Open risks:
+
+- `mapname` was empty in the Die Rise lobby before spawn, while `ui_mapname=zm_highrise` identified the lobby target. Active-match `mapname=zm_highrise` is the promotion evidence.
+- `party_gametype` remained stale as `TranZit` during the Die Rise validation run, so it must not be used as a standalone map discriminator.
+- This validation package is retained as Die Rise support evidence.
+
+## Buried
+
+Status: supported
+Support decision: Buried is a Supported Zombies Map with a base-map-token-only standalone identity.
+Validation package: `../../.scratch/all-bo2-map-tracking/buried-validation.md`
+
+Buried was selected as a standalone target because it was the earliest installed non-Green-Run round-based Zombies map on this machine at validation time. The local Steam install contained `zone\all\zm_buried.ff` and `zone\all\zm_tomb.ff`, but not the earlier standalone DLC fastfiles for Nuketown Zombies, Die Rise, or Mob of the Dead.
+
+Current evidence:
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Target selection | confirmed | Buried was selected from installed standalone candidates `zm_buried.ff` and `zm_tomb.ff`. |
+| Map identity | confirmed | Active-match captures observed `mapname=zm_buried` and `ui_mapname=zm_buried`. `ui_zm_mapstartlocation` stayed present as `processing`, but it did not identify a submap and should not participate in standalone identity resolution. |
+| Lifecycle events | confirmed | Buried published `start_of_round` value `1`, `end_of_round` value `2`, next `start_of_round` value `2`, and final `end_game` records through Event Monitor shared memory. |
+| Player stats | confirmed | Current Game UI read plausible required stats during Buried: points changed `500` -> `1,430` -> `720`, kills changed `0` -> `6` -> `13`, headshots reached `6`, and downs/revives remained readable at `0`. |
+| Timing | confirmed | Current Game UI showed active plausible timing: round 1 `0:14` / `0:14`, round 2 `1:07` / `0:04`, post-box `2:23` / `1:20`, and post-game timers returned to `--:--`. |
+| Box events | confirmed | Buried published `randomization_done` and `user_grabbed_weapon` with `tar21_zm`, another `user_grabbed_weapon` with `frag_grenade_zm`, plus `closed` and `chest_accessed`; the UI rendered `tar21_zm` as MTAR. |
+
+Promotion result:
+
+- Buried is supported from active `mapname=zm_buried` to internal token `zm_buried` and friendly name `Buried`.
+- The resolver does not require a Green Run start-location token for Buried.
+
+Open risks:
+
+- `mapname` remained stale as `zm_transit` in the Buried lobby before spawn, while `ui_mapname=zm_buried` identified the lobby target. Active-match `mapname=zm_buried` is the promotion evidence.
+- `party_gametype` remained `TranZit` during the Buried validation run, so it must not be used as a standalone map discriminator.
+- This validation package is retained as Buried support evidence.
+
+## Farm
+
+Status: supported
+Support decision: Farm is a Supported Zombies Map with a Green Run start-location identity.
+Validation package: `../../.scratch/all-bo2-map-tracking/farm-validation.md`
+
+Farm was selected as the first non-Town target because it is a Green Run start-location variant and was the smallest expansion from the original Town-scoped baseline. Existing map identity notes record Green Run as `mapname=zm_transit` plus `ui_zm_mapstartlocation`, with `farm` as an observed start-location token.
+
+Current evidence:
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Target selection | confirmed | Farm is the first validation target. |
+| Map identity | confirmed | Active-match capture observed `mapname=zm_transit`, `ui_mapname=zm_transit`, and `ui_zm_mapstartlocation=farm`, deriving internal token `zm_transit_gump_farm`. |
+| Lifecycle events | confirmed | Farm published `start_of_round`, `end_of_round`, next `start_of_round`, and `end_game` through Event Monitor shared memory. |
+| Player stats | confirmed | Current Game UI read plausible required stats during Farm: points changed `1,420` -> `1,760` -> `810`, kills changed `11` -> `13`, and downs/revives/headshots remained readable at `0`. |
+| Timing | confirmed | Current Game UI showed active monotonic timing: game time advanced `0:12` -> `3:46`, and round time advanced `0:12` -> `2:28`. |
+| Box events | confirmed | Farm published box events. `randomization_done` and `user_grabbed_weapon` carried `saiga12_zm`; another `user_grabbed_weapon` carried `knife_zm`; `closed` and `chest_accessed` published without aliases. |
+
+Prior live behavior:
+
+- The 2026-05-10 Game History validation recorded a live Farm check where the app connected in a Farm lobby, BO2Monitor was compatible, round 1 started, the UI remained in the `Town required` state, and no Farm history entry was saved.
+- That evidence proves the old unsupported-map guard held. It does not prove Farm is safe to promote.
+- The 2026-05-14 live lobby continuation connected the packaged BO2 app to Steam Zombies Farm and confirmed `Monitor compatible`, `ui_mapname=zm_transit`, and `ui_zm_mapstartlocation=farm`. During the observed poll window, the app stayed in lobby state with `--:--` timers and no Event Monitor records.
+- The 2026-05-14 live Farm completion captured active identity, lifecycle, Player Stats Read, Game Timing Read, box events with aliases, and `end_game`. Event Monitor shared memory reported snapshot version `6`, compatibility state `2`, no dropped events/notifies, and published notify count `9` by the final `end_game` capture.
+
+Promotion result:
+
+- Farm has been promoted in managed map identity and Game History recording policy. `ui_zm_mapstartlocation=farm` now resolves to supported internal token `zm_transit_gump_farm` with friendly name `Farm`.
+
+Open risk:
+
+- `mapname` can be empty/null in a Farm lobby; active-match validation should use the post-spawn value.
+
+## Green Run
+
+Status: supported
+Validation package: `../../.scratch/all-bo2-map-tracking/green-run-validation.md`
+
+App-relevant Green Run validation is complete for round-based Game History support. Town, Farm, TranZit, and Bus Depot Survival are supported. A static pass on 2026-05-14 inspected the local Steam install at `C:\Program Files (x86)\Steam\steamapps\common\Call of Duty Black Ops II` and found additional Green Run fastfile candidates in `zone\all`; those static files are not support targets unless they represent a round-based map with live validation.
+
+Supported Green Run targets and technical boundary:
+
+| Target | Observed base map token | Observed start-location token | Mode discriminator | Status |
+| --- | --- | --- | --- | --- |
+| Town | `zm_transit` | `town` | not required | supported |
+| Farm | `zm_transit` | `farm` | not required | supported |
+| TranZit | `zm_transit` | `transit` | `ui_gametype=zclassic`; `ui_zm_gamemodegroup=zclassic`; `party_gametype=TranZit` | supported with mode-aware identity |
+| Bus Depot Survival | `zm_transit` | `transit` | `ui_gametype=zstandard`; `ui_zm_gamemodegroup=zsurvival`; `party_gametype=Survival` | supported with mode-aware identity |
+| Diner | not applicable | not applicable | Turned-only | out of scope; do not promote for this app |
+
+Notes:
+
+- Static fastfile names are not promotion evidence.
+- The 2026-05-14 Bus Depot Survival live run observed `mapname=zm_transit`, `ui_mapname=zm_transit`, and `ui_zm_mapstartlocation=transit` in lobby, active rounds, and post-game. Lifecycle, stats, timing, box aliases, and `end_game` worked with no dropped counters.
+- The 2026-05-15 TranZit re-check observed the same `zm_transit` / `transit` identity tokens, with `g_gametype=zclassic`, `ui_gametype=zclassic`, and `party_gametype=TranZit`.
+- The 2026-05-15 Bus Depot Survival lobby and active round 1 captures observed the same `zm_transit` / `transit` identity tokens, with `g_gametype=zstandard`, `ui_gametype=zstandard`, and `party_gametype=Survival`.
+- `ui_zm_gamemodegroup` is a type `7` enum dvar, not a string dvar. Its observed enum domain is `0=zclassic`, `1=zsurvival`, `2=zencounter`; Bus Depot Survival observed current index `1`, while the TranZit string-reader capture observed current slot `0x00000000`, consistent with index `0`.
+- Bus Depot Survival and TranZit must not be identified from static fastfile names or from `zm_transit` / `transit` alone; the resolver uses mode-aware identity before assigning the correct friendly name.
+- `bus_depot` is only a previous test placeholder. `busstation` was a static fastfile hypothesis, but it was not the observed dvar value for the live Bus Depot Survival run.
+- Diner is Turned-only and not relevant to this Game History app, so the `zm_transit_gump_diner.ff` static fastfile candidate is not a support target.

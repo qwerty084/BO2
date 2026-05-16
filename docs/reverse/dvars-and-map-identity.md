@@ -16,7 +16,11 @@ Green Run map identity is split across dvars:
 | --- | --- | --- | --- |
 | `mapname` | string | `zm_transit` | Base map token. |
 | `ui_mapname` | string | `zm_transit` | UI-facing base map token. |
-| `ui_zm_mapstartlocation` | string | `town` or `farm` | Green Run start-location/submap token. |
+| `ui_zm_mapstartlocation` | string | `town`, `farm`, or `transit` | Green Run start-location/submap token. `transit` is shared by TranZit and Bus Depot Survival. |
+| `ui_gametype` | string | `zclassic` or `zstandard` | Green Run mode discriminator observed live; separates TranZit from Bus Depot Survival when base/start tokens are shared. |
+| `g_gametype` | string | `zclassic` or `zstandard` | Active game type, observed matching `ui_gametype` for the validated TranZit and Bus Depot Survival captures. |
+| `party_gametype` | string | `TranZit` or `Survival` | Party-facing mode label observed live; useful corroborating evidence. |
+| `ui_zm_gamemodegroup` | enum | `0=zclassic`, `1=zsurvival`, `2=zencounter` | Type `7` enum dvar. Decode the current value as an enum index, not as a string pointer. |
 
 For Green Run, derive the internal token as:
 
@@ -31,7 +35,28 @@ Examples:
 | `zm_transit` | `town` | `zm_transit_gump_town` |
 | `zm_transit` | `farm` | `zm_transit_gump_farm` |
 
-For maps without a start-location split, fall back to the base `mapname` value. Validate at least one non-Green-Run map before treating this as complete map support.
+Do not apply this derivation blindly to `ui_zm_mapstartlocation=transit`. Live validation showed both TranZit and Bus Depot Survival use `mapname=zm_transit`, `ui_mapname=zm_transit`, and `ui_zm_mapstartlocation=transit`. They require mode-aware identity:
+
+| Target | Required observed identity |
+| --- | --- |
+| TranZit | `mapname=zm_transit`, `ui_zm_mapstartlocation=transit`, `ui_gametype=zclassic`, `ui_zm_gamemodegroup=zclassic`, `party_gametype=TranZit` |
+| Bus Depot Survival | `mapname=zm_transit`, `ui_zm_mapstartlocation=transit`, `ui_gametype=zstandard`, `ui_zm_gamemodegroup=zsurvival`, `party_gametype=Survival` |
+
+For maps without a start-location split, fall back to the base `mapname` value. Buried validation on 2026-05-15 proved standalone base-map identity: active gameplay observed `mapname=zm_buried` and `ui_mapname=zm_buried`, while `ui_zm_mapstartlocation` remained present as `processing` and did not identify a submap. Die Rise, Mob of the Dead, Nuketown, and Origins later confirmed the same standalone pattern with active `mapname=zm_highrise` / `ui_mapname=zm_highrise`, active `mapname=zm_prison` / `ui_mapname=zm_prison`, active `mapname=zm_nuked` / `ui_mapname=zm_nuked`, and active `mapname=zm_tomb` / `ui_mapname=zm_tomb`; their observed start-location values `rooftop`, `prison`, `nuked`, and `tomb` are corroborating UI/lobby values, not required identity inputs.
+
+Do not use stale lobby-only fields as standalone identity. In the same Buried run, the lobby had `ui_mapname=zm_buried` but `mapname` still held stale `zm_transit` until the match spawned, and `party_gametype` remained `TranZit` throughout the run. Active `mapname=zm_buried` is the supported promotion evidence for Buried.
+
+Mob of the Dead validation on 2026-05-15 repeated that lobby caveat: before spawn, `ui_mapname=zm_prison` and `ui_zm_mapstartlocation=prison` identified the target while `mapname` still held stale `zm_highrise` from the prior Die Rise run. After spawn, active `mapname=zm_prison` became the promotion evidence. `party_gametype` again remained stale as `TranZit`, so it must not be used as a standalone map discriminator.
+
+Nuketown validation on 2026-05-15 repeated the same active-match rule: before spawn, `ui_mapname=zm_nuked` and `ui_zm_mapstartlocation=nuked` identified the target while `mapname` still held stale `zm_prison` from the prior Mob of the Dead run. After spawn, active `mapname=zm_nuked` became the promotion evidence. `g_gametype=zstandard`, `ui_gametype=zstandard`, and `party_gametype=Survival` are corroborating values for the observed run, not required standalone discriminators.
+
+Origins validation on 2026-05-15 repeated the active-match rule: before spawn, `ui_mapname=zm_tomb` and `ui_zm_mapstartlocation=tomb` identified the target while `mapname` was empty. After spawn, active `mapname=zm_tomb` became the promotion evidence. `g_gametype=zclassic` and `ui_gametype=zclassic` are corroborating values for the observed run, and stale `party_gametype=TranZit` must not be used as a standalone discriminator.
+
+Static local fastfile names provide candidate Green Run tokens, but they are not enough to promote support. On 2026-05-14, `zone\all` in the local Steam install contained `zm_transit_gump_busstation.ff`, `zm_transit_gump_diner.ff`, `zm_transit_gump_powerstation.ff`, `zm_transit_gump_tunnel.ff`, `zm_transit_gump_cornfield.ff`, `zm_transit_gump_labs.ff`, `zm_transit_gump_forest.ff`, `zm_transit_gump_forest2.ff`, and `zm_transit_gump_bridge.ff`. Live validation established the app-relevant round-based Green Run identities as Town (`town`), Farm (`farm`), TranZit (`transit` + `zclassic`), and Bus Depot Survival (`transit` + `zstandard`). Diner is Turned-only and is not a current support target for this app.
+
+On 2026-05-14, a live Green Run / Survival / Bus Depot run observed `ui_zm_mapstartlocation=transit` in lobby, active rounds, and post-game. Do not infer Bus Depot support from `zm_transit_gump_busstation.ff`.
+
+On 2026-05-15, focused live captures resolved the TranZit vs Bus Depot ambiguity. TranZit observed `g_gametype=zclassic`, `ui_gametype=zclassic`, and `party_gametype=TranZit`. Bus Depot Survival observed `g_gametype=zstandard`, `ui_gametype=zstandard`, and `party_gametype=Survival` in both lobby and active round 1. A type-aware read of `ui_zm_gamemodegroup` found type `7`, enum domain `0=zclassic`, `1=zsurvival`, `2=zencounter`, and Bus Depot Survival current index `1`.
 
 ## Read-Only Dvar Lookup Evidence
 

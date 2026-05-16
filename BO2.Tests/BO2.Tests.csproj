@@ -22,6 +22,7 @@
     </PackageReference>
     <!-- FakeTimeProvider for deterministic cache-expiry tests -->
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="8.1.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
     <!-- Needed to compile WindowsProcessInfoProvider (linked below) -->
     <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>
@@ -41,6 +42,7 @@
       Exclude="..\Widgets\BoxTrackerWidgetNativeAdapter.cs;..\Widgets\BoxTrackerWidgetSettingsDialog.cs;..\Widgets\BoxTrackerWidgetWindow.cs"
       Link="Widgets\%(Filename)%(Extension)" />
     <Compile Include="..\ViewModels\CurrentGamePageViewModel.cs" Link="ViewModels\CurrentGamePageViewModel.cs" />
+    <Compile Include="..\ViewModels\GameHistory*.cs" Link="ViewModels\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

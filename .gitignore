@@ -13,3 +13,7 @@ TestResults/
 .act-dotnet/
 .act-toolcache/
 artifacts/reverse/ghidra/project/
+artifacts/*
+
+BO2.csproj.lscache
+BO2.Tests/BO2.Tests.csproj.lscache

@@ -27,14 +27,17 @@ namespace BO2.Tests.Services
         {
             Assert.Equal(TimerDisplayKind.Placeholder, TimerDisplayState.Placeholder.Kind);
             Assert.Equal(TimerDisplayState.PlaceholderText, Render(TimerDisplayState.Placeholder));
+            Assert.Null(TimerDisplayState.Placeholder.Duration);
 
             TimerDisplayState active = TimerDisplayState.Active(TimeSpan.FromMilliseconds(61_999));
             TimerDisplayState frozen = TimerDisplayState.Frozen(TimeSpan.FromMilliseconds(125_999));
 
             Assert.Equal(TimerDisplayKind.Active, active.Kind);
             Assert.Equal("1:01", Render(active));
+            Assert.Equal(TimeSpan.FromMilliseconds(61_999), active.Duration);
             Assert.Equal(TimerDisplayKind.Frozen, frozen.Kind);
             Assert.Equal("2:05", Render(frozen));
+            Assert.Equal(TimeSpan.FromMilliseconds(125_999), frozen.Duration);
         }
 
         [Fact]

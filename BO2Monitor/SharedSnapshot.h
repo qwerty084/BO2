@@ -124,6 +124,8 @@ namespace BO2Monitor
         bool WaitForStop(DWORD milliseconds) const;
 
     private:
+        void CloseObjects() noexcept;
+
         HANDLE mappingHandle_ = nullptr;
         HANDLE eventHandle_ = nullptr;
         HANDLE stopEventHandle_ = nullptr;

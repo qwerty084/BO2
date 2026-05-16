@@ -45,8 +45,8 @@
   <data name="ConnectionCardStatusDisconnected" xml:space="preserve">
     <value>Disconnected</value>
   </data>
-  <data name="ConnectionCardStatusMonitoring" xml:space="preserve">
-    <value>Monitoring</value>
+  <data name="ConnectionCardStatusGameDetected" xml:space="preserve">
+    <value>Game detected</value>
   </data>
   <data name="ConnectionCardStatusUnsupported" xml:space="preserve">
     <value>Unsupported</value>
@@ -261,9 +261,6 @@
   <data name="EventMonitorPublishedEventsFormat" xml:space="preserve">
     <value>{0} ({1} notifies published)</value>
   </data>
-  <data name="EventMonitorStatusLabel.Text" xml:space="preserve">
-    <value>Monitor status</value>
-  </data>
   <data name="EventMonitorUnknown" xml:space="preserve">
     <value>Unknown monitor state</value>
   </data>
@@ -332,12 +329,6 @@
   </data>
   <data name="GameTimePlaceholder.Text" xml:space="preserve">
     <value>--:--:--</value>
-  </data>
-  <data name="GameConnectionTitle.Text" xml:space="preserve">
-    <value>Game connection</value>
-  </data>
-  <data name="LastUpdateLabel.Text" xml:space="preserve">
-    <value>Last update</value>
   </data>
   <data name="HeadshotsLabel.Text" xml:space="preserve">
     <value>Headshots</value>
@@ -566,5 +557,206 @@
   </data>
   <data name="Zombie0GEntityLabel" xml:space="preserve">
     <value>Zombie0 GEntity</value>
+  </data>
+  <data name="GameHistoryNavigationItem.Content" xml:space="preserve">
+    <value>Game History</value>
+  </data>
+  <data name="NavigationGameHistory" xml:space="preserve">
+    <value>Game History</value>
+  </data>
+  <data name="GameHistoryEmptyTitle" xml:space="preserve">
+    <value>No saved games yet</value>
+  </data>
+  <data name="GameHistoryEmptyText" xml:space="preserve">
+    <value>Completed games from supported Black Ops II Zombies maps will appear here after they end.</value>
+  </data>
+  <data name="GameHistoryLoadErrorTitle" xml:space="preserve">
+    <value>Game History unavailable</value>
+  </data>
+  <data name="GameHistoryLoadErrorText" xml:space="preserve">
+    <value>Saved games could not be loaded.</value>
+  </data>
+  <data name="GameHistoryLoadErrorTextFormat" xml:space="preserve">
+    <value>Saved games could not be loaded: {0}</value>
+  </data>
+  <data name="GameHistoryDetailLoadingTitle" xml:space="preserve">
+    <value>Loading saved game</value>
+  </data>
+  <data name="GameHistoryDetailLoadingText" xml:space="preserve">
+    <value>Loading rounds, stats, and box activity for the selected game.</value>
+  </data>
+  <data name="GameHistoryDetailLoadErrorTitle" xml:space="preserve">
+    <value>Saved game unavailable</value>
+  </data>
+  <data name="GameHistoryDetailLoadErrorText" xml:space="preserve">
+    <value>The selected saved game could not be loaded.</value>
+  </data>
+  <data name="GameHistoryDetailLoadErrorTextFormat" xml:space="preserve">
+    <value>The selected saved game could not be loaded: {0}</value>
+  </data>
+  <data name="GameHistoryDetailLoadNotFoundTextFormat" xml:space="preserve">
+    <value>The selected saved game was not found: {0}</value>
+  </data>
+  <data name="GameHistoryRecordingStatusWaitingTitle" xml:space="preserve">
+    <value>History recording idle</value>
+  </data>
+  <data name="GameHistoryRecordingStatusWaitingText" xml:space="preserve">
+    <value>Connect to Steam Zombies to evaluate whether the current map can be recorded.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusActiveTitle" xml:space="preserve">
+    <value>Recording game history</value>
+  </data>
+  <data name="GameHistoryRecordingStatusActiveText" xml:space="preserve">
+    <value>This game is being recorded. It will appear in Game History after the game ends.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusActiveMapFormat" xml:space="preserve">
+    <value>{0} is being recorded. It will appear in Game History after the game ends.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusActiveRoundFormat" xml:space="preserve">
+    <value>This game is being recorded. It will appear in Game History after the game ends.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusActiveMapRoundFormat" xml:space="preserve">
+    <value>{0} is being recorded. It will appear in Game History after the game ends.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusWaitingForRoundOneText" xml:space="preserve">
+    <value>Ready to record. Start round 1 and this game will be tracked.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusWaitingForRoundOneMapFormat" xml:space="preserve">
+    <value>{0} is ready to record. Start round 1 and this game will be tracked.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusSavePendingTitle" xml:space="preserve">
+    <value>Saving game</value>
+  </data>
+  <data name="GameHistoryRecordingStatusSavePendingText" xml:space="preserve">
+    <value>The completed game is being saved to Game History.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusSavePendingMapFormat" xml:space="preserve">
+    <value>The completed {0} game is being saved to Game History.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusFailedSaveTitle" xml:space="preserve">
+    <value>Game save failed</value>
+  </data>
+  <data name="GameHistoryRecordingStatusFailedSaveText" xml:space="preserve">
+    <value>The completed game could not be saved to Game History.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusFailedSaveMapFormat" xml:space="preserve">
+    <value>The completed {0} game could not be saved to Game History.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusSavedTitle" xml:space="preserve">
+    <value>Game saved</value>
+  </data>
+  <data name="GameHistoryRecordingStatusSavedText" xml:space="preserve">
+    <value>The completed round-based map game was saved to Game History.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusSavedMapFormat" xml:space="preserve">
+    <value>The completed {0} game was saved to Game History.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusRequiresSupportedMapTitle" xml:space="preserve">
+    <value>Identified map required</value>
+  </data>
+  <data name="GameHistoryRecordingStatusRequiresSupportedMapText" xml:space="preserve">
+    <value>Game History saves completed games on supported Zombies maps. Unknown or unsupported maps are not saved.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusRequiresHookTitle" xml:space="preserve">
+    <value>Live game data required</value>
+  </data>
+  <data name="GameHistoryRecordingStatusRequiresHookText" xml:space="preserve">
+    <value>Game History needs live game data from BO2Monitor. If tracking is off or unavailable, this game will not be saved.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusDiscardedTitle" xml:space="preserve">
+    <value>Game was not saved</value>
+  </data>
+  <data name="GameHistoryRecordingStatusDiscardedSequenceText" xml:space="preserve">
+    <value>This game could not be saved because some live game events were missed.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusDiscardedMissingStatsText" xml:space="preserve">
+    <value>This game could not be saved because some round stats were missing.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusDiscardedConnectionEndedText" xml:space="preserve">
+    <value>This game could not be saved because tracking stopped before the game ended.</value>
+  </data>
+  <data name="GameHistoryFinalRoundFormat" xml:space="preserve">
+    <value>Round {0}</value>
+  </data>
+  <data name="GameHistoryRoundTitleFormat" xml:space="preserve">
+    <value>Round {0}</value>
+  </data>
+  <data name="GameHistoryFinalRoundLabel.Text" xml:space="preserve">
+    <value>Final round</value>
+  </data>
+  <data name="GameHistoryDurationLabel.Text" xml:space="preserve">
+    <value>Duration</value>
+  </data>
+  <data name="GameHistoryBackButtonText.Text" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="GameHistorySavedGamesTitle.Text" xml:space="preserve">
+    <value>Saved games</value>
+  </data>
+  <data name="GameHistoryTrackedGameCountFormat" xml:space="preserve">
+    <value>Tracked games: {0}</value>
+  </data>
+  <data name="GameHistoryDateLabel.Text" xml:space="preserve">
+    <value>Date</value>
+  </data>
+  <data name="GameHistoryMapLabel.Text" xml:space="preserve">
+    <value>Map</value>
+  </data>
+  <data name="GameHistoryFinalStatsTitle.Text" xml:space="preserve">
+    <value>Final stats</value>
+  </data>
+  <data name="GameHistoryRoundsTitle.Text" xml:space="preserve">
+    <value>Rounds</value>
+  </data>
+  <data name="GameHistoryRoundColumnRound.Text" xml:space="preserve">
+    <value>Round</value>
+  </data>
+  <data name="GameHistoryRoundColumnTime.Text" xml:space="preserve">
+    <value>Time</value>
+  </data>
+  <data name="GameHistoryCumulativeStatsLabel.Text" xml:space="preserve">
+    <value>Cumulative</value>
+  </data>
+  <data name="GameHistoryDeltaStatsLabel.Text" xml:space="preserve">
+    <value>Delta</value>
+  </data>
+  <data name="GameHistoryBoxEventsTitle.Text" xml:space="preserve">
+    <value>Mystery Box</value>
+  </data>
+  <data name="GameHistoryBoxEventsDescription.Text" xml:space="preserve">
+    <value>Completed Mystery Box rolls for this game. Averages update from captured roll results.</value>
+  </data>
+  <data name="GameHistoryBoxEventsEmpty" xml:space="preserve">
+    <value>No completed Mystery Box rolls were saved for this game.</value>
+  </data>
+  <data name="GameHistoryBoxEventUnknownWeapon" xml:space="preserve">
+    <value>Unknown weapon</value>
+  </data>
+  <data name="GameHistoryBoxRollPrimaryFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="GameHistoryBoxRollsLabel.Text" xml:space="preserve">
+    <value>Rolls</value>
+  </data>
+  <data name="GameHistoryBoxUniqueWeaponsLabel.Text" xml:space="preserve">
+    <value>Weapons</value>
+  </data>
+  <data name="GameHistoryBoxAveragePerRoundLabel.Text" xml:space="preserve">
+    <value>Avg rolls/round</value>
+  </data>
+  <data name="GameHistoryBoxMostSeenLabel.Text" xml:space="preserve">
+    <value>Most seen</value>
+  </data>
+  <data name="GameHistoryBoxAveragesTitle.Text" xml:space="preserve">
+    <value>Weapon averages</value>
+  </data>
+  <data name="GameHistoryBoxWeaponColumn.Text" xml:space="preserve">
+    <value>Weapon</value>
+  </data>
+  <data name="GameHistoryBoxAverageRoundColumn.Text" xml:space="preserve">
+    <value>Avg round</value>
+  </data>
+  <data name="GameHistoryBoxShareColumn.Text" xml:space="preserve">
+    <value>Share</value>
   </data>
 </root>

@@ -18,6 +18,16 @@ namespace BO2InjectorHelper
         DWORD WaitMilliseconds = 15000;
     };
 
+    enum class PayloadValidationStatus
+    {
+        Success,
+        InvalidPath,
+        InvalidFileName,
+        InvalidPeFormat,
+        InvalidPeMachine,
+        MissingStartMonitorExport
+    };
+
     class IInjectorWindowsApi
     {
     public:
@@ -108,6 +118,13 @@ namespace BO2InjectorHelper
         const std::wstring& dllPath,
         DWORD_PTR remoteModuleBase,
         const InjectorOrchestrationOptions& options = {});
+
+    std::wstring GetCurrentExecutablePath();
+
+    PayloadValidationStatus ValidateMonitorPayload(
+        const std::wstring& dllPath,
+        const std::wstring& helperExecutablePath,
+        std::wstring& canonicalDllPath);
 
     bool InjectLibrary(
         IInjectorWindowsApi& api,

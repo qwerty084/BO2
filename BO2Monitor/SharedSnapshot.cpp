@@ -105,6 +105,11 @@ namespace BO2Monitor
 
     SharedSnapshotWriter::~SharedSnapshotWriter()
     {
+        CloseObjects();
+    }
+
+    void SharedSnapshotWriter::CloseObjects() noexcept
+    {
         if (snapshot_ != nullptr)
         {
             UnmapViewOfFile(snapshot_);
@@ -132,10 +137,12 @@ namespace BO2Monitor
 
     bool SharedSnapshotWriter::Initialize()
     {
+        CloseObjects();
         const DWORD processId = GetCurrentProcessId();
         const std::wstring sharedMemoryName = BuildSharedMemoryName(processId);
         const std::wstring eventHandleName = BuildEventHandleName(processId);
         const std::wstring stopEventHandleName = BuildStopEventHandleName(processId);
+        SetLastError(ERROR_SUCCESS);
         mappingHandle_ = CreateFileMappingW(
             INVALID_HANDLE_VALUE,
             nullptr,
@@ -143,8 +150,9 @@ namespace BO2Monitor
             0,
             static_cast<DWORD>(SharedMemorySize),
             sharedMemoryName.c_str());
-        if (mappingHandle_ == nullptr)
+        if (mappingHandle_ == nullptr || GetLastError() == ERROR_ALREADY_EXISTS)
         {
+            CloseObjects();
             return false;
         }
 
@@ -156,18 +164,23 @@ namespace BO2Monitor
             SharedMemorySize));
         if (snapshot_ == nullptr)
         {
+            CloseObjects();
             return false;
         }
 
+        SetLastError(ERROR_SUCCESS);
         eventHandle_ = CreateEventW(nullptr, FALSE, FALSE, eventHandleName.c_str());
-        if (eventHandle_ == nullptr)
+        if (eventHandle_ == nullptr || GetLastError() == ERROR_ALREADY_EXISTS)
         {
+            CloseObjects();
             return false;
         }
 
+        SetLastError(ERROR_SUCCESS);
         stopEventHandle_ = CreateEventW(nullptr, TRUE, FALSE, stopEventHandleName.c_str());
-        if (stopEventHandle_ == nullptr)
+        if (stopEventHandle_ == nullptr || GetLastError() == ERROR_ALREADY_EXISTS)
         {
+            CloseObjects();
             return false;
         }
 

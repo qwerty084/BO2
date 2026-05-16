@@ -5,8 +5,9 @@ Reads the Event Monitor shared-memory snapshot for a BO2 process.
 .DESCRIPTION
 The current v6 snapshot layout is loaded from
 contracts/EventMonitorSnapshotContract.v1.json. Legacy fallback event counts are
-kept only so this troubleshooting script can still inspect older partial maps
-created before the contract fixed the Event Monitor capacity at 128 records.
+kept only so this troubleshooting script can still inspect older diagnostic
+shared-memory maps created before the contract fixed the Event Monitor capacity
+at 128 records.
 
 .EXAMPLE
 .\tools\Read-BO2MonitorSharedMem.ps1 -ProcessId 1234

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -15,9 +16,14 @@ namespace BO2.ViewModels
 
         private readonly DispatcherQueue _dispatcherQueue;
         private readonly GameConnectionSession _connectionSession;
+        private readonly GameHistoryPersistenceCoordinator _gameHistoryPersistence;
+        private readonly GameHistoryRecorder _gameHistoryRecorder;
         private readonly ShellConnectionDisplayProjector _shellDisplayProjector;
         private readonly CurrentGamePageViewModel _currentGamePage = new();
+        private readonly GameHistoryPageViewModel _gameHistoryPage = new();
         private readonly SemaphoreSlim _operationSemaphore = new(1, 1);
+        private readonly CancellationTokenSource _gameHistoryUiCancellationTokenSource = new();
+        private CancellationTokenSource? _gameHistoryDetailLoadCancellationTokenSource;
         private bool _disposed;
         private string _detectedGameText = AppStrings.Get("NoGameDetected");
         private string _eventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForMonitor");
@@ -44,14 +50,26 @@ namespace BO2.ViewModels
         }
 
         internal MainWindowViewModel(DispatcherQueue dispatcherQueue, GameConnectionSession connectionSession)
+            : this(dispatcherQueue, connectionSession, GameHistoryStore.CreateDefault())
+        {
+        }
+
+        internal MainWindowViewModel(
+            DispatcherQueue dispatcherQueue,
+            GameConnectionSession connectionSession,
+            IGameHistoryStore gameHistoryStore)
         {
             ArgumentNullException.ThrowIfNull(dispatcherQueue);
             ArgumentNullException.ThrowIfNull(connectionSession);
+            ArgumentNullException.ThrowIfNull(gameHistoryStore);
 
             _dispatcherQueue = dispatcherQueue;
             _connectionSession = connectionSession;
+            _gameHistoryPersistence = new GameHistoryPersistenceCoordinator(gameHistoryStore);
+            _gameHistoryRecorder = new GameHistoryRecorder();
             _shellDisplayProjector = new ShellConnectionDisplayProjector();
             _connectionSession.SnapshotChanged += OnSnapshotChanged;
+            _gameHistoryPage.SelectedGameDetailRequested += OnSelectedGameDetailRequested;
 
             _connectionSession.Start();
             ApplyRefreshSnapshot(_connectionSession.GetStatusSnapshot());
@@ -64,6 +82,8 @@ namespace BO2.ViewModels
         public event EventHandler? RefreshRequested;
 
         public CurrentGamePageViewModel CurrentGamePage => _currentGamePage;
+
+        public GameHistoryPageViewModel GameHistoryPage => _gameHistoryPage;
 
         public string StatusText
         {
@@ -249,11 +269,22 @@ namespace BO2.ViewModels
             return TryApplyReadErrorAsync(message, sessionAlreadyHandled: false, cancellationToken);
         }
 
+        public Task LoadGameHistoryAsync(CancellationToken cancellationToken)
+        {
+            return ReloadGameHistoryAsync(cancellationToken);
+        }
+
         public void Dispose()
         {
             _disposed = true;
             _connectionSession.SnapshotChanged -= OnSnapshotChanged;
+            _gameHistoryPage.SelectedGameDetailRequested -= OnSelectedGameDetailRequested;
+            _gameHistoryUiCancellationTokenSource.Cancel();
+            _gameHistoryDetailLoadCancellationTokenSource?.Cancel();
+            _gameHistoryRecorder.DiscardForAppClose();
             _connectionSession.Dispose();
+            _gameHistoryPersistence.Dispose();
+            _gameHistoryUiCancellationTokenSource.Dispose();
             _operationSemaphore.Dispose();
         }
 
@@ -305,6 +336,11 @@ namespace BO2.ViewModels
 
         private static bool IsNonFatalDispatcherException(Exception exception)
         {
+            return IsNonFatalException(exception);
+        }
+
+        private static bool IsNonFatalException(Exception exception)
+        {
             return exception is not OutOfMemoryException
                 && exception is not StackOverflowException
                 && exception is not AccessViolationException
@@ -341,7 +377,218 @@ namespace BO2.ViewModels
         private void ApplyRefreshSnapshot(GameConnectionSnapshot snapshot)
         {
             _currentGamePage.ApplySnapshot(snapshot);
+            GameHistoryEntry? completedEntry = _gameHistoryRecorder.ObserveSnapshot(snapshot);
+            ApplyGameHistoryRecordingStatus(_gameHistoryRecorder.Status);
+            if (completedEntry is not null)
+            {
+                _ = SaveCompletedGameAsync(
+                    completedEntry,
+                    _gameHistoryUiCancellationTokenSource.Token);
+            }
+
             ApplyShellDisplayState(_shellDisplayProjector.Project(snapshot));
+        }
+
+        private void ApplyGameHistoryRecordingStatus(GameHistoryRecordingStatus status)
+        {
+            _gameHistoryPage.ApplyRecordingStatus(status);
+        }
+
+        private async Task SaveCompletedGameAsync(
+            GameHistoryEntry completedEntry,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _gameHistoryPersistence.AppendCompletedEntryAsync(completedEntry);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex) when (IsNonFatalException(ex))
+            {
+                try
+                {
+                    await RunOnDispatcherAsync(
+                        () =>
+                        {
+                            _gameHistoryRecorder.MarkCompletedEntrySaveFailed(completedEntry, ex.Message);
+                            ApplyGameHistoryRecordingStatus(_gameHistoryRecorder.Status);
+                        },
+                        cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (InvalidOperationException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                return;
+            }
+
+            IReadOnlyList<GameHistorySummary>? summaries = null;
+            string? summaryLoadError = null;
+            try
+            {
+                summaries = await _gameHistoryPersistence.LoadSummariesNewestFirstAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex) when (IsNonFatalException(ex))
+            {
+                summaryLoadError = AppStrings.Format("GameHistoryLoadErrorTextFormat", ex.Message);
+            }
+
+            try
+            {
+                await RunOnDispatcherAsync(
+                    () =>
+                    {
+                        if (summaries is not null)
+                        {
+                            _gameHistoryPage.ReplaceSummaries(summaries);
+                            _gameHistoryPage.SelectGameById(completedEntry.Id);
+                        }
+                        else if (summaryLoadError is not null)
+                        {
+                            _gameHistoryPage.ShowSummaryLoadError(summaryLoadError);
+                        }
+
+                        _gameHistoryRecorder.MarkCompletedEntrySaved(completedEntry);
+                        ApplyGameHistoryRecordingStatus(_gameHistoryRecorder.Status);
+                    },
+                    cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (InvalidOperationException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+        }
+
+        private void OnSelectedGameDetailRequested(object? sender, GameHistoryDetailRequestedEventArgs args)
+        {
+            CancellationTokenSource nextCancellationTokenSource = new();
+            CancellationTokenSource? previousCancellationTokenSource = _gameHistoryDetailLoadCancellationTokenSource;
+            _gameHistoryDetailLoadCancellationTokenSource = nextCancellationTokenSource;
+
+            previousCancellationTokenSource?.Cancel();
+
+            _ = LoadSelectedGameDetailAsync(args.Id, nextCancellationTokenSource);
+        }
+
+        private async Task LoadSelectedGameDetailAsync(string id, CancellationTokenSource cancellationTokenSource)
+        {
+            CancellationToken cancellationToken = cancellationTokenSource.Token;
+            GameHistoryEntry? detail = null;
+            string? detailLoadError = null;
+            try
+            {
+                try
+                {
+                    detail = await _gameHistoryPersistence.LoadDetailByIdAsync(id, cancellationToken);
+                    if (detail is null)
+                    {
+                        detailLoadError = AppStrings.Format("GameHistoryDetailLoadNotFoundTextFormat", id);
+                    }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception ex) when (IsNonFatalException(ex))
+                {
+                    detailLoadError = AppStrings.Format("GameHistoryDetailLoadErrorTextFormat", ex.Message);
+                }
+
+                try
+                {
+                    await RunOnDispatcherAsync(
+                        () =>
+                        {
+                            if (!IsSelectedGameSummary(id))
+                            {
+                                return;
+                            }
+
+                            if (detail is not null)
+                            {
+                                _gameHistoryPage.ShowSelectedGameDetail(detail);
+                            }
+                            else if (detailLoadError is not null)
+                            {
+                                _gameHistoryPage.ShowSelectedGameDetailError(detailLoadError);
+                            }
+                        },
+                        cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (InvalidOperationException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+            }
+            finally
+            {
+                if (ReferenceEquals(_gameHistoryDetailLoadCancellationTokenSource, cancellationTokenSource))
+                {
+                    _gameHistoryDetailLoadCancellationTokenSource = null;
+                }
+
+                cancellationTokenSource.Dispose();
+            }
+        }
+
+        private bool IsSelectedGameSummary(string id)
+        {
+            return _gameHistoryPage.SelectedGameSummary is GameHistorySummaryViewModel selectedSummary
+                && string.Equals(selectedSummary.Id, id, StringComparison.Ordinal);
+        }
+
+        private async Task ReloadGameHistoryAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                IReadOnlyList<GameHistorySummary> summaries =
+                    await _gameHistoryPersistence.LoadSummariesNewestFirstAsync(cancellationToken);
+                await RunOnDispatcherAsync(
+                    () => _gameHistoryPage.ReplaceSummaries(summaries),
+                    cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex) when (IsNonFatalException(ex))
+            {
+                try
+                {
+                    await RunOnDispatcherAsync(
+                        () => _gameHistoryPage.ShowSummaryLoadError(
+                            AppStrings.Format("GameHistoryLoadErrorTextFormat", ex.Message)),
+                        cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (InvalidOperationException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+            }
         }
 
         private void ApplyShellDisplayState(ShellConnectionDisplayState state)

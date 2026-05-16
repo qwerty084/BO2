@@ -1,0 +1,711 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="BO2.Views.GameHistoryPageView"
+    x:Name="Root"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:views="using:BO2.Views"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <views:BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <views:BooleanToGridLengthConverter
+            x:Key="HistoryRailWidthConverter"
+            VisibleLength="340" />
+        <views:SignedStatBrushConverter
+            x:Key="SignedStatBrushConverter"
+            NegativeBrush="{ThemeResource BO2ErrorBrush}"
+            NeutralBrush="{ThemeResource BO2TextSecondaryBrush}"
+            PositiveBrush="{ThemeResource BO2SuccessBrush}" />
+        <views:SignedStatBrushConverter
+            x:Key="InvertedSignedStatBrushConverter"
+            Invert="True"
+            NegativeBrush="{ThemeResource BO2ErrorBrush}"
+            NeutralBrush="{ThemeResource BO2TextSecondaryBrush}"
+            PositiveBrush="{ThemeResource BO2SuccessBrush}" />
+
+        <Style x:Key="HistoryListItemContainerStyle" TargetType="ListViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+
+        <Style x:Key="HistoryRailListItemContainerStyle" TargetType="ListViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid RowSpacing="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border
+            Padding="14,10"
+            Background="{ThemeResource BO2Surface1Brush}"
+            BorderBrush="{ThemeResource BO2BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <FontIcon
+                    Margin="0,1,0,0"
+                    FontSize="16"
+                    Foreground="{ThemeResource BO2AccentBrush}"
+                    Glyph="&#xE946;" />
+                <TextBlock
+                    Grid.Column="1"
+                    Style="{StaticResource BO2StatValueTextBlockStyle}"
+                    Text="{Binding RecordingStatusTitle, Mode=OneWay}" />
+                <TextBlock
+                    Grid.Column="2"
+                    Style="{StaticResource BO2BodyTextBlockStyle}"
+                    Text="{Binding RecordingStatusText, Mode=OneWay}"
+                    TextWrapping="WrapWholeWords" />
+            </Grid>
+        </Border>
+
+        <Grid
+            Grid.Row="1"
+            Visibility="{Binding IsListVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border
+                Padding="18"
+                BorderBrush="{ThemeResource BO2ErrorBrush}"
+                Style="{StaticResource BO2CardBorderStyle}"
+                Visibility="{Binding IsSummaryLoadErrorVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel Spacing="8">
+                    <TextBlock
+                        AutomationProperties.HeadingLevel="Level2"
+                        Foreground="{ThemeResource BO2ErrorBrush}"
+                        Style="{StaticResource BO2CardTitleTextBlockStyle}"
+                        Text="{Binding SummaryLoadErrorTitle, Mode=OneWay}" />
+                    <TextBlock
+                        Style="{StaticResource BO2CaptionTextBlockStyle}"
+                        Text="{Binding SummaryLoadErrorText, Mode=OneWay}"
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Padding="18"
+                Style="{StaticResource BO2CardBorderStyle}"
+                Visibility="{Binding IsEmptyVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel Spacing="8">
+                    <TextBlock
+                        AutomationProperties.HeadingLevel="Level2"
+                        Style="{StaticResource BO2CardTitleTextBlockStyle}"
+                        Text="{Binding EmptyStateTitle, Mode=OneWay}" />
+                    <TextBlock
+                        Style="{StaticResource BO2CaptionTextBlockStyle}"
+                        Text="{Binding EmptyStateText, Mode=OneWay}"
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+            </Border>
+
+            <ListView
+                x:Name="SavedGamesListView"
+                IsItemClickEnabled="True"
+                ItemClick="OnSavedGameItemClick"
+                ItemContainerStyle="{StaticResource HistoryListItemContainerStyle}"
+                ItemsSource="{Binding SavedGames, Mode=OneWay}"
+                SelectionMode="None"
+                Visibility="{Binding IsSavedGamesListVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                <ListView.Header>
+                    <Grid
+                        Margin="0,0,0,10"
+                        ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            x:Uid="GameHistorySavedGamesTitle"
+                            AutomationProperties.HeadingLevel="Level2"
+                            Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                        <TextBlock
+                            Grid.Column="1"
+                            HorizontalAlignment="Right"
+                            Style="{StaticResource BO2CaptionTextBlockStyle}"
+                            Text="{Binding DataContext.TrackedGameCountText, ElementName=Root, Mode=OneWay}" />
+                    </Grid>
+                </ListView.Header>
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Border
+                            Padding="16,14"
+                            Background="{ThemeResource BO2Surface1Brush}"
+                            BorderBrush="{ThemeResource BO2BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                            <Grid ColumnSpacing="28" RowSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="3*" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Spacing="4">
+                                    <TextBlock
+                                        Style="{StaticResource BO2StatValueTextBlockStyle}"
+                                        Text="{Binding MapNameText, Mode=OneWay}"
+                                        TextTrimming="CharacterEllipsis" />
+                                    <TextBlock
+                                        Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                        Text="{Binding DateText, Mode=OneWay}"
+                                        TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+
+                                <StackPanel
+                                    Grid.Column="1"
+                                    MinWidth="112"
+                                    Spacing="4">
+                                    <TextBlock
+                                        x:Uid="GameHistoryFinalRoundLabel"
+                                        Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <TextBlock
+                                        Style="{StaticResource BO2StatValueTextBlockStyle}"
+                                        Text="{Binding FinalRoundText, Mode=OneWay}" />
+                                </StackPanel>
+
+                                <StackPanel
+                                    Grid.Column="2"
+                                    MinWidth="96"
+                                    Spacing="4">
+                                    <TextBlock
+                                        x:Uid="GameHistoryDurationLabel"
+                                        Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <TextBlock
+                                        Style="{StaticResource BO2StatValueTextBlockStyle}"
+                                        Text="{Binding GameDurationText, Mode=OneWay}" />
+                                </StackPanel>
+
+                                <Grid
+                                    Grid.Column="3"
+                                    ColumnSpacing="18">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="3">
+                                        <TextBlock x:Uid="PointsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding PointsText, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="3">
+                                        <TextBlock x:Uid="KillsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding KillsText, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Spacing="3">
+                                        <TextBlock x:Uid="HeadshotsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding HeadshotsText, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="3" Spacing="3">
+                                        <TextBlock x:Uid="DownsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding DownsText, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4" Spacing="3">
+                                        <TextBlock x:Uid="RevivesLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding RevivesText, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Grid>
+
+        <Grid
+            Grid.Row="1"
+            Visibility="{Binding IsDetailVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="{Binding DataContext.IsHistoryRailVisible, ElementName=Root, Mode=OneWay, Converter={StaticResource HistoryRailWidthConverter}}" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border
+                Margin="0,0,16,0"
+                Style="{StaticResource BO2CardBorderStyle}"
+                Visibility="{Binding IsHistoryRailVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid RowSpacing="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                x:Uid="GameHistorySavedGamesTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                            <TextBlock
+                                Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                Text="{Binding TrackedGameCountText, Mode=OneWay}" />
+                        </StackPanel>
+                        <Button
+                            Grid.Column="1"
+                            AutomationProperties.Name="Hide saved games sidebar"
+                            Click="OnHideHistoryRailButtonClick"
+                            MinWidth="0"
+                            Padding="8,4"
+                            Style="{StaticResource BO2SecondaryButtonStyle}"
+                            ToolTipService.ToolTip="Hide saved games sidebar">
+                            <FontIcon
+                                FontSize="14"
+                                Glyph="&#xE72B;" />
+                        </Button>
+                    </Grid>
+
+                    <ListView
+                        Grid.Row="1"
+                        IsItemClickEnabled="True"
+                        ItemClick="OnSavedGameItemClick"
+                        ItemContainerStyle="{StaticResource HistoryRailListItemContainerStyle}"
+                        ItemsSource="{Binding SavedGames, Mode=OneWay}"
+                        SelectedItem="{Binding SelectedGameSummary, Mode=TwoWay}"
+                        SelectionMode="Single">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Border
+                                    Background="{ThemeResource BO2Surface2Brush}"
+                                    BorderBrush="{ThemeResource BO2BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                    <Grid>
+                                        <Rectangle
+                                            Width="3"
+                                            HorizontalAlignment="Left"
+                                            Fill="{ThemeResource BO2AccentBrush}"
+                                            RadiusX="1.5"
+                                            RadiusY="1.5"
+                                            Visibility="{Binding IsSelected, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                        <StackPanel
+                                            Margin="12"
+                                            Spacing="8">
+                                            <Grid ColumnSpacing="10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="2">
+                                                    <TextBlock
+                                                        Style="{StaticResource BO2StatValueTextBlockStyle}"
+                                                        Text="{Binding MapNameText, Mode=OneWay}"
+                                                        TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock
+                                                        Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                                        Text="{Binding DateText, Mode=OneWay}"
+                                                        TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                                <TextBlock
+                                                    Grid.Column="1"
+                                                    Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                                    Text="{Binding GameDurationText, Mode=OneWay}" />
+                                            </Grid>
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock
+                                                    Style="{StaticResource BO2StatValueTextBlockStyle}"
+                                                    Text="{Binding FinalRoundText, Mode=OneWay}" />
+                                                <TextBlock
+                                                    Grid.Column="1"
+                                                    HorizontalAlignment="Right"
+                                                    Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                                    Text="{Binding KillsText, Mode=OneWay}" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+            </Border>
+
+            <Border
+                Grid.Column="1"
+                Padding="18"
+                Style="{StaticResource BO2CardBorderStyle}"
+                Visibility="{Binding IsSelectedGameDetailLoadingVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel Spacing="10">
+                    <ProgressRing
+                        Width="28"
+                        Height="28"
+                        HorizontalAlignment="Left"
+                        IsActive="True" />
+                    <TextBlock
+                        AutomationProperties.HeadingLevel="Level2"
+                        Style="{StaticResource BO2CardTitleTextBlockStyle}"
+                        Text="{Binding SelectedGameDetailLoadingTitle, Mode=OneWay}" />
+                    <TextBlock
+                        Style="{StaticResource BO2CaptionTextBlockStyle}"
+                        Text="{Binding SelectedGameDetailLoadingText, Mode=OneWay}"
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Grid.Column="1"
+                Padding="18"
+                BorderBrush="{ThemeResource BO2ErrorBrush}"
+                Style="{StaticResource BO2CardBorderStyle}"
+                Visibility="{Binding IsSelectedGameDetailErrorVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel Spacing="8">
+                    <TextBlock
+                        AutomationProperties.HeadingLevel="Level2"
+                        Foreground="{ThemeResource BO2ErrorBrush}"
+                        Style="{StaticResource BO2CardTitleTextBlockStyle}"
+                        Text="{Binding SelectedGameDetailErrorTitle, Mode=OneWay}" />
+                    <TextBlock
+                        Style="{StaticResource BO2CaptionTextBlockStyle}"
+                        Text="{Binding SelectedGameDetailErrorText, Mode=OneWay}"
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+            </Border>
+
+            <ScrollViewer
+                Grid.Column="1"
+                HorizontalScrollBarVisibility="Disabled"
+                VerticalScrollBarVisibility="Auto"
+                Visibility="{Binding IsSelectedGameDetailContentVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel Spacing="16">
+                    <Border Style="{StaticResource BO2CardBorderStyle}">
+                        <StackPanel Spacing="16">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Button
+                                    AutomationProperties.Name="Show saved games sidebar"
+                                    Click="OnShowHistoryRailButtonClick"
+                                    Margin="0,0,20,0"
+                                    MinWidth="0"
+                                    Padding="8,4"
+                                    Style="{StaticResource BO2SecondaryButtonStyle}"
+                                    ToolTipService.ToolTip="Show saved games sidebar"
+                                    Visibility="{Binding IsHistoryRailReopenButtonVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <FontIcon
+                                        FontSize="14"
+                                        Glyph="&#xE72A;" />
+                                </Button>
+
+                                <StackPanel
+                                    Grid.Column="1"
+                                    Spacing="4">
+                                    <TextBlock
+                                        AutomationProperties.HeadingLevel="Level2"
+                                        FontSize="22"
+                                        FontWeight="SemiBold"
+                                        Foreground="{ThemeResource BO2TextPrimaryBrush}"
+                                        LineHeight="30"
+                                        Text="{Binding SelectedGame.MapNameText, Mode=OneWay}"
+                                        TextTrimming="CharacterEllipsis" />
+                                    <TextBlock
+                                        Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                        Text="{Binding SelectedGame.DateText, Mode=OneWay}"
+                                        TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+
+                                <StackPanel
+                                    Grid.Column="2"
+                                    Margin="20,0,0,0"
+                                    MinWidth="120"
+                                    Spacing="4">
+                                    <TextBlock
+                                        x:Uid="GameHistoryFinalRoundLabel"
+                                        Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <TextBlock
+                                        Style="{StaticResource BO2StatValueTextBlockStyle}"
+                                        Text="{Binding SelectedGame.FinalRoundText, Mode=OneWay}" />
+                                </StackPanel>
+
+                                <StackPanel
+                                    Grid.Column="3"
+                                    HorizontalAlignment="Right"
+                                    Margin="20,0,0,0"
+                                    MinWidth="96"
+                                    Spacing="4">
+                                    <TextBlock
+                                        x:Uid="GameHistoryDurationLabel"
+                                        HorizontalAlignment="Right"
+                                        Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                        TextAlignment="Right" />
+                                    <TextBlock
+                                        HorizontalAlignment="Right"
+                                        Style="{StaticResource BO2StatValueTextBlockStyle}"
+                                        Text="{Binding SelectedGame.GameDurationText, Mode=OneWay}"
+                                        TextAlignment="Right" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Rectangle
+                                Height="1"
+                                Fill="{ThemeResource BO2BorderBrush}" />
+
+                            <StackPanel Spacing="10">
+                                <TextBlock
+                                    x:Uid="GameHistoryFinalStatsTitle"
+                                    Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                                <Grid ColumnSpacing="20">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="3">
+                                        <TextBlock x:Uid="PointsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding SelectedGame.FinalStats.PointsText, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="3">
+                                        <TextBlock x:Uid="KillsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding SelectedGame.FinalStats.KillsText, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Spacing="3">
+                                        <TextBlock x:Uid="HeadshotsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding SelectedGame.FinalStats.HeadshotsText, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="3" Spacing="3">
+                                        <TextBlock x:Uid="DownsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding SelectedGame.FinalStats.DownsText, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4" Spacing="3">
+                                        <TextBlock x:Uid="RevivesLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding SelectedGame.FinalStats.RevivesText, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Spacing="10">
+                        <TextBlock
+                            x:Uid="GameHistoryRoundsTitle"
+                            AutomationProperties.HeadingLevel="Level2"
+                            Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                        <Border Style="{StaticResource BO2CardBorderStyle}">
+                            <StackPanel Spacing="0">
+                                <Grid
+                                    Padding="0,0,0,10"
+                                    ColumnSpacing="18">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="96" />
+                                        <ColumnDefinition Width="80" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Uid="GameHistoryRoundColumnRound" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <TextBlock Grid.Column="1" x:Uid="GameHistoryRoundColumnTime" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <TextBlock Grid.Column="2" x:Uid="PointsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <TextBlock Grid.Column="3" x:Uid="KillsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <TextBlock Grid.Column="4" x:Uid="HeadshotsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <TextBlock Grid.Column="5" x:Uid="DownsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                    <TextBlock Grid.Column="6" x:Uid="RevivesLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                </Grid>
+
+                                <ItemsControl ItemsSource="{Binding SelectedGame.Rounds, Mode=OneWay}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border
+                                                Padding="0,10"
+                                                BorderBrush="{ThemeResource BO2BorderBrush}"
+                                                BorderThickness="0,1,0,0">
+                                                <Grid ColumnSpacing="18">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="96" />
+                                                        <ColumnDefinition Width="80" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock
+                                                        Style="{StaticResource BO2StatValueTextBlockStyle}"
+                                                        Text="{Binding RoundTitleText, Mode=OneWay}" />
+                                                    <TextBlock
+                                                        Grid.Column="1"
+                                                        Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                                        Text="{Binding DurationText, Mode=OneWay}" />
+                                                    <StackPanel Grid.Column="2" Spacing="2">
+                                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding CumulativeStats.PointsText, Mode=OneWay}" />
+                                                        <TextBlock
+                                                            Foreground="{Binding DeltaStats.PointsText, Mode=OneWay, Converter={StaticResource SignedStatBrushConverter}}"
+                                                            Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                                            Text="{Binding DeltaStats.PointsText, Mode=OneWay}" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="3" Spacing="2">
+                                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding CumulativeStats.KillsText, Mode=OneWay}" />
+                                                        <TextBlock
+                                                            Foreground="{Binding DeltaStats.KillsText, Mode=OneWay, Converter={StaticResource SignedStatBrushConverter}}"
+                                                            Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                                            Text="{Binding DeltaStats.KillsText, Mode=OneWay}" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="4" Spacing="2">
+                                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding CumulativeStats.HeadshotsText, Mode=OneWay}" />
+                                                        <TextBlock
+                                                            Foreground="{Binding DeltaStats.HeadshotsText, Mode=OneWay, Converter={StaticResource SignedStatBrushConverter}}"
+                                                            Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                                            Text="{Binding DeltaStats.HeadshotsText, Mode=OneWay}" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="5" Spacing="2">
+                                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding CumulativeStats.DownsText, Mode=OneWay}" />
+                                                        <TextBlock
+                                                            Foreground="{Binding DeltaStats.DownsText, Mode=OneWay, Converter={StaticResource InvertedSignedStatBrushConverter}}"
+                                                            Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                                            Text="{Binding DeltaStats.DownsText, Mode=OneWay}" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="6" Spacing="2">
+                                                        <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding CumulativeStats.RevivesText, Mode=OneWay}" />
+                                                        <TextBlock
+                                                            Foreground="{Binding DeltaStats.RevivesText, Mode=OneWay, Converter={StaticResource SignedStatBrushConverter}}"
+                                                            Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                                            Text="{Binding DeltaStats.RevivesText, Mode=OneWay}" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="4">
+                            <TextBlock
+                                x:Uid="GameHistoryBoxEventsTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+                            <TextBlock
+                                x:Uid="GameHistoryBoxEventsDescription"
+                                Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                TextWrapping="WrapWholeWords" />
+                        </StackPanel>
+
+                        <Border Style="{StaticResource BO2CardBorderStyle}">
+                            <StackPanel Spacing="18">
+                                <TextBlock
+                                    Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                    Text="{Binding SelectedGame.BoxEventsEmptyText, Mode=OneWay}"
+                                    Visibility="{Binding SelectedGame.IsBoxEventsEmpty, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                                <StackPanel
+                                    Spacing="18"
+                                    Visibility="{Binding SelectedGame.HasBoxEvents, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <Grid ColumnSpacing="18">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="1.3*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Spacing="2">
+                                            <TextBlock x:Uid="GameHistoryBoxRollsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                            <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding SelectedGame.BoxRollCountText, Mode=OneWay}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock x:Uid="GameHistoryBoxUniqueWeaponsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                            <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding SelectedGame.BoxUniqueWeaponCountText, Mode=OneWay}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Spacing="2">
+                                            <TextBlock x:Uid="GameHistoryBoxAveragePerRoundLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                            <TextBlock Style="{StaticResource BO2StatValueTextBlockStyle}" Text="{Binding SelectedGame.BoxAverageRollsPerRoundText, Mode=OneWay}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="3" Spacing="2">
+                                            <TextBlock x:Uid="GameHistoryBoxMostSeenLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                            <TextBlock
+                                                Style="{StaticResource BO2StatValueTextBlockStyle}"
+                                                Text="{Binding SelectedGame.BoxMostSeenWeaponText, Mode=OneWay}"
+                                                TextWrapping="WrapWholeWords" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Rectangle Height="1" Fill="{ThemeResource BO2BorderBrush}" />
+
+                                    <StackPanel Spacing="10">
+                                        <TextBlock
+                                            x:Uid="GameHistoryBoxAveragesTitle"
+                                            Style="{StaticResource BO2CardTitleTextBlockStyle}" />
+
+                                        <Grid ColumnSpacing="18">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock x:Uid="GameHistoryBoxWeaponColumn" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                            <TextBlock Grid.Column="1" x:Uid="GameHistoryBoxRollsLabel" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                            <TextBlock Grid.Column="2" x:Uid="GameHistoryBoxAverageRoundColumn" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                            <TextBlock Grid.Column="3" x:Uid="GameHistoryBoxShareColumn" Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        </Grid>
+
+                                        <ItemsControl ItemsSource="{Binding SelectedGame.BoxWeaponAverages, Mode=OneWay}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border
+                                                        Padding="0,10"
+                                                        BorderBrush="{ThemeResource BO2BorderBrush}"
+                                                        BorderThickness="0,1,0,0">
+                                                        <Grid ColumnSpacing="18">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="2*" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <TextBlock
+                                                                Style="{StaticResource BO2StatValueTextBlockStyle}"
+                                                                Text="{Binding WeaponText, Mode=OneWay}"
+                                                                TextWrapping="WrapWholeWords" />
+                                                            <TextBlock Grid.Column="1" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding RollCountText, Mode=OneWay}" />
+                                                            <TextBlock Grid.Column="2" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding AverageRoundText, Mode=OneWay}" />
+                                                            <TextBlock Grid.Column="3" Style="{StaticResource BO2BodyTextBlockStyle}" Text="{Binding ShareText, Mode=OneWay}" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</UserControl>

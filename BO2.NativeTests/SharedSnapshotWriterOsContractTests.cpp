@@ -316,6 +316,91 @@ namespace BO2NativeTests
             Assert::IsTrue(stopEvent.Get() == nullptr);
         }
 
+        TEST_METHOD(InitializeFailsClosedWhenSharedMemoryAlreadyExists)
+        {
+            AssertNoCurrentProcessWriterObjects();
+            UniqueHandle sharedMemoryBlocker(CreateFileMappingW(
+                INVALID_HANDLE_VALUE,
+                nullptr,
+                PAGE_READWRITE,
+                0,
+                static_cast<DWORD>(BO2Monitor::SharedMemorySize),
+                CurrentProcessSharedMemoryName().c_str()));
+            Assert::IsTrue(sharedMemoryBlocker.Get() != nullptr);
+
+            BO2Monitor::SharedSnapshotWriter writer;
+
+            Assert::IsFalse(writer.Initialize());
+
+            writer.SetCompatibility(BO2Monitor::GameCompatibilityState::Compatible);
+            writer.SetNotifyEventCounters(1u, 2u);
+            writer.PublishEvent(BO2Monitor::GameEventType::RoundChanged, "round_changed", 3);
+            Assert::IsFalse(writer.WaitForStop(0));
+
+            UniqueHandle updateEvent(OpenEventW(SYNCHRONIZE, FALSE, CurrentProcessEventName().c_str()));
+            Assert::IsTrue(updateEvent.Get() == nullptr);
+
+            UniqueHandle stopEvent(OpenEventW(SYNCHRONIZE, FALSE, CurrentProcessStopEventName().c_str()));
+            Assert::IsTrue(stopEvent.Get() == nullptr);
+
+            sharedMemoryBlocker.Reset();
+            AssertNoCurrentProcessWriterObjects();
+        }
+
+        TEST_METHOD(InitializeFailsClosedWhenUpdateEventAlreadyExists)
+        {
+            AssertNoCurrentProcessWriterObjects();
+            UniqueHandle updateEventBlocker(CreateEventW(
+                nullptr,
+                FALSE,
+                FALSE,
+                CurrentProcessEventName().c_str()));
+            Assert::IsTrue(updateEventBlocker.Get() != nullptr);
+
+            BO2Monitor::SharedSnapshotWriter writer;
+
+            Assert::IsFalse(writer.Initialize());
+
+            writer.SetCompatibility(BO2Monitor::GameCompatibilityState::Compatible);
+            Assert::AreEqual(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(updateEventBlocker.Get(), 0));
+
+            UniqueHandle mapping(OpenFileMappingW(FILE_MAP_READ, FALSE, CurrentProcessSharedMemoryName().c_str()));
+            Assert::IsTrue(mapping.Get() == nullptr);
+
+            UniqueHandle stopEvent(OpenEventW(SYNCHRONIZE, FALSE, CurrentProcessStopEventName().c_str()));
+            Assert::IsTrue(stopEvent.Get() == nullptr);
+
+            updateEventBlocker.Reset();
+            AssertNoCurrentProcessWriterObjects();
+        }
+
+        TEST_METHOD(InitializeFailsClosedWhenStopEventAlreadyExists)
+        {
+            AssertNoCurrentProcessWriterObjects();
+            UniqueHandle stopEventBlocker(CreateEventW(
+                nullptr,
+                TRUE,
+                FALSE,
+                CurrentProcessStopEventName().c_str()));
+            Assert::IsTrue(stopEventBlocker.Get() != nullptr);
+
+            BO2Monitor::SharedSnapshotWriter writer;
+
+            Assert::IsFalse(writer.Initialize());
+
+            Assert::IsTrue(SetEvent(stopEventBlocker.Get()) != FALSE);
+            Assert::IsFalse(writer.WaitForStop(0));
+
+            UniqueHandle mapping(OpenFileMappingW(FILE_MAP_READ, FALSE, CurrentProcessSharedMemoryName().c_str()));
+            Assert::IsTrue(mapping.Get() == nullptr);
+
+            UniqueHandle updateEvent(OpenEventW(SYNCHRONIZE, FALSE, CurrentProcessEventName().c_str()));
+            Assert::IsTrue(updateEvent.Get() == nullptr);
+
+            stopEventBlocker.Reset();
+            AssertNoCurrentProcessWriterObjects();
+        }
+
         TEST_METHOD(DestructorClosesProcessScopedObjects)
         {
             {

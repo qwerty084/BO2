@@ -26,6 +26,8 @@
 
 ## Key conventions
 
+- Line endings are repository policy: keep all tracked text files CRLF on checkout and after edits, except `*.sh` files which must stay LF. Respect `.editorconfig` and `.gitattributes`; do not introduce LF-only churn in Windows project files, XAML, C#, markdown, JSON, XML, manifests, or PowerShell scripts.
+- When using a patch/editing tool that may write LF, immediately normalize each touched non-`*.sh` text file back to CRLF before continuing. Treat line-ending normalization as part of the edit itself, not a late cleanup step.
 - Keep XAML `x:Class`, code-behind partial class names, and `BO2` namespace in sync when renaming/moving UI types.
 - Preserve `_window` field pattern in `App.xaml.cs`; app keeps window reference at application level, not transient launch local.
 - Add shared styles, brushes, app-wide resources in `App.xaml`, not directly in `MainWindow.xaml`.

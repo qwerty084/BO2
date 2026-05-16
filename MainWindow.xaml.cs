@@ -42,6 +42,7 @@ namespace BO2
             _widgetWindowManager = new WidgetWindowManager();
             _widgetWindowManager.SettingsChanged += OnWidgetSettingsChanged;
             ViewModel.EventStatusUpdated += OnEventStatusUpdated;
+            _ = ViewModel.LoadGameHistoryAsync(_refreshCancellationTokenSource.Token);
 
             _refreshTimer = new DispatcherTimer
             {
@@ -198,6 +199,12 @@ namespace BO2
                 return;
             }
 
+            if (ReferenceEquals(sender.SelectedItem, GameHistoryNavigationItem))
+            {
+                ShowGameHistory();
+                return;
+            }
+
             if (ReferenceEquals(sender.SelectedItem, SettingsNavigationItem))
             {
                 ShowSettings();
@@ -207,12 +214,26 @@ namespace BO2
         private void ShowCurrentGamePage()
         {
             PageTitle.Text = AppStrings.Get("NavigationCurrentGame");
-            CurrentGamePageContent.Visibility = Visibility.Visible;
-            SettingsContent.Visibility = Visibility.Collapsed;
+            CurrentGamePageScrollViewer.Visibility = Visibility.Visible;
+            GameHistoryContent.Visibility = Visibility.Collapsed;
+            SettingsScrollViewer.Visibility = Visibility.Collapsed;
 
             if (!ReferenceEquals(RootNavigationView.SelectedItem, CurrentGamePageNavigationItem))
             {
                 RootNavigationView.SelectedItem = CurrentGamePageNavigationItem;
+            }
+        }
+
+        private void ShowGameHistory()
+        {
+            PageTitle.Text = AppStrings.Get("NavigationGameHistory");
+            CurrentGamePageScrollViewer.Visibility = Visibility.Collapsed;
+            GameHistoryContent.Visibility = Visibility.Visible;
+            SettingsScrollViewer.Visibility = Visibility.Collapsed;
+
+            if (!ReferenceEquals(RootNavigationView.SelectedItem, GameHistoryNavigationItem))
+            {
+                RootNavigationView.SelectedItem = GameHistoryNavigationItem;
             }
         }
 
@@ -224,8 +245,9 @@ namespace BO2
             }
 
             PageTitle.Text = AppStrings.Get("NavigationSettings");
-            CurrentGamePageContent.Visibility = Visibility.Collapsed;
-            SettingsContent.Visibility = Visibility.Visible;
+            CurrentGamePageScrollViewer.Visibility = Visibility.Collapsed;
+            GameHistoryContent.Visibility = Visibility.Collapsed;
+            SettingsScrollViewer.Visibility = Visibility.Visible;
         }
 
         private void OnEventStatusUpdated(object? sender, GameEventMonitorStatus eventStatus)
