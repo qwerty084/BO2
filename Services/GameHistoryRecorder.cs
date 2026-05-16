@@ -493,15 +493,14 @@ namespace BO2.Services
                 return null;
             }
 
-            GameHistoryStats? finalStats = observedStats ?? _candidate.LatestStats;
             if (_candidate.ActiveRound is not null
-                && !TryCloseActiveRound(gameEvent.ReceivedAt, finalStats, roundDuration, observationGeneration))
+                && !TryCloseActiveRound(gameEvent.ReceivedAt, observedStats, roundDuration, observationGeneration))
             {
                 Discard(GameHistoryRecordingDiscardReason.MissingRequiredStats);
                 return null;
             }
 
-            finalStats ??= _candidate.LatestStats;
+            GameHistoryStats? finalStats = observedStats ?? _candidate.LatestStats;
             if (finalStats is null || _candidate.Rounds.Count == 0)
             {
                 Discard(GameHistoryRecordingDiscardReason.MissingRequiredStats);

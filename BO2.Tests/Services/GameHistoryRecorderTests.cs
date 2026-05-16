@@ -420,6 +420,34 @@ namespace BO2.Tests.Services
             Assert.Equal(GameHistoryRecordingDiscardReason.MissingRequiredStats, recorder.Status.DiscardReason);
         }
 
+        [Fact]
+        public void ObserveSnapshot_WhenEndGameStatsMissingForActiveRound_DiscardsWithoutUsingStaleStats()
+        {
+            var recorder = new GameHistoryRecorder();
+            DetectedGame detectedGame = CreateGame();
+            DateTimeOffset startedAt = new(2026, 5, 10, 12, 0, 0, TimeSpan.Zero);
+
+            recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(0, 0, 0, 0, 0),
+                CreateTimers(gameSeconds: 0, roundSeconds: 0),
+                CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 1))));
+            recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(250, 4, 0, 0, 1),
+                CreateTimers(gameSeconds: 30, roundSeconds: 30),
+                CreateCompatibleStatus()));
+
+            Assert.Null(recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                null,
+                CreateTimers(gameSeconds: 45, roundSeconds: 45),
+                CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(45), sequence: 2)))));
+
+            Assert.Equal(GameHistoryRecordingState.Discarded, recorder.Status.State);
+            Assert.Equal(GameHistoryRecordingDiscardReason.MissingRequiredStats, recorder.Status.DiscardReason);
+        }
+
         [Theory]
         [InlineData(GameHistoryRecordingDiscardReason.PollingFallback)]
         [InlineData(GameHistoryRecordingDiscardReason.SequenceGap)]
