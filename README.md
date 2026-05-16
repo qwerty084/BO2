@@ -7,7 +7,7 @@ The app targets the current Steam Zombies `t6zm.exe` build, runs as a 32-bit Win
 ## Prerequisites
 
 - Windows 10 1809 or newer.
-- .NET 8 SDK.
+- .NET 10 SDK, as pinned by `global.json`. The app still targets .NET 8.
 - Visual Studio 2022 or newer with the .NET desktop, Windows App SDK/MSIX, and Desktop development with C++ workloads.
 - Visual C++ MSBuild targets for Win32 native builds.
 
@@ -51,12 +51,22 @@ Run native C++ unit tests for repo-owned **Event Monitor** and injector-helper l
 
 Live Steam Zombies verification is covered by the [native smoke test](docs/native-smoke-test.md).
 
+Run repo validation checks used by CI:
+
+```powershell
+dotnet format .\BO2.slnx -v detailed --verify-no-changes --severity info
+.\tools\Generate-EventMonitorSnapshotContract.ps1 -Check
+```
+
 ## Runtime Notes
 
-- The app reads process memory and monitor snapshots but does not write game memory.
+- Player stats and timing reads use read-only process memory access.
+- Event capture is explicit-connect live process access: the app injects `BO2Monitor.dll`, starts it in Steam Zombies, and the monitor may install hooks for supported event capture. The app does not write game stats or gameplay state.
 - Event capture depends on the native monitor reaching a compatible snapshot state.
 - Mystery-box event display uses the snapshot v6 weapon-name field. The native monitor attempts alias recovery for `randomization_done` and `user_grabbed_weapon`; treat only `randomization_done` as the roll-result source for future averages until more event-boundary evidence exists.
+- User preferences are stored under `%LocalAppData%\BO2\preferences.json`.
 - Widget settings are stored under `%LocalAppData%\BO2\widgets.json`; invalid settings are moved to a timestamped backup and defaults are restored.
+- Game History is stored under `%LocalAppData%\BO2\game-history.sqlite`.
 
 ## Packaging
 
@@ -68,9 +78,14 @@ Repo-maintained docs are canonical under [docs](docs/index.md). Runtime and reve
 
 Useful entry points:
 
+- [Project context](CONTEXT.md)
+- [Validation commands](docs/validation/index.md)
+- [Release and signing notes](docs/release-signing.md)
 - [Reverse-engineering index](docs/reverse/index.md)
 - [Runtime address ledger](docs/reverse/address-ledger.md)
 - [Event pipeline and snapshot bridge](docs/reverse/event-pipeline.md)
+- [Map validation and Game History support](docs/reverse/map-validation.md)
+- [Dvars and map identity](docs/reverse/dvars-and-map-identity.md)
 - [In-game and round timers](docs/reverse/timers.md)
 - [Mystery-box weapon tracking](docs/reverse/box-weapon-tracking.md)
 - [Ghidra and x32dbg workflow](docs/reverse/ghidra-x32dbg-workflow.md)

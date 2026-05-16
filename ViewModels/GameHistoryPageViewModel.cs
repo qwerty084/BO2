@@ -16,6 +16,7 @@ namespace BO2.ViewModels
         public const string MissingValueText = "--";
 
         private readonly StatFormatter _statFormatter = new(MissingValueText);
+        private readonly GameHistoryDisplayProjector _displayProjector = new();
         private bool _isHistoryRailOpen = true;
         private GameHistoryDetailViewModel? _selectedGame;
         private GameHistorySummaryViewModel? _selectedGameSummary;
@@ -231,29 +232,7 @@ namespace BO2.ViewModels
         {
             ArgumentNullException.ThrowIfNull(status);
 
-            (RecordingStatusTitle, RecordingStatusText) = status.State switch
-            {
-                GameHistoryRecordingState.Recording => (
-                    AppStrings.Get("GameHistoryRecordingStatusActiveTitle"),
-                    ProjectActiveRecordingText(status)),
-                GameHistoryRecordingState.WaitingForRoundOne => (
-                    AppStrings.Get("GameHistoryRecordingStatusActiveTitle"),
-                    ProjectWaitingForRoundOneText(status.MapName)),
-                GameHistoryRecordingState.SavePending => (
-                    AppStrings.Get("GameHistoryRecordingStatusSavePendingTitle"),
-                    ProjectSavePendingText(status.MapName)),
-                GameHistoryRecordingState.FailedSave => (
-                    AppStrings.Get("GameHistoryRecordingStatusFailedSaveTitle"),
-                    ProjectFailedSaveText(status.MapName)),
-                GameHistoryRecordingState.Saved => (
-                    AppStrings.Get("GameHistoryRecordingStatusSavedTitle"),
-                    ProjectSavedText(status.MapName)),
-                GameHistoryRecordingState.Discarded => ProjectDiscardedStatus(status.DiscardReason),
-                GameHistoryRecordingState.Unavailable => ProjectUnavailableStatus(status.UnavailableReason),
-                _ => (
-                    AppStrings.Get("GameHistoryRecordingStatusWaitingTitle"),
-                    AppStrings.Get("GameHistoryRecordingStatusWaitingText"))
-            };
+            ApplyRecordingStatusDisplayState(_displayProjector.ProjectRecordingStatus(status));
         }
 
         internal void ApplySnapshot(GameConnectionSnapshot snapshot)
@@ -292,53 +271,6 @@ namespace BO2.ViewModels
                 ProjectUnavailableReason(snapshot.MapIdentityResult)));
         }
 
-        private static string ProjectActiveRecordingText(GameHistoryRecordingStatus status)
-        {
-            string? mapName = NormalizeMapName(status.MapName);
-            if (status.ActiveRoundNumber is int roundNumber)
-            {
-                return mapName is null
-                    ? AppStrings.Format("GameHistoryRecordingStatusActiveRoundFormat", roundNumber)
-                    : AppStrings.Format("GameHistoryRecordingStatusActiveMapRoundFormat", mapName, roundNumber);
-            }
-
-            return mapName is null
-                ? AppStrings.Get("GameHistoryRecordingStatusActiveText")
-                : AppStrings.Format("GameHistoryRecordingStatusActiveMapFormat", mapName);
-        }
-
-        private static string ProjectWaitingForRoundOneText(string? mapName)
-        {
-            string? normalizedMapName = NormalizeMapName(mapName);
-            return normalizedMapName is null
-                ? AppStrings.Get("GameHistoryRecordingStatusWaitingForRoundOneText")
-                : AppStrings.Format("GameHistoryRecordingStatusWaitingForRoundOneMapFormat", normalizedMapName);
-        }
-
-        private static string ProjectSavedText(string? mapName)
-        {
-            string? normalizedMapName = NormalizeMapName(mapName);
-            return normalizedMapName is null
-                ? AppStrings.Get("GameHistoryRecordingStatusSavedText")
-                : AppStrings.Format("GameHistoryRecordingStatusSavedMapFormat", normalizedMapName);
-        }
-
-        private static string ProjectSavePendingText(string? mapName)
-        {
-            string? normalizedMapName = NormalizeMapName(mapName);
-            return normalizedMapName is null
-                ? AppStrings.Get("GameHistoryRecordingStatusSavePendingText")
-                : AppStrings.Format("GameHistoryRecordingStatusSavePendingMapFormat", normalizedMapName);
-        }
-
-        private static string ProjectFailedSaveText(string? mapName)
-        {
-            string? normalizedMapName = NormalizeMapName(mapName);
-            return normalizedMapName is null
-                ? AppStrings.Get("GameHistoryRecordingStatusFailedSaveText")
-                : AppStrings.Format("GameHistoryRecordingStatusFailedSaveMapFormat", normalizedMapName);
-        }
-
         private static GameHistoryRecordingUnavailableReason ProjectUnavailableReason(
             GameMapIdentityReadResult? mapIdentityResult)
         {
@@ -351,59 +283,12 @@ namespace BO2.ViewModels
             };
         }
 
-        private static (string Title, string Text) ProjectUnavailableStatus(
-            GameHistoryRecordingUnavailableReason unavailableReason)
+        private void ApplyRecordingStatusDisplayState(GameHistoryRecordingStatusDisplayState state)
         {
-            return unavailableReason switch
-            {
-                GameHistoryRecordingUnavailableReason.RequiresHookBackedEventMonitor => (
-                    AppStrings.Get("GameHistoryRecordingStatusRequiresHookTitle"),
-                    AppStrings.Get("GameHistoryRecordingStatusRequiresHookText")),
-                GameHistoryRecordingUnavailableReason.RequiresSupportedMap
-                    or GameHistoryRecordingUnavailableReason.MissingMapIdentity
-                    or GameHistoryRecordingUnavailableReason.MissingFriendlyMapName => (
-                        AppStrings.Get("GameHistoryRecordingStatusRequiresSupportedMapTitle"),
-                        AppStrings.Get("GameHistoryRecordingStatusRequiresSupportedMapText")),
-                _ => (
-                    AppStrings.Get("GameHistoryRecordingStatusWaitingTitle"),
-                    AppStrings.Get("GameHistoryRecordingStatusWaitingText"))
-            };
-        }
+            ArgumentNullException.ThrowIfNull(state);
 
-        private static (string Title, string Text) ProjectDiscardedStatus(
-            GameHistoryRecordingDiscardReason discardReason)
-        {
-            return discardReason switch
-            {
-                GameHistoryRecordingDiscardReason.SequenceGap
-                    or GameHistoryRecordingDiscardReason.DroppedLifecycleData
-                    or GameHistoryRecordingDiscardReason.PollingFallback => (
-                        AppStrings.Get("GameHistoryRecordingStatusDiscardedTitle"),
-                        AppStrings.Get("GameHistoryRecordingStatusDiscardedSequenceText")),
-                GameHistoryRecordingDiscardReason.MissingRequiredStats => (
-                    AppStrings.Get("GameHistoryRecordingStatusDiscardedTitle"),
-                    AppStrings.Get("GameHistoryRecordingStatusDiscardedMissingStatsText")),
-                GameHistoryRecordingDiscardReason.DetectedGameChanged
-                    or GameHistoryRecordingDiscardReason.Disconnected
-                    or GameHistoryRecordingDiscardReason.AppClosed => (
-                        AppStrings.Get("GameHistoryRecordingStatusDiscardedTitle"),
-                        AppStrings.Get("GameHistoryRecordingStatusDiscardedConnectionEndedText")),
-                GameHistoryRecordingDiscardReason.MissingMapIdentity
-                    or GameHistoryRecordingDiscardReason.UnsupportedMapIdentity
-                    or GameHistoryRecordingDiscardReason.MissingFriendlyMapName => (
-                        AppStrings.Get("GameHistoryRecordingStatusRequiresSupportedMapTitle"),
-                        AppStrings.Get("GameHistoryRecordingStatusRequiresSupportedMapText")),
-                _ => (
-                    AppStrings.Get("GameHistoryRecordingStatusDiscardedTitle"),
-                    AppStrings.Get("GameHistoryRecordingStatusDiscardedSequenceText"))
-            };
-        }
-
-        private static string? NormalizeMapName(string? mapName)
-        {
-            return string.IsNullOrWhiteSpace(mapName)
-                ? null
-                : mapName.Trim();
+            RecordingStatusTitle = state.Title;
+            RecordingStatusText = state.BodyText;
         }
 
         private GameHistorySummaryViewModel CreateSummary(GameHistoryEntry game)

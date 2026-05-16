@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using BO2.Services;
@@ -361,47 +362,24 @@ namespace BO2.Tests.ViewModels
         }
 
         [Fact]
-        public void ApplyRecordingStatus_ProjectsActiveUnavailableAndDiscardedStatesWithoutAddingEntries()
+        public void ApplyRecordingStatus_AppliesProjectedStateWithoutAddingEntries()
         {
             var viewModel = new GameHistoryPageViewModel();
+            GameHistoryRecordingStatus status = GameHistoryRecordingStatus.Recording(3, "Farm");
+            GameHistoryRecordingStatusDisplayState expectedState =
+                new GameHistoryDisplayProjector().ProjectRecordingStatus(status);
+            List<string?> changedProperties = [];
+            viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
 
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Recording(3, "Farm"));
-            Assert.Equal("GameHistoryRecordingStatusActiveTitle", viewModel.RecordingStatusTitle);
-            Assert.Equal("GameHistoryRecordingStatusActiveMapRoundFormat(Farm, 3)", viewModel.RecordingStatusText);
+            viewModel.ApplyRecordingStatus(status);
 
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.WaitingForRoundOne("Farm"));
-            Assert.Equal("GameHistoryRecordingStatusWaitingForRoundOneMapFormat(Farm)", viewModel.RecordingStatusText);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.SavePending("farm-run", "Farm"));
-            Assert.Equal("GameHistoryRecordingStatusSavePendingMapFormat(Farm)", viewModel.RecordingStatusText);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Saved("farm-run", "Farm"));
-            Assert.Equal("GameHistoryRecordingStatusSavedMapFormat(Farm)", viewModel.RecordingStatusText);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.FailedSave("farm-run", "Farm", "database locked"));
-            Assert.Equal("GameHistoryRecordingStatusFailedSaveMapFormat(Farm)", viewModel.RecordingStatusText);
+            Assert.Equal(expectedState.Title, viewModel.RecordingStatusTitle);
+            Assert.Equal(expectedState.BodyText, viewModel.RecordingStatusText);
             Assert.Empty(viewModel.SavedGames);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Unavailable(
-                GameHistoryRecordingUnavailableReason.RequiresSupportedMap));
-            Assert.Equal("GameHistoryRecordingStatusRequiresSupportedMapText", viewModel.RecordingStatusText);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Unavailable(
-                GameHistoryRecordingUnavailableReason.RequiresHookBackedEventMonitor));
-            Assert.Equal("GameHistoryRecordingStatusRequiresHookText", viewModel.RecordingStatusText);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Discarded(
-                GameHistoryRecordingDiscardReason.SequenceGap));
-            Assert.Equal("GameHistoryRecordingStatusDiscardedSequenceText", viewModel.RecordingStatusText);
-            Assert.Empty(viewModel.SavedGames);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Discarded(
-                GameHistoryRecordingDiscardReason.MissingRequiredStats));
-            Assert.Equal("GameHistoryRecordingStatusDiscardedMissingStatsText", viewModel.RecordingStatusText);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Discarded(
-                GameHistoryRecordingDiscardReason.Disconnected));
-            Assert.Equal("GameHistoryRecordingStatusDiscardedConnectionEndedText", viewModel.RecordingStatusText);
+            Assert.Contains(nameof(GameHistoryPageViewModel.RecordingStatusTitle), changedProperties);
+            Assert.Contains(nameof(GameHistoryPageViewModel.RecordingStatusText), changedProperties);
+            Assert.DoesNotContain(nameof(GameHistoryPageViewModel.IsListVisible), changedProperties);
+            Assert.DoesNotContain(nameof(GameHistoryPageViewModel.IsDetailVisible), changedProperties);
         }
 
         [Theory]
@@ -428,10 +406,10 @@ namespace BO2.Tests.ViewModels
                     detectedGame,
                     new GameMapIdentity(baseMapToken, startLocationToken, internalMapToken, friendlyName))));
 
-            Assert.Equal("GameHistoryRecordingStatusActiveTitle", viewModel.RecordingStatusTitle);
-            Assert.Equal(
-                $"GameHistoryRecordingStatusWaitingForRoundOneMapFormat({friendlyName})",
-                viewModel.RecordingStatusText);
+            GameHistoryRecordingStatusDisplayState expectedState = new GameHistoryDisplayProjector()
+                .ProjectRecordingStatus(GameHistoryRecordingStatus.WaitingForRoundOne(friendlyName));
+            Assert.Equal(expectedState.Title, viewModel.RecordingStatusTitle);
+            Assert.Equal(expectedState.BodyText, viewModel.RecordingStatusText);
         }
 
         private static GameHistoryDetailViewModel SelectAndLoad(
