@@ -204,7 +204,6 @@ namespace BO2.Services
         private DetectedGame? _observedGame;
         private ulong? _lastObservedEventSequence;
         private ulong _observationGeneration;
-        private uint _lastDroppedEventCount;
         private uint _lastDroppedNotifyCount;
 
         public GameHistoryRecorder()
@@ -290,7 +289,7 @@ namespace BO2.Services
             }
 
             GameHistoryEventBatch eventBatch = ReadNewEvents(eventMonitorSummary.Status);
-            if (HasDroppedLifecycleData(eventMonitorSummary.Status))
+            if (HasDroppedNotifyData(eventMonitorSummary.Status))
             {
                 if (_candidate is not null)
                 {
@@ -707,11 +706,9 @@ namespace BO2.Services
             return new GameHistoryEventBatch(newEvents, hasSequenceGap);
         }
 
-        private bool HasDroppedLifecycleData(GameEventMonitorStatus eventStatus)
+        private bool HasDroppedNotifyData(GameEventMonitorStatus eventStatus)
         {
-            bool hasDroppedData = eventStatus.DroppedEventCount > _lastDroppedEventCount
-                || eventStatus.DroppedNotifyCount > _lastDroppedNotifyCount;
-            _lastDroppedEventCount = eventStatus.DroppedEventCount;
+            bool hasDroppedData = eventStatus.DroppedNotifyCount > _lastDroppedNotifyCount;
             _lastDroppedNotifyCount = eventStatus.DroppedNotifyCount;
             return hasDroppedData;
         }
@@ -725,7 +722,6 @@ namespace BO2.Services
         private void ResetEventTracking()
         {
             _lastObservedEventSequence = null;
-            _lastDroppedEventCount = 0;
             _lastDroppedNotifyCount = 0;
         }
 

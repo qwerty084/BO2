@@ -369,6 +369,39 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void ObserveSnapshot_WhenEventRingWrapsWithContinuousSequences_CompletesRecording()
+        {
+            var recorder = new GameHistoryRecorder();
+            DetectedGame detectedGame = CreateGame();
+            DateTimeOffset startedAt = new(2026, 5, 10, 12, 0, 0, TimeSpan.Zero);
+
+            recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(0, 0, 0, 0, 0),
+                CreateTimers(0, 0),
+                CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 1))));
+            GameHistoryEntry saved = AssertCompleted(recorder.ObserveSnapshot(CreateSnapshot(
+                detectedGame,
+                CreateStats(320, 5, 0, 0, 1),
+                CreateTimers(gameSeconds: 50, roundSeconds: 50),
+                new GameEventMonitorStatus(
+                    GameCompatibilityState.Compatible,
+                    DroppedEventCount: 1,
+                    DroppedNotifyCount: 0,
+                    PublishedNotifyCount: 4,
+                    [
+                        CreateBoxEvent(startedAt.AddSeconds(20), sequence: 2, "ray_gun_zm", ownerId: 7),
+                        CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(50), sequence: 3)
+                    ]))));
+
+            Assert.Equal(GameHistoryRecordingState.SavePending, recorder.Status.State);
+            Assert.Equal(1, saved.FinalRound);
+            Assert.Equal(320, saved.FinalStats.Points);
+            GameHistoryBoxEvent boxEvent = Assert.Single(saved.BoxEvents);
+            Assert.Equal("Ray Gun", boxEvent.WeaponDisplayName);
+        }
+
+        [Fact]
         public void ObserveSnapshot_WhenRoundStartAndEndAreFirstObservedTogether_DiscardsWithoutSaving()
         {
             var recorder = new GameHistoryRecorder();
@@ -542,7 +575,7 @@ namespace BO2.Tests.Services
                     CreateTimers(1, 1),
                     new GameConnectionEventMonitorSummary(
                         GameConnectionEventMonitorState.Ready,
-                        new GameEventMonitorStatus(GameCompatibilityState.Compatible, 1, 0, 1, []))),
+                        new GameEventMonitorStatus(GameCompatibilityState.Compatible, 0, 1, 1, []))),
                 GameHistoryRecordingDiscardReason.MissingRequiredStats => CreateSnapshot(
                     detectedGame,
                     null,
