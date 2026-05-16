@@ -10,7 +10,7 @@ namespace BO2.Tests.Services
     public sealed class GameHistoryPersistenceCoordinatorTests
     {
         [Fact]
-        public async Task Dispose_WhenCompletedGameAppendIsPending_WaitsForAppendBeforeDisposingStore()
+        public async Task Dispose_WhenCompletedGameAppendIsPending_ReturnsBeforeAppendAndDisposesStoreAfterAppend()
         {
             var store = new BlockingGameHistoryStore();
             var coordinator = new GameHistoryPersistenceCoordinator(store);
@@ -22,14 +22,24 @@ namespace BO2.Tests.Services
             Task disposeTask = Task.Run(coordinator.Dispose);
             Task firstCompletedTask = await Task.WhenAny(disposeTask, Task.Delay(TimeSpan.FromMilliseconds(100)));
 
-            Assert.NotSame(disposeTask, firstCompletedTask);
+            if (firstCompletedTask != disposeTask)
+            {
+                store.CompleteAppend();
+                await disposeTask.WaitAsync(TimeSpan.FromSeconds(5));
+            }
+
+            Assert.Same(disposeTask, firstCompletedTask);
             Assert.False(store.AppendCancellationToken.CanBeCanceled);
             Assert.False(store.Disposed);
+            Assert.Throws<ObjectDisposedException>(() =>
+            {
+                _ = coordinator.AppendCompletedEntryAsync(CreateEntry());
+            });
 
             store.CompleteAppend();
 
             await appendTask.WaitAsync(TimeSpan.FromSeconds(5));
-            await disposeTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await store.DisposeCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.True(store.AppendCompletedBeforeDispose);
             Assert.True(store.Disposed);
         }
@@ -63,6 +73,9 @@ namespace BO2.Tests.Services
             public TaskCompletionSource AppendStarted { get; } =
                 new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+            public TaskCompletionSource DisposeCompleted { get; } =
+                new(TaskCreationOptions.RunContinuationsAsynchronously);
+
             public CancellationToken AppendCancellationToken { get; private set; }
 
             public bool AppendCompletedBeforeDispose { get; private set; }
@@ -92,12 +105,13 @@ namespace BO2.Tests.Services
 
             public void CompleteAppend()
             {
-                _allowAppend.SetResult();
+                _allowAppend.TrySetResult();
             }
 
             public void Dispose()
             {
                 Disposed = true;
+                DisposeCompleted.SetResult();
             }
         }
     }

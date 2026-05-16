@@ -73,16 +73,22 @@ namespace BO2.Services
                 pendingAppends = [.. _pendingAppends];
             }
 
-            try
+            if (pendingAppends.Length == 0)
             {
-                Task.WaitAll(pendingAppends);
-            }
-            catch (AggregateException)
-            {
-                // Append failures are observed by the save path that started the task.
+                _store.Dispose();
+                return;
             }
 
-            _store.Dispose();
+            _ = Task.WhenAll(pendingAppends).ContinueWith(
+                static (completedTask, state) =>
+                {
+                    _ = completedTask.Exception;
+                    ((GameHistoryPersistenceCoordinator)state!)._store.Dispose();
+                },
+                this,
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
         }
 
         private void RemovePendingAppend(Task appendTask)
