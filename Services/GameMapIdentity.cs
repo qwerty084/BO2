@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 namespace BO2.Services
 {
@@ -134,29 +135,27 @@ namespace BO2.Services
             }
 
             bool startLocationRequiresMode = false;
-            foreach (SupportedGreenRunMap map in GreenRunMaps)
+            foreach (SupportedGreenRunMap map in GreenRunMaps.Where(map =>
+                string.Equals(normalizedStartLocation, map.StartLocationToken, StringComparison.Ordinal)))
             {
-                if (string.Equals(normalizedStartLocation, map.StartLocationToken, StringComparison.Ordinal))
+                if (map.ModeToken is not null)
                 {
-                    if (map.ModeToken is not null)
-                    {
-                        startLocationRequiresMode = true;
-                    }
-
-                    if (map.ModeToken is not null
-                        && !string.Equals(normalizedMode, map.ModeToken, StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
-
-                    return GameMapIdentityReadResult.SupportedMap(
-                        detectedGame,
-                        new GameMapIdentity(
-                            normalizedBaseToken,
-                            normalizedStartLocation,
-                            map.InternalMapToken,
-                            map.DisplayName));
+                    startLocationRequiresMode = true;
                 }
+
+                if (map.ModeToken is not null
+                    && !string.Equals(normalizedMode, map.ModeToken, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                return GameMapIdentityReadResult.SupportedMap(
+                    detectedGame,
+                    new GameMapIdentity(
+                        normalizedBaseToken,
+                        normalizedStartLocation,
+                        map.InternalMapToken,
+                        map.DisplayName));
             }
 
             if (startLocationRequiresMode && normalizedMode is null)
