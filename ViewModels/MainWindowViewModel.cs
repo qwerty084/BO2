@@ -22,7 +22,8 @@ namespace BO2.ViewModels
         private readonly CurrentGamePageViewModel _currentGamePage = new();
         private readonly GameHistoryPageViewModel _gameHistoryPage = new();
         private readonly SemaphoreSlim _operationSemaphore = new(1, 1);
-        private string? _lastLoadedSavedHistoryId;
+        private readonly CancellationTokenSource _gameHistoryPersistenceCancellationTokenSource = new();
+        private CancellationTokenSource? _gameHistoryDetailLoadCancellationTokenSource;
         private bool _disposed;
         private string _detectedGameText = AppStrings.Get("NoGameDetected");
         private string _eventMonitorStatusText = AppStrings.Get("EventMonitorWaitingForMonitor");
@@ -65,9 +66,10 @@ namespace BO2.ViewModels
             _dispatcherQueue = dispatcherQueue;
             _connectionSession = connectionSession;
             _gameHistoryStore = gameHistoryStore;
-            _gameHistoryRecorder = new GameHistoryRecorder(_gameHistoryStore);
+            _gameHistoryRecorder = new GameHistoryRecorder();
             _shellDisplayProjector = new ShellConnectionDisplayProjector();
             _connectionSession.SnapshotChanged += OnSnapshotChanged;
+            _gameHistoryPage.SelectedGameDetailRequested += OnSelectedGameDetailRequested;
 
             _connectionSession.Start();
             ApplyRefreshSnapshot(_connectionSession.GetStatusSnapshot());
@@ -276,9 +278,13 @@ namespace BO2.ViewModels
         {
             _disposed = true;
             _connectionSession.SnapshotChanged -= OnSnapshotChanged;
+            _gameHistoryPage.SelectedGameDetailRequested -= OnSelectedGameDetailRequested;
+            _gameHistoryPersistenceCancellationTokenSource.Cancel();
+            _gameHistoryDetailLoadCancellationTokenSource?.Cancel();
             _gameHistoryRecorder.DiscardForAppClose();
             _connectionSession.Dispose();
             _gameHistoryStore.Dispose();
+            _gameHistoryPersistenceCancellationTokenSource.Dispose();
             _operationSemaphore.Dispose();
         }
 
@@ -371,22 +377,161 @@ namespace BO2.ViewModels
         private void ApplyRefreshSnapshot(GameConnectionSnapshot snapshot)
         {
             _currentGamePage.ApplySnapshot(snapshot);
-            _gameHistoryRecorder.ObserveSnapshot(snapshot);
+            GameHistoryEntry? completedEntry = _gameHistoryRecorder.ObserveSnapshot(snapshot);
             ApplyGameHistoryRecordingStatus(_gameHistoryRecorder.Status);
+            if (completedEntry is not null)
+            {
+                _ = SaveCompletedGameAsync(
+                    completedEntry,
+                    _gameHistoryPersistenceCancellationTokenSource.Token);
+            }
+
             ApplyShellDisplayState(_shellDisplayProjector.Project(snapshot));
         }
 
         private void ApplyGameHistoryRecordingStatus(GameHistoryRecordingStatus status)
         {
             _gameHistoryPage.ApplyRecordingStatus(status);
-            if (status.LastSavedHistoryId is not string historyId
-                || string.Equals(_lastLoadedSavedHistoryId, historyId, StringComparison.Ordinal))
+        }
+
+        private async Task SaveCompletedGameAsync(
+            GameHistoryEntry completedEntry,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _gameHistoryStore.AppendAsync(completedEntry, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 return;
             }
+            catch (Exception ex) when (IsNonFatalException(ex))
+            {
+                await RunOnDispatcherAsync(
+                    () =>
+                    {
+                        _gameHistoryRecorder.MarkCompletedEntrySaveFailed(completedEntry, ex.Message);
+                        ApplyGameHistoryRecordingStatus(_gameHistoryRecorder.Status);
+                    },
+                    CancellationToken.None);
+                return;
+            }
 
-            _ = ReloadGameHistoryAsync(CancellationToken.None);
-            _lastLoadedSavedHistoryId = historyId;
+            IReadOnlyList<GameHistorySummary>? summaries = null;
+            string? summaryLoadError = null;
+            try
+            {
+                summaries = await _gameHistoryStore.LoadSummariesNewestFirstAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex) when (IsNonFatalException(ex))
+            {
+                summaryLoadError = AppStrings.Format("GameHistoryLoadErrorTextFormat", ex.Message);
+            }
+
+            await RunOnDispatcherAsync(
+                () =>
+                {
+                    if (summaries is not null)
+                    {
+                        _gameHistoryPage.ReplaceSummaries(summaries);
+                        _gameHistoryPage.SelectGameById(completedEntry.Id);
+                    }
+                    else if (summaryLoadError is not null)
+                    {
+                        _gameHistoryPage.ShowSummaryLoadError(summaryLoadError);
+                    }
+
+                    _gameHistoryRecorder.MarkCompletedEntrySaved(completedEntry);
+                    ApplyGameHistoryRecordingStatus(_gameHistoryRecorder.Status);
+                },
+                cancellationToken);
+        }
+
+        private void OnSelectedGameDetailRequested(object? sender, GameHistoryDetailRequestedEventArgs args)
+        {
+            CancellationTokenSource nextCancellationTokenSource = new();
+            CancellationTokenSource? previousCancellationTokenSource = _gameHistoryDetailLoadCancellationTokenSource;
+            _gameHistoryDetailLoadCancellationTokenSource = nextCancellationTokenSource;
+
+            previousCancellationTokenSource?.Cancel();
+
+            _ = LoadSelectedGameDetailAsync(args.Id, nextCancellationTokenSource);
+        }
+
+        private async Task LoadSelectedGameDetailAsync(string id, CancellationTokenSource cancellationTokenSource)
+        {
+            CancellationToken cancellationToken = cancellationTokenSource.Token;
+            GameHistoryEntry? detail = null;
+            string? detailLoadError = null;
+            try
+            {
+                try
+                {
+                    detail = await _gameHistoryStore.LoadDetailByIdAsync(id, cancellationToken);
+                    if (detail is null)
+                    {
+                        detailLoadError = AppStrings.Format("GameHistoryDetailLoadNotFoundTextFormat", id);
+                    }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception ex) when (IsNonFatalException(ex))
+                {
+                    detailLoadError = AppStrings.Format("GameHistoryDetailLoadErrorTextFormat", ex.Message);
+                }
+
+                try
+                {
+                    await RunOnDispatcherAsync(
+                        () =>
+                        {
+                            if (!IsSelectedGameSummary(id))
+                            {
+                                return;
+                            }
+
+                            if (detail is not null)
+                            {
+                                _gameHistoryPage.ShowSelectedGameDetail(detail);
+                            }
+                            else if (detailLoadError is not null)
+                            {
+                                _gameHistoryPage.ShowSelectedGameDetailError(detailLoadError);
+                            }
+                        },
+                        cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (InvalidOperationException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+            }
+            finally
+            {
+                if (ReferenceEquals(_gameHistoryDetailLoadCancellationTokenSource, cancellationTokenSource))
+                {
+                    _gameHistoryDetailLoadCancellationTokenSource = null;
+                }
+
+                cancellationTokenSource.Dispose();
+            }
+        }
+
+        private bool IsSelectedGameSummary(string id)
+        {
+            return _gameHistoryPage.SelectedGameSummary is GameHistorySummaryViewModel selectedSummary
+                && string.Equals(selectedSummary.Id, id, StringComparison.Ordinal);
         }
 
         private async Task ReloadGameHistoryAsync(CancellationToken cancellationToken)

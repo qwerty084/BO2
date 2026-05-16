@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using BO2.Services;
 using Xunit;
 
@@ -10,8 +9,7 @@ namespace BO2.Tests.Services
         [Fact]
         public void ObserveSnapshot_WhenTownGameCompletes_SavesSummaryRoundsDeltasAndBoxEvents()
         {
-            List<GameHistoryEntry> savedEntries = [];
-            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            var recorder = new GameHistoryRecorder();
             DetectedGame detectedGame = CreateGame();
             DateTimeOffset startedAt = new(2026, 5, 10, 12, 0, 0, TimeSpan.Zero);
 
@@ -40,13 +38,12 @@ namespace BO2.Tests.Services
                 CreateStats(750, 10, 0, 0, 4),
                 CreateTimers(gameSeconds: 70, roundSeconds: 20),
                 CreateCompatibleStatus(CreateBoxEvent(startedAt.AddSeconds(70), sequence: 5, "zm_future", ownerId: 42))));
-            recorder.ObserveSnapshot(CreateSnapshot(
+            GameHistoryEntry saved = AssertCompleted(recorder.ObserveSnapshot(CreateSnapshot(
                 detectedGame,
                 CreateStats(1200, 16, 1, 0, 8),
                 CreateTimers(gameSeconds: 95, roundSeconds: 45),
-                CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 2, startedAt.AddSeconds(95), sequence: 6))));
+                CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 2, startedAt.AddSeconds(95), sequence: 6)))));
 
-            GameHistoryEntry saved = Assert.Single(savedEntries);
             Assert.Equal(startedAt, saved.StartedAt);
             Assert.Equal(startedAt.AddSeconds(95), saved.EndedAt);
             Assert.Equal("Town", saved.MapIdentity.FriendlyName);
@@ -70,6 +67,8 @@ namespace BO2.Tests.Services
             Assert.Equal(2, saved.BoxEvents[1].RoundNumber);
             Assert.Equal("zm_future", saved.BoxEvents[1].RawWeaponToken);
             Assert.Null(saved.BoxEvents[1].WeaponDisplayName);
+            Assert.Equal(GameHistoryRecordingState.SavePending, recorder.Status.State);
+            recorder.MarkCompletedEntrySaved(saved);
             Assert.Equal(GameHistoryRecordingState.Saved, recorder.Status.State);
             Assert.Equal(saved.Id, recorder.Status.LastSavedHistoryId);
         }
@@ -77,8 +76,7 @@ namespace BO2.Tests.Services
         [Fact]
         public void ObserveSnapshot_WhenFarmGameCompletes_SavesSummaryRoundsDurationsAndBoxEvents()
         {
-            List<GameHistoryEntry> savedEntries = [];
-            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            var recorder = new GameHistoryRecorder();
             DetectedGame detectedGame = CreateGame();
             DateTimeOffset startedAt = new(2026, 5, 14, 13, 44, 0, TimeSpan.Zero);
 
@@ -94,14 +92,13 @@ namespace BO2.Tests.Services
                 CreateTimers(gameSeconds: 25, roundSeconds: 25),
                 CreateCompatibleStatus(CreateBoxEvent(startedAt.AddSeconds(25), sequence: 2, "saiga12_zm", ownerId: 9)),
                 CreateFarmResult(detectedGame)));
-            recorder.ObserveSnapshot(CreateSnapshot(
+            GameHistoryEntry saved = AssertCompleted(recorder.ObserveSnapshot(CreateSnapshot(
                 detectedGame,
                 CreateStats(500, 7, 0, 0, 2),
                 CreateTimers(gameSeconds: 60, roundSeconds: 60),
                 CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(60), sequence: 3)),
-                CreateFarmResult(detectedGame)));
+                CreateFarmResult(detectedGame))));
 
-            GameHistoryEntry saved = Assert.Single(savedEntries);
             Assert.Equal("zm_transit", saved.MapIdentity.BaseMapToken);
             Assert.Equal("farm", saved.MapIdentity.StartLocationToken);
             Assert.Equal("zm_transit_gump_farm", saved.MapIdentity.InternalMapToken);
@@ -117,6 +114,8 @@ namespace BO2.Tests.Services
             GameHistoryBoxEvent boxEvent = Assert.Single(saved.BoxEvents);
             Assert.Equal("saiga12_zm", boxEvent.RawWeaponToken);
             Assert.Equal("S12", boxEvent.WeaponDisplayName);
+            Assert.Equal(GameHistoryRecordingState.SavePending, recorder.Status.State);
+            recorder.MarkCompletedEntrySaved(saved);
             Assert.Equal(GameHistoryRecordingState.Saved, recorder.Status.State);
             Assert.Equal("Farm", recorder.Status.MapName);
         }
@@ -124,8 +123,7 @@ namespace BO2.Tests.Services
         [Fact]
         public void ObserveSnapshot_WhenBuriedGameCompletes_SavesStandaloneMapIdentity()
         {
-            List<GameHistoryEntry> savedEntries = [];
-            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            var recorder = new GameHistoryRecorder();
             DetectedGame detectedGame = CreateGame();
             DateTimeOffset startedAt = new(2026, 5, 15, 15, 23, 0, TimeSpan.Zero);
             GameMapIdentityReadResult mapIdentityResult = CreateBuriedResult(detectedGame);
@@ -142,14 +140,13 @@ namespace BO2.Tests.Services
                 CreateTimers(gameSeconds: 143, roundSeconds: 80),
                 CreateCompatibleStatus(CreateBoxEvent(startedAt.AddSeconds(80), sequence: 2, "tar21_zm", ownerId: 11)),
                 mapIdentityResult));
-            recorder.ObserveSnapshot(CreateSnapshot(
+            GameHistoryEntry saved = AssertCompleted(recorder.ObserveSnapshot(CreateSnapshot(
                 detectedGame,
                 CreateStats(720, 13, 0, 0, 6),
                 CreateTimers(gameSeconds: 145, roundSeconds: 82),
                 CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(145), sequence: 3)),
-                mapIdentityResult));
+                mapIdentityResult)));
 
-            GameHistoryEntry saved = Assert.Single(savedEntries);
             Assert.Equal("zm_buried", saved.MapIdentity.BaseMapToken);
             Assert.Null(saved.MapIdentity.StartLocationToken);
             Assert.Equal("zm_buried", saved.MapIdentity.InternalMapToken);
@@ -160,6 +157,8 @@ namespace BO2.Tests.Services
             GameHistoryBoxEvent boxEvent = Assert.Single(saved.BoxEvents);
             Assert.Equal("tar21_zm", boxEvent.RawWeaponToken);
             Assert.Equal("MTAR", boxEvent.WeaponDisplayName);
+            Assert.Equal(GameHistoryRecordingState.SavePending, recorder.Status.State);
+            recorder.MarkCompletedEntrySaved(saved);
             Assert.Equal(GameHistoryRecordingState.Saved, recorder.Status.State);
             Assert.Equal("Buried", recorder.Status.MapName);
         }
@@ -167,8 +166,7 @@ namespace BO2.Tests.Services
         [Fact]
         public void ObserveSnapshot_WhenDieRiseGameCompletes_SavesStandaloneMapIdentity()
         {
-            List<GameHistoryEntry> savedEntries = [];
-            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            var recorder = new GameHistoryRecorder();
             DetectedGame detectedGame = CreateGame();
             DateTimeOffset startedAt = new(2026, 5, 15, 16, 8, 0, TimeSpan.Zero);
             GameMapIdentityReadResult mapIdentityResult = CreateDieRiseResult(detectedGame);
@@ -179,14 +177,13 @@ namespace BO2.Tests.Services
                 CreateTimers(gameSeconds: 0, roundSeconds: 0),
                 CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 1)),
                 mapIdentityResult));
-            recorder.ObserveSnapshot(CreateSnapshot(
+            GameHistoryEntry saved = AssertCompleted(recorder.ObserveSnapshot(CreateSnapshot(
                 detectedGame,
                 CreateStats(1080, 14, 0, 0, 5),
                 CreateTimers(gameSeconds: 180, roundSeconds: 180),
                 CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(180), sequence: 2)),
-                mapIdentityResult));
+                mapIdentityResult)));
 
-            GameHistoryEntry saved = Assert.Single(savedEntries);
             Assert.Equal("zm_highrise", saved.MapIdentity.BaseMapToken);
             Assert.Null(saved.MapIdentity.StartLocationToken);
             Assert.Equal("zm_highrise", saved.MapIdentity.InternalMapToken);
@@ -194,6 +191,8 @@ namespace BO2.Tests.Services
             Assert.Equal(1, saved.FinalRound);
             Assert.Equal(1080, saved.FinalStats.Points);
             Assert.Equal(TimeSpan.FromSeconds(180), saved.GameDuration);
+            Assert.Equal(GameHistoryRecordingState.SavePending, recorder.Status.State);
+            recorder.MarkCompletedEntrySaved(saved);
             Assert.Equal(GameHistoryRecordingState.Saved, recorder.Status.State);
             Assert.Equal("Die Rise", recorder.Status.MapName);
         }
@@ -201,8 +200,7 @@ namespace BO2.Tests.Services
         [Fact]
         public void ObserveSnapshot_WhenMobOfTheDeadGameCompletes_SavesStandaloneMapIdentity()
         {
-            List<GameHistoryEntry> savedEntries = [];
-            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            var recorder = new GameHistoryRecorder();
             DetectedGame detectedGame = CreateGame();
             DateTimeOffset startedAt = new(2026, 5, 15, 17, 45, 0, TimeSpan.Zero);
             GameMapIdentityReadResult mapIdentityResult = CreateMobOfTheDeadResult(detectedGame);
@@ -213,14 +211,13 @@ namespace BO2.Tests.Services
                 CreateTimers(gameSeconds: 0, roundSeconds: 0),
                 CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 1)),
                 mapIdentityResult));
-            recorder.ObserveSnapshot(CreateSnapshot(
+            GameHistoryEntry saved = AssertCompleted(recorder.ObserveSnapshot(CreateSnapshot(
                 detectedGame,
                 CreateStats(960, 12, 1, 0, 4),
                 CreateTimers(gameSeconds: 150, roundSeconds: 150),
                 CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(150), sequence: 2)),
-                mapIdentityResult));
+                mapIdentityResult)));
 
-            GameHistoryEntry saved = Assert.Single(savedEntries);
             Assert.Equal("zm_prison", saved.MapIdentity.BaseMapToken);
             Assert.Null(saved.MapIdentity.StartLocationToken);
             Assert.Equal("zm_prison", saved.MapIdentity.InternalMapToken);
@@ -228,6 +225,8 @@ namespace BO2.Tests.Services
             Assert.Equal(1, saved.FinalRound);
             Assert.Equal(960, saved.FinalStats.Points);
             Assert.Equal(TimeSpan.FromSeconds(150), saved.GameDuration);
+            Assert.Equal(GameHistoryRecordingState.SavePending, recorder.Status.State);
+            recorder.MarkCompletedEntrySaved(saved);
             Assert.Equal(GameHistoryRecordingState.Saved, recorder.Status.State);
             Assert.Equal("Mob of the Dead", recorder.Status.MapName);
         }
@@ -235,8 +234,7 @@ namespace BO2.Tests.Services
         [Fact]
         public void ObserveSnapshot_WhenNuketownGameCompletes_SavesStandaloneMapIdentity()
         {
-            List<GameHistoryEntry> savedEntries = [];
-            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            var recorder = new GameHistoryRecorder();
             DetectedGame detectedGame = CreateGame();
             DateTimeOffset startedAt = new(2026, 5, 15, 18, 20, 0, TimeSpan.Zero);
             GameMapIdentityReadResult mapIdentityResult = CreateNuketownResult(detectedGame);
@@ -247,14 +245,13 @@ namespace BO2.Tests.Services
                 CreateTimers(gameSeconds: 0, roundSeconds: 0),
                 CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 1)),
                 mapIdentityResult));
-            recorder.ObserveSnapshot(CreateSnapshot(
+            GameHistoryEntry saved = AssertCompleted(recorder.ObserveSnapshot(CreateSnapshot(
                 detectedGame,
                 CreateStats(760, 10, 1, 0, 3),
                 CreateTimers(gameSeconds: 120, roundSeconds: 120),
                 CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(120), sequence: 2)),
-                mapIdentityResult));
+                mapIdentityResult)));
 
-            GameHistoryEntry saved = Assert.Single(savedEntries);
             Assert.Equal("zm_nuked", saved.MapIdentity.BaseMapToken);
             Assert.Null(saved.MapIdentity.StartLocationToken);
             Assert.Equal("zm_nuked", saved.MapIdentity.InternalMapToken);
@@ -262,6 +259,8 @@ namespace BO2.Tests.Services
             Assert.Equal(1, saved.FinalRound);
             Assert.Equal(760, saved.FinalStats.Points);
             Assert.Equal(TimeSpan.FromSeconds(120), saved.GameDuration);
+            Assert.Equal(GameHistoryRecordingState.SavePending, recorder.Status.State);
+            recorder.MarkCompletedEntrySaved(saved);
             Assert.Equal(GameHistoryRecordingState.Saved, recorder.Status.State);
             Assert.Equal("Nuketown", recorder.Status.MapName);
         }
@@ -269,8 +268,7 @@ namespace BO2.Tests.Services
         [Fact]
         public void ObserveSnapshot_WhenOriginsGameCompletes_SavesStandaloneMapIdentity()
         {
-            List<GameHistoryEntry> savedEntries = [];
-            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            var recorder = new GameHistoryRecorder();
             DetectedGame detectedGame = CreateGame();
             DateTimeOffset startedAt = new(2026, 5, 15, 19, 5, 0, TimeSpan.Zero);
             GameMapIdentityReadResult mapIdentityResult = CreateOriginsResult(detectedGame);
@@ -281,14 +279,13 @@ namespace BO2.Tests.Services
                 CreateTimers(gameSeconds: 0, roundSeconds: 0),
                 CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 1)),
                 mapIdentityResult));
-            recorder.ObserveSnapshot(CreateSnapshot(
+            GameHistoryEntry saved = AssertCompleted(recorder.ObserveSnapshot(CreateSnapshot(
                 detectedGame,
                 CreateStats(900, 11, 1, 0, 4),
                 CreateTimers(gameSeconds: 135, roundSeconds: 135),
                 CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(135), sequence: 2)),
-                mapIdentityResult));
+                mapIdentityResult)));
 
-            GameHistoryEntry saved = Assert.Single(savedEntries);
             Assert.Equal("zm_tomb", saved.MapIdentity.BaseMapToken);
             Assert.Null(saved.MapIdentity.StartLocationToken);
             Assert.Equal("zm_tomb", saved.MapIdentity.InternalMapToken);
@@ -296,6 +293,8 @@ namespace BO2.Tests.Services
             Assert.Equal(1, saved.FinalRound);
             Assert.Equal(900, saved.FinalStats.Points);
             Assert.Equal(TimeSpan.FromSeconds(135), saved.GameDuration);
+            Assert.Equal(GameHistoryRecordingState.SavePending, recorder.Status.State);
+            recorder.MarkCompletedEntrySaved(saved);
             Assert.Equal(GameHistoryRecordingState.Saved, recorder.Status.State);
             Assert.Equal("Origins", recorder.Status.MapName);
         }
@@ -307,8 +306,7 @@ namespace BO2.Tests.Services
             string internalMapToken,
             string friendlyName)
         {
-            List<GameHistoryEntry> savedEntries = [];
-            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            var recorder = new GameHistoryRecorder();
             DetectedGame detectedGame = CreateGame();
             DateTimeOffset startedAt = new(2026, 5, 15, 14, 30, 0, TimeSpan.Zero);
             GameMapIdentityReadResult mapIdentityResult = CreateGreenRunTransitResult(
@@ -322,18 +320,19 @@ namespace BO2.Tests.Services
                 CreateTimers(gameSeconds: 0, roundSeconds: 0),
                 CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 1)),
                 mapIdentityResult));
-            recorder.ObserveSnapshot(CreateSnapshot(
+            GameHistoryEntry saved = AssertCompleted(recorder.ObserveSnapshot(CreateSnapshot(
                 detectedGame,
                 CreateStats(500, 7, 0, 0, 2),
                 CreateTimers(gameSeconds: 60, roundSeconds: 60),
                 CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(60), sequence: 2)),
-                mapIdentityResult));
+                mapIdentityResult)));
 
-            GameHistoryEntry saved = Assert.Single(savedEntries);
             Assert.Equal("zm_transit", saved.MapIdentity.BaseMapToken);
             Assert.Equal("transit", saved.MapIdentity.StartLocationToken);
             Assert.Equal(internalMapToken, saved.MapIdentity.InternalMapToken);
             Assert.Equal(friendlyName, saved.MapIdentity.FriendlyName);
+            Assert.Equal(GameHistoryRecordingState.SavePending, recorder.Status.State);
+            recorder.MarkCompletedEntrySaved(saved);
             Assert.Equal(GameHistoryRecordingState.Saved, recorder.Status.State);
             Assert.Equal(friendlyName, recorder.Status.MapName);
         }
@@ -341,8 +340,7 @@ namespace BO2.Tests.Services
         [Fact]
         public void ObserveSnapshot_IgnoresEventsBeforeRoundOneAndAfterGameOver()
         {
-            List<GameHistoryEntry> savedEntries = [];
-            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            var recorder = new GameHistoryRecorder();
             DetectedGame detectedGame = CreateGame();
             DateTimeOffset startedAt = new(2026, 5, 10, 12, 0, 0, TimeSpan.Zero);
 
@@ -356,18 +354,17 @@ namespace BO2.Tests.Services
                 CreateStats(0, 0, 0, 0, 0),
                 CreateTimers(0, 0),
                 CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 2))));
-            recorder.ObserveSnapshot(CreateSnapshot(
+            GameHistoryEntry saved = AssertCompleted(recorder.ObserveSnapshot(CreateSnapshot(
                 detectedGame,
                 CreateStats(100, 2, 0, 0, 1),
                 CreateTimers(30, 30),
-                CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(30), sequence: 3))));
-            recorder.ObserveSnapshot(CreateSnapshot(
+                CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(30), sequence: 3)))));
+            Assert.Null(recorder.ObserveSnapshot(CreateSnapshot(
                 detectedGame,
                 CreateStats(100, 2, 0, 0, 1),
                 CreateTimers(30, 30),
-                CreateCompatibleStatus(CreateBoxEvent(startedAt.AddSeconds(31), sequence: 4, "python_zm", ownerId: 8))));
+                CreateCompatibleStatus(CreateBoxEvent(startedAt.AddSeconds(31), sequence: 4, "python_zm", ownerId: 8)))));
 
-            GameHistoryEntry saved = Assert.Single(savedEntries);
             Assert.Empty(saved.BoxEvents);
         }
 
@@ -384,8 +381,7 @@ namespace BO2.Tests.Services
         public void ObserveSnapshot_WhenCandidateBecomesUntrusted_DiscardsWithoutSaving(
             GameHistoryRecordingDiscardReason reason)
         {
-            List<GameHistoryEntry> savedEntries = [];
-            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            var recorder = new GameHistoryRecorder();
             DetectedGame detectedGame = CreateGame();
             DateTimeOffset startedAt = new(2026, 5, 10, 12, 0, 0, TimeSpan.Zero);
             recorder.ObserveSnapshot(CreateSnapshot(
@@ -394,9 +390,8 @@ namespace BO2.Tests.Services
                 CreateTimers(0, 0),
                 CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 1))));
 
-            recorder.ObserveSnapshot(CreateUntrustedSnapshot(reason, detectedGame, startedAt));
+            Assert.Null(recorder.ObserveSnapshot(CreateUntrustedSnapshot(reason, detectedGame, startedAt)));
 
-            Assert.Empty(savedEntries);
             Assert.Equal(GameHistoryRecordingState.Discarded, recorder.Status.State);
             Assert.Equal(reason, recorder.Status.DiscardReason);
         }
@@ -404,8 +399,7 @@ namespace BO2.Tests.Services
         [Fact]
         public void DiscardForAppClose_WhenCandidateActive_DiscardsWithoutSaving()
         {
-            List<GameHistoryEntry> savedEntries = [];
-            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            var recorder = new GameHistoryRecorder();
             DetectedGame detectedGame = CreateGame();
             DateTimeOffset startedAt = new(2026, 5, 10, 12, 0, 0, TimeSpan.Zero);
             recorder.ObserveSnapshot(CreateSnapshot(
@@ -416,7 +410,6 @@ namespace BO2.Tests.Services
 
             recorder.DiscardForAppClose();
 
-            Assert.Empty(savedEntries);
             Assert.Equal(GameHistoryRecordingState.Discarded, recorder.Status.State);
             Assert.Equal(GameHistoryRecordingDiscardReason.AppClosed, recorder.Status.DiscardReason);
         }
@@ -428,19 +421,17 @@ namespace BO2.Tests.Services
         public void ObserveSnapshot_WhenMapIdentityUnavailableBeforeRoundOne_BlocksCandidate(
             GameHistoryRecordingUnavailableReason reason)
         {
-            List<GameHistoryEntry> savedEntries = [];
-            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            var recorder = new GameHistoryRecorder();
             DetectedGame detectedGame = CreateGame();
             DateTimeOffset startedAt = new(2026, 5, 10, 12, 0, 0, TimeSpan.Zero);
 
-            recorder.ObserveSnapshot(CreateSnapshot(
+            Assert.Null(recorder.ObserveSnapshot(CreateSnapshot(
                 detectedGame,
                 CreateStats(0, 0, 0, 0, 0),
                 CreateTimers(0, 0),
                 CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, sequence: 1)),
-                CreateUnavailableMapIdentityResult(reason, detectedGame)));
+                CreateUnavailableMapIdentityResult(reason, detectedGame))));
 
-            Assert.Empty(savedEntries);
             Assert.Equal(GameHistoryRecordingState.Unavailable, recorder.Status.State);
             Assert.Equal(reason, recorder.Status.UnavailableReason);
         }
@@ -448,21 +439,41 @@ namespace BO2.Tests.Services
         [Fact]
         public void ObserveSnapshot_RecordsMultipleGamesWithinOneConnection()
         {
-            List<GameHistoryEntry> savedEntries = [];
-            var recorder = new GameHistoryRecorder(savedEntries.Add);
+            var recorder = new GameHistoryRecorder();
             DetectedGame detectedGame = CreateGame();
             DateTimeOffset firstStart = new(2026, 5, 10, 12, 0, 0, TimeSpan.Zero);
             DateTimeOffset secondStart = firstStart.AddMinutes(10);
 
-            CompleteOneRoundGame(recorder, detectedGame, firstStart, firstSequence: 1, finalPoints: 100);
-            CompleteOneRoundGame(recorder, detectedGame, secondStart, firstSequence: 3, finalPoints: 250);
+            GameHistoryEntry first = CompleteOneRoundGame(recorder, detectedGame, firstStart, firstSequence: 1, finalPoints: 100);
+            GameHistoryEntry second = CompleteOneRoundGame(recorder, detectedGame, secondStart, firstSequence: 3, finalPoints: 250);
 
-            Assert.Equal(2, savedEntries.Count);
-            Assert.Equal(100, savedEntries[0].FinalStats.Points);
-            Assert.Equal(250, savedEntries[1].FinalStats.Points);
+            Assert.Equal(100, first.FinalStats.Points);
+            Assert.Equal(250, second.FinalStats.Points);
         }
 
-        private static void CompleteOneRoundGame(
+        [Fact]
+        public void MarkCompletedEntrySaveFailed_WhenAppendFails_ReportsFailedSaveInsteadOfDiscard()
+        {
+            var recorder = new GameHistoryRecorder();
+            DetectedGame detectedGame = CreateGame();
+            DateTimeOffset startedAt = new(2026, 5, 10, 12, 0, 0, TimeSpan.Zero);
+            GameHistoryEntry completedEntry = CompleteOneRoundGame(
+                recorder,
+                detectedGame,
+                startedAt,
+                firstSequence: 1,
+                finalPoints: 100);
+
+            recorder.MarkCompletedEntrySaveFailed(completedEntry, "UNIQUE constraint failed");
+
+            Assert.Equal(GameHistoryRecordingState.FailedSave, recorder.Status.State);
+            Assert.Equal(GameHistoryRecordingStatusKind.FailedSave, recorder.Status.Kind);
+            Assert.Equal(GameHistoryRecordingDiscardReason.None, recorder.Status.DiscardReason);
+            Assert.Equal(completedEntry.Id, recorder.Status.LastSavedHistoryId);
+            Assert.Equal("UNIQUE constraint failed", recorder.Status.SaveErrorMessage);
+        }
+
+        private static GameHistoryEntry CompleteOneRoundGame(
             GameHistoryRecorder recorder,
             DetectedGame detectedGame,
             DateTimeOffset startedAt,
@@ -474,11 +485,17 @@ namespace BO2.Tests.Services
                 CreateStats(0, 0, 0, 0, 0),
                 CreateTimers(0, 0),
                 CreateCompatibleStatus(CreateEvent(GameEventType.StartOfRound, 1, startedAt, firstSequence))));
-            recorder.ObserveSnapshot(CreateSnapshot(
+            return AssertCompleted(recorder.ObserveSnapshot(CreateSnapshot(
                 detectedGame,
                 CreateStats(finalPoints, 3, 0, 0, 1),
                 CreateTimers(40, 40),
-                CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(40), firstSequence + 1))));
+                CreateCompatibleStatus(CreateEvent(GameEventType.EndGame, 1, startedAt.AddSeconds(40), firstSequence + 1)))));
+        }
+
+        private static GameHistoryEntry AssertCompleted(GameHistoryEntry? entry)
+        {
+            Assert.NotNull(entry);
+            return entry!;
         }
 
         private static GameConnectionSnapshot CreateUntrustedSnapshot(

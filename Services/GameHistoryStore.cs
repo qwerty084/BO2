@@ -50,6 +50,11 @@ namespace BO2.Services
             return LoadSummariesNewestFirstAsync(CancellationToken.None).GetAwaiter().GetResult();
         }
 
+        public GameHistoryEntry? LoadDetailById(string id)
+        {
+            return LoadDetailByIdAsync(id, CancellationToken.None).GetAwaiter().GetResult();
+        }
+
         public async Task<IReadOnlyList<GameHistorySummary>> LoadSummariesNewestFirstAsync(
             CancellationToken cancellationToken)
         {
@@ -86,6 +91,53 @@ namespace BO2.Services
             }
 
             return summaries;
+        }
+
+        public async Task<GameHistoryEntry?> LoadDetailByIdAsync(string id, CancellationToken cancellationToken)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(id);
+
+            await EnsureInitializedAsync(cancellationToken);
+
+            using SqliteConnection connection = await OpenConnectionAsync(cancellationToken);
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText =
+                """
+                SELECT
+                    id,
+                    started_at_unix_time_ms,
+                    ended_at_unix_time_ms,
+                    base_map_token,
+                    start_location_token,
+                    internal_map_token,
+                    friendly_name,
+                    final_round,
+                    final_points,
+                    final_kills,
+                    final_downs,
+                    final_revives,
+                    final_headshots,
+                    game_duration_ms
+                FROM game_history_entries
+                WHERE id = $id;
+                """;
+            command.Parameters.AddWithValue("$id", id);
+
+            GameHistorySummary summary;
+            using (SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken))
+            {
+                if (!await reader.ReadAsync(cancellationToken))
+                {
+                    return null;
+                }
+
+                summary = ReadSummary(reader);
+            }
+
+            GameHistoryEntry entry = CreateEntry(summary);
+            entry.Rounds = await LoadRoundsAsync(connection, entry.Id, cancellationToken);
+            entry.BoxEvents = await LoadBoxEventsAsync(connection, entry.Id, cancellationToken);
+            return entry;
         }
 
         public async Task AppendAsync(GameHistoryEntry entry, CancellationToken cancellationToken)

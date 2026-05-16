@@ -579,6 +579,24 @@
   <data name="GameHistoryLoadErrorTextFormat" xml:space="preserve">
     <value>Saved games could not be loaded: {0}</value>
   </data>
+  <data name="GameHistoryDetailLoadingTitle" xml:space="preserve">
+    <value>Loading saved game</value>
+  </data>
+  <data name="GameHistoryDetailLoadingText" xml:space="preserve">
+    <value>Loading rounds, stats, and box activity for the selected game.</value>
+  </data>
+  <data name="GameHistoryDetailLoadErrorTitle" xml:space="preserve">
+    <value>Saved game unavailable</value>
+  </data>
+  <data name="GameHistoryDetailLoadErrorText" xml:space="preserve">
+    <value>The selected saved game could not be loaded.</value>
+  </data>
+  <data name="GameHistoryDetailLoadErrorTextFormat" xml:space="preserve">
+    <value>The selected saved game could not be loaded: {0}</value>
+  </data>
+  <data name="GameHistoryDetailLoadNotFoundTextFormat" xml:space="preserve">
+    <value>The selected saved game was not found: {0}</value>
+  </data>
   <data name="GameHistoryRecordingStatusWaitingTitle" xml:space="preserve">
     <value>History recording idle</value>
   </data>
@@ -605,6 +623,24 @@
   </data>
   <data name="GameHistoryRecordingStatusWaitingForRoundOneMapFormat" xml:space="preserve">
     <value>{0} is ready to record. Start round 1 and this game will be tracked.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusSavePendingTitle" xml:space="preserve">
+    <value>Saving game</value>
+  </data>
+  <data name="GameHistoryRecordingStatusSavePendingText" xml:space="preserve">
+    <value>The completed game is being saved to Game History.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusSavePendingMapFormat" xml:space="preserve">
+    <value>The completed {0} game is being saved to Game History.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusFailedSaveTitle" xml:space="preserve">
+    <value>Game save failed</value>
+  </data>
+  <data name="GameHistoryRecordingStatusFailedSaveText" xml:space="preserve">
+    <value>The completed game could not be saved to Game History.</value>
+  </data>
+  <data name="GameHistoryRecordingStatusFailedSaveMapFormat" xml:space="preserve">
+    <value>The completed {0} game could not be saved to Game History.</value>
   </data>
   <data name="GameHistoryRecordingStatusSavedTitle" xml:space="preserve">
     <value>Game saved</value>

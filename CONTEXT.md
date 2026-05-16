@@ -24,6 +24,10 @@ _Avoid_: home stats view, current game view
 A user-visible record of completed Zombies games that the app can show after a game ends.
 _Avoid_: history feature, match history, saved game log
 
+**Completed Zombies Game**:
+A supported round-based Zombies run that ended cleanly and has enough final stats to appear in **Game History**.
+_Avoid_: in-progress recording, partial game, abandoned session
+
 **Supported Zombies Map**:
 A round-based Black Ops II Zombies map that is eligible to appear in **Game History**.
 _Avoid_: supported map table, standalone identity, base-map-token-only support
@@ -60,7 +64,7 @@ _Avoid_: widget manager, overlay service
 - A **Current Game Page** displays round-focused state from the current **Game Connection Snapshot**.
 - A **Current Game Page** does not own **Game Connection Session** commands; connect and disconnect controls live in the app shell footer/sidebar.
 - A **Current Game Page** is the app's default first page; the old home stats surface no longer exists as a separate page.
-- **Game History** records completed games only for **Supported Zombies Maps**.
+- **Game History** records only **Completed Zombies Games** on **Supported Zombies Maps**.
 - A **Player Stats Read** belongs to exactly one **Detected Game** when Steam Zombies is supported.
 - An **Event Monitor** can provide event data only after the **Game Connection Session** connects to Steam Zombies.
 - A **Game Timing Read** belongs to exactly one **Detected Game** when Steam Zombies timing support is available.

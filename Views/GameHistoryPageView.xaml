@@ -343,10 +343,52 @@
                 </Grid>
             </Border>
 
+            <Border
+                Grid.Column="1"
+                Padding="18"
+                Style="{StaticResource BO2CardBorderStyle}"
+                Visibility="{Binding IsSelectedGameDetailLoadingVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel Spacing="10">
+                    <ProgressRing
+                        Width="28"
+                        Height="28"
+                        HorizontalAlignment="Left"
+                        IsActive="True" />
+                    <TextBlock
+                        AutomationProperties.HeadingLevel="Level2"
+                        Style="{StaticResource BO2CardTitleTextBlockStyle}"
+                        Text="{Binding SelectedGameDetailLoadingTitle, Mode=OneWay}" />
+                    <TextBlock
+                        Style="{StaticResource BO2CaptionTextBlockStyle}"
+                        Text="{Binding SelectedGameDetailLoadingText, Mode=OneWay}"
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Grid.Column="1"
+                Padding="18"
+                BorderBrush="{ThemeResource BO2ErrorBrush}"
+                Style="{StaticResource BO2CardBorderStyle}"
+                Visibility="{Binding IsSelectedGameDetailErrorVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel Spacing="8">
+                    <TextBlock
+                        AutomationProperties.HeadingLevel="Level2"
+                        Foreground="{ThemeResource BO2ErrorBrush}"
+                        Style="{StaticResource BO2CardTitleTextBlockStyle}"
+                        Text="{Binding SelectedGameDetailErrorTitle, Mode=OneWay}" />
+                    <TextBlock
+                        Style="{StaticResource BO2CaptionTextBlockStyle}"
+                        Text="{Binding SelectedGameDetailErrorText, Mode=OneWay}"
+                        TextWrapping="WrapWholeWords" />
+                </StackPanel>
+            </Border>
+
             <ScrollViewer
                 Grid.Column="1"
                 HorizontalScrollBarVisibility="Disabled"
-                VerticalScrollBarVisibility="Auto">
+                VerticalScrollBarVisibility="Auto"
+                Visibility="{Binding IsSelectedGameDetailContentVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
                 <StackPanel Spacing="16">
                     <Border Style="{StaticResource BO2CardBorderStyle}">
                         <StackPanel Spacing="16">

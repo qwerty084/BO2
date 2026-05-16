@@ -20,10 +20,12 @@ namespace BO2.Tests.ViewModels
             viewModel.ReplaceSavedGames([oldest, newest, middle]);
 
             Assert.Equal(["newest", "middle", "oldest"], viewModel.SavedGames.Select(game => game.Id));
-            Assert.Equal("newest", viewModel.SelectedGameSummary?.Id);
+            Assert.Null(viewModel.SelectedGameSummary);
             Assert.Equal("GameHistoryTrackedGameCountFormat(3)", viewModel.TrackedGameCountText);
-            Assert.True(viewModel.SavedGames[0].IsSelected);
+            Assert.False(viewModel.SavedGames[0].IsSelected);
             Assert.False(viewModel.SavedGames[1].IsSelected);
+            Assert.True(viewModel.IsListVisible);
+            Assert.False(viewModel.IsDetailVisible);
         }
 
         [Fact]
@@ -74,7 +76,10 @@ namespace BO2.Tests.ViewModels
         public void SelectGame_OpensDetailAndBackReturnsToList()
         {
             var viewModel = new GameHistoryPageViewModel();
-            viewModel.ReplaceSavedGames([CreateDetailedGame("town-run")]);
+            GameHistoryEntry game = CreateDetailedGame("town-run");
+            string? requestedDetailId = null;
+            viewModel.SelectedGameDetailRequested += (_, args) => requestedDetailId = args.Id;
+            viewModel.ReplaceSavedGames([game]);
 
             viewModel.SelectGame(viewModel.SavedGames[0]);
 
@@ -83,6 +88,16 @@ namespace BO2.Tests.ViewModels
             Assert.False(viewModel.IsHistoryRailReopenButtonVisible);
             Assert.Same(viewModel.SavedGames[0], viewModel.SelectedGameSummary);
             Assert.True(viewModel.SavedGames[0].IsSelected);
+            Assert.True(viewModel.IsSelectedGameDetailLoadingVisible);
+            Assert.False(viewModel.IsSelectedGameDetailContentVisible);
+            Assert.False(viewModel.IsSelectedGameDetailErrorVisible);
+            Assert.Null(viewModel.SelectedGame);
+            Assert.Equal("town-run", requestedDetailId);
+
+            viewModel.ShowSelectedGameDetail(game);
+
+            Assert.False(viewModel.IsSelectedGameDetailLoadingVisible);
+            Assert.True(viewModel.IsSelectedGameDetailContentVisible);
             Assert.Equal("town-run", Assert.IsType<GameHistoryDetailViewModel>(viewModel.SelectedGame).Id);
 
             viewModel.ShowList();
@@ -91,15 +106,19 @@ namespace BO2.Tests.ViewModels
             Assert.Null(viewModel.SelectedGameSummary);
             Assert.False(viewModel.SavedGames[0].IsSelected);
             Assert.Null(viewModel.SelectedGame);
+            Assert.False(viewModel.IsSelectedGameDetailLoadingVisible);
+            Assert.False(viewModel.IsSelectedGameDetailErrorVisible);
         }
 
         [Fact]
         public void HistoryRail_CanBeHiddenAndReopenedWithoutClearingSelectedGame()
         {
             var viewModel = new GameHistoryPageViewModel();
-            viewModel.ReplaceSavedGames([CreateDetailedGame("town-run")]);
+            GameHistoryEntry game = CreateDetailedGame("town-run");
+            viewModel.ReplaceSavedGames([game]);
 
             viewModel.SelectGame(viewModel.SavedGames[0]);
+            viewModel.ShowSelectedGameDetail(game);
             viewModel.HideHistoryRail();
 
             Assert.True(viewModel.IsDetailVisible);
@@ -127,16 +146,69 @@ namespace BO2.Tests.ViewModels
             Assert.False(viewModel.SavedGames[0].IsSelected);
             Assert.True(viewModel.SavedGames[1].IsSelected);
             Assert.Same(viewModel.SavedGames[1], viewModel.SelectedGameSummary);
+            Assert.True(viewModel.IsSelectedGameDetailLoadingVisible);
+        }
+
+        [Fact]
+        public void SelectGameById_SelectsSummaryAndRequestsDetailLoad()
+        {
+            var viewModel = new GameHistoryPageViewModel();
+            string? requestedDetailId = null;
+            viewModel.SelectedGameDetailRequested += (_, args) => requestedDetailId = args.Id;
+            viewModel.ReplaceSavedGames([CreateDetailedGame("first"), CreateDetailedGame("second")]);
+
+            viewModel.SelectGameById("second");
+
+            Assert.Equal("second", viewModel.SelectedGameSummary?.Id);
+            Assert.True(viewModel.SavedGames.Single(game => game.Id == "second").IsSelected);
+            Assert.True(viewModel.IsSelectedGameDetailLoadingVisible);
+            Assert.Equal("second", requestedDetailId);
+        }
+
+        [Fact]
+        public void ShowSelectedGameDetailError_ClearsStaleDetail()
+        {
+            var viewModel = new GameHistoryPageViewModel();
+            GameHistoryEntry first = CreateDetailedGame("first");
+            GameHistoryEntry second = CreateDetailedGame("second");
+            viewModel.ReplaceSavedGames([first, second]);
+            SelectAndLoad(viewModel, first);
+
+            viewModel.SelectGame(viewModel.SavedGames.Single(game => game.Id == "second"));
+            viewModel.ShowSelectedGameDetailError("database locked");
+
+            Assert.Equal("second", viewModel.SelectedGameSummary?.Id);
+            Assert.Null(viewModel.SelectedGame);
+            Assert.False(viewModel.IsSelectedGameDetailLoadingVisible);
+            Assert.False(viewModel.IsSelectedGameDetailContentVisible);
+            Assert.True(viewModel.IsSelectedGameDetailErrorVisible);
+            Assert.Equal("database locked", viewModel.SelectedGameDetailErrorText);
+        }
+
+        [Fact]
+        public void ShowSelectedGameDetail_IgnoresStaleLoadedDetailForPreviousSelection()
+        {
+            var viewModel = new GameHistoryPageViewModel();
+            GameHistoryEntry first = CreateDetailedGame("first");
+            GameHistoryEntry second = CreateDetailedGame("second");
+            viewModel.ReplaceSavedGames([first, second]);
+
+            viewModel.SelectGame(viewModel.SavedGames.Single(game => game.Id == "second"));
+            viewModel.ShowSelectedGameDetail(first);
+
+            Assert.Equal("second", viewModel.SelectedGameSummary?.Id);
+            Assert.Null(viewModel.SelectedGame);
+            Assert.True(viewModel.IsSelectedGameDetailLoadingVisible);
         }
 
         [Fact]
         public void DetailProjection_ShowsFinalRoundStatsRoundDeltasAndMissingDurations()
         {
             var viewModel = new GameHistoryPageViewModel();
-            viewModel.ReplaceSavedGames([CreateDetailedGame("town-run")]);
+            GameHistoryEntry game = CreateDetailedGame("town-run");
+            viewModel.ReplaceSavedGames([game]);
 
-            viewModel.SelectGame(viewModel.SavedGames[0]);
-            GameHistoryDetailViewModel detail = Assert.IsType<GameHistoryDetailViewModel>(viewModel.SelectedGame);
+            GameHistoryDetailViewModel detail = SelectAndLoad(viewModel, game);
 
             Assert.Equal("Town", detail.MapNameText);
             Assert.Equal("GameHistoryFinalRoundFormat(12)", detail.FinalRoundText);
@@ -164,12 +236,12 @@ namespace BO2.Tests.ViewModels
 
             GameHistoryEntry game = CreateGame("town-run", 2026, 5, 15, 20, 0);
             viewModel.ReplaceSavedGames([game]);
-            viewModel.SelectGame(viewModel.SavedGames[0]);
+            GameHistoryDetailViewModel detail = SelectAndLoad(viewModel, game);
 
             string expectedDateText = game.EndedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
             Assert.Equal("5/15/2026 20:30", expectedDateText);
             Assert.Equal(expectedDateText, viewModel.SavedGames[0].DateText);
-            Assert.Equal(expectedDateText, Assert.IsType<GameHistoryDetailViewModel>(viewModel.SelectedGame).DateText);
+            Assert.Equal(expectedDateText, detail.DateText);
         }
 
         [Theory]
@@ -188,18 +260,17 @@ namespace BO2.Tests.ViewModels
             string friendlyName)
         {
             var viewModel = new GameHistoryPageViewModel();
-            viewModel.ReplaceSavedGames([CreateDetailedGame(
+            GameHistoryEntry game = CreateDetailedGame(
                 "saved-run",
                 startLocationToken,
                 internalMapToken,
                 friendlyName,
-                baseMapToken)]);
+                baseMapToken);
+            viewModel.ReplaceSavedGames([game]);
 
             Assert.Equal(friendlyName, viewModel.SavedGames[0].MapNameText);
 
-            viewModel.SelectGame(viewModel.SavedGames[0]);
-
-            GameHistoryDetailViewModel detail = Assert.IsType<GameHistoryDetailViewModel>(viewModel.SelectedGame);
+            GameHistoryDetailViewModel detail = SelectAndLoad(viewModel, game);
             Assert.Equal(friendlyName, detail.MapNameText);
         }
 
@@ -207,10 +278,10 @@ namespace BO2.Tests.ViewModels
         public void DetailProjection_TracksMysteryBoxAveragesWithoutInternalEventNames()
         {
             var viewModel = new GameHistoryPageViewModel();
-            viewModel.ReplaceSavedGames([CreateDetailedGame("town-run")]);
+            GameHistoryEntry game = CreateDetailedGame("town-run");
+            viewModel.ReplaceSavedGames([game]);
 
-            viewModel.SelectGame(viewModel.SavedGames[0]);
-            GameHistoryDetailViewModel detail = Assert.IsType<GameHistoryDetailViewModel>(viewModel.SelectedGame);
+            GameHistoryDetailViewModel detail = SelectAndLoad(viewModel, game);
 
             Assert.True(detail.HasBoxEvents);
             Assert.Equal(3, detail.BoxEvents.Count);
@@ -255,8 +326,15 @@ namespace BO2.Tests.ViewModels
             viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.WaitingForRoundOne("Farm"));
             Assert.Equal("GameHistoryRecordingStatusWaitingForRoundOneMapFormat(Farm)", viewModel.RecordingStatusText);
 
+            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.SavePending("farm-run", "Farm"));
+            Assert.Equal("GameHistoryRecordingStatusSavePendingMapFormat(Farm)", viewModel.RecordingStatusText);
+
             viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Saved("farm-run", "Farm"));
             Assert.Equal("GameHistoryRecordingStatusSavedMapFormat(Farm)", viewModel.RecordingStatusText);
+
+            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.FailedSave("farm-run", "Farm", "database locked"));
+            Assert.Equal("GameHistoryRecordingStatusFailedSaveMapFormat(Farm)", viewModel.RecordingStatusText);
+            Assert.Empty(viewModel.SavedGames);
 
             viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Unavailable(
                 GameHistoryRecordingUnavailableReason.RequiresSupportedMap));
@@ -308,6 +386,20 @@ namespace BO2.Tests.ViewModels
             Assert.Equal(
                 $"GameHistoryRecordingStatusWaitingForRoundOneMapFormat({friendlyName})",
                 viewModel.RecordingStatusText);
+        }
+
+        private static GameHistoryDetailViewModel SelectAndLoad(
+            GameHistoryPageViewModel viewModel,
+            GameHistoryEntry game)
+        {
+            GameHistorySummaryViewModel summary = viewModel.SavedGames.Single(
+                savedGame => string.Equals(savedGame.Id, game.Id, StringComparison.Ordinal));
+
+            viewModel.SelectGame(summary);
+            Assert.True(viewModel.IsSelectedGameDetailLoadingVisible);
+            viewModel.ShowSelectedGameDetail(game);
+            Assert.True(viewModel.IsSelectedGameDetailContentVisible);
+            return Assert.IsType<GameHistoryDetailViewModel>(viewModel.SelectedGame);
         }
 
         private static GameHistoryEntry CreateDetailedGame(

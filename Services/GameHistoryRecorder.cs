@@ -11,6 +11,8 @@ namespace BO2.Services
         WaitingForRoundOne,
         Recording,
         Discarded,
+        SavePending,
+        FailedSave,
         Saved
     }
 
@@ -22,7 +24,9 @@ namespace BO2.Services
         RequiresHookBackedEventMonitor,
         DiscardedSequenceOrDroppedLifecycle,
         DiscardedMissingStats,
-        DiscardedConnectionEndedBeforeSave
+        DiscardedConnectionEndedBeforeSave,
+        SavePending,
+        FailedSave
     }
 
     public enum GameHistoryRecordingUnavailableReason
@@ -56,11 +60,14 @@ namespace BO2.Services
         GameHistoryRecordingDiscardReason DiscardReason,
         int? ActiveRoundNumber,
         string? LastSavedHistoryId,
-        string? MapName = null)
+        string? MapName = null,
+        string? SaveErrorMessage = null)
     {
         public GameHistoryRecordingStatusKind Kind => State switch
         {
             GameHistoryRecordingState.Recording => GameHistoryRecordingStatusKind.ActiveRecording,
+            GameHistoryRecordingState.SavePending => GameHistoryRecordingStatusKind.SavePending,
+            GameHistoryRecordingState.FailedSave => GameHistoryRecordingStatusKind.FailedSave,
             GameHistoryRecordingState.Discarded => DiscardReason switch
             {
                 GameHistoryRecordingDiscardReason.SequenceGap
@@ -163,33 +170,50 @@ namespace BO2.Services
                 historyId,
                 mapName);
         }
+
+        public static GameHistoryRecordingStatus SavePending(string historyId, string? mapName = null)
+        {
+            return new GameHistoryRecordingStatus(
+                GameHistoryRecordingState.SavePending,
+                GameHistoryRecordingUnavailableReason.None,
+                GameHistoryRecordingDiscardReason.None,
+                null,
+                historyId,
+                mapName);
+        }
+
+        public static GameHistoryRecordingStatus FailedSave(
+            string historyId,
+            string? mapName = null,
+            string? errorMessage = null)
+        {
+            return new GameHistoryRecordingStatus(
+                GameHistoryRecordingState.FailedSave,
+                GameHistoryRecordingUnavailableReason.None,
+                GameHistoryRecordingDiscardReason.None,
+                null,
+                historyId,
+                mapName,
+                errorMessage);
+        }
     }
 
     internal sealed class GameHistoryRecorder
     {
-        private readonly Action<GameHistoryEntry> _saveEntry;
         private CandidateSession? _candidate;
         private DetectedGame? _observedGame;
         private ulong? _lastObservedEventSequence;
         private uint _lastDroppedEventCount;
         private uint _lastDroppedNotifyCount;
 
-        public GameHistoryRecorder(GameHistoryStore store)
-            : this(store.Append)
+        public GameHistoryRecorder()
         {
-        }
-
-        internal GameHistoryRecorder(Action<GameHistoryEntry> saveEntry)
-        {
-            ArgumentNullException.ThrowIfNull(saveEntry);
-
-            _saveEntry = saveEntry;
             Status = GameHistoryRecordingStatus.Unavailable(GameHistoryRecordingUnavailableReason.NotConnected);
         }
 
         public GameHistoryRecordingStatus Status { get; private set; }
 
-        public void ObserveSnapshot(GameConnectionSnapshot snapshot)
+        public GameHistoryEntry? ObserveSnapshot(GameConnectionSnapshot snapshot)
         {
             if (HasDetectedGameChanged(snapshot.CurrentGame))
             {
@@ -198,7 +222,7 @@ namespace BO2.Services
                 {
                     Discard(GameHistoryRecordingDiscardReason.DetectedGameChanged);
                     _observedGame = snapshot.CurrentGame;
-                    return;
+                    return null;
                 }
             }
 
@@ -210,11 +234,11 @@ namespace BO2.Services
                 if (_candidate is not null)
                 {
                     Discard(GameHistoryRecordingDiscardReason.Disconnected);
-                    return;
+                    return null;
                 }
 
                 Status = GameHistoryRecordingStatus.Unavailable(GameHistoryRecordingUnavailableReason.NotConnected);
-                return;
+                return null;
             }
 
             GameConnectionEventMonitorSummary eventMonitorSummary = snapshot.EventMonitorSummary;
@@ -224,12 +248,12 @@ namespace BO2.Services
                 if (_candidate is not null)
                 {
                     Discard(GameHistoryRecordingDiscardReason.PollingFallback);
-                    return;
+                    return null;
                 }
 
                 Status = GameHistoryRecordingStatus.Unavailable(
                     GameHistoryRecordingUnavailableReason.RequiresHookBackedEventMonitor);
-                return;
+                return null;
             }
 
             if (eventMonitorSummary.State != GameConnectionEventMonitorState.Ready
@@ -238,12 +262,12 @@ namespace BO2.Services
                 if (_candidate is not null)
                 {
                     Discard(GameHistoryRecordingDiscardReason.DroppedLifecycleData);
-                    return;
+                    return null;
                 }
 
                 Status = GameHistoryRecordingStatus.Unavailable(
                     GameHistoryRecordingUnavailableReason.RequiresHookBackedEventMonitor);
-                return;
+                return null;
             }
 
             if (!TryGetSupportedMap(
@@ -255,11 +279,11 @@ namespace BO2.Services
                 if (_candidate is not null)
                 {
                     Discard(discardReason);
-                    return;
+                    return null;
                 }
 
                 Status = GameHistoryRecordingStatus.Unavailable(unavailableReason);
-                return;
+                return null;
             }
 
             GameHistoryEventBatch eventBatch = ReadNewEvents(eventMonitorSummary.Status);
@@ -268,12 +292,12 @@ namespace BO2.Services
                 if (_candidate is not null)
                 {
                     Discard(GameHistoryRecordingDiscardReason.DroppedLifecycleData);
-                    return;
+                    return null;
                 }
 
                 Status = GameHistoryRecordingStatus.Unavailable(
                     GameHistoryRecordingUnavailableReason.RequiresHookBackedEventMonitor);
-                return;
+                return null;
             }
 
             if (eventBatch.HasSequenceGap)
@@ -281,12 +305,12 @@ namespace BO2.Services
                 if (_candidate is not null)
                 {
                     Discard(GameHistoryRecordingDiscardReason.SequenceGap);
-                    return;
+                    return null;
                 }
 
                 Status = GameHistoryRecordingStatus.Unavailable(
                     GameHistoryRecordingUnavailableReason.RequiresHookBackedEventMonitor);
-                return;
+                return null;
             }
 
             GameHistoryStats? observedStats = TryReadRequiredStats(snapshot.ReadResult);
@@ -301,10 +325,16 @@ namespace BO2.Services
 
             foreach (GameEvent gameEvent in eventBatch.Events)
             {
-                ProcessEvent(snapshot, gameEvent, mapIdentity, observedStats, gameDuration, roundDuration);
+                GameHistoryEntry? completedEntry =
+                    ProcessEvent(snapshot, gameEvent, mapIdentity, observedStats, gameDuration, roundDuration);
                 if (Status.State == GameHistoryRecordingState.Discarded)
                 {
-                    return;
+                    return null;
+                }
+
+                if (completedEntry is not null)
+                {
+                    return completedEntry;
                 }
             }
 
@@ -314,10 +344,14 @@ namespace BO2.Services
                     _candidate.ActiveRound?.RoundNumber ?? 0,
                     _candidate.MapIdentity.DisplayName);
             }
-            else if (Status.State != GameHistoryRecordingState.Saved)
+            else if (Status.State is not GameHistoryRecordingState.Saved
+                and not GameHistoryRecordingState.SavePending
+                and not GameHistoryRecordingState.FailedSave)
             {
                 Status = GameHistoryRecordingStatus.WaitingForRoundOne(mapIdentity.DisplayName);
             }
+
+            return null;
         }
 
         public void DiscardForAppClose()
@@ -328,7 +362,32 @@ namespace BO2.Services
             }
         }
 
-        private void ProcessEvent(
+        public void MarkCompletedEntrySaved(GameHistoryEntry entry)
+        {
+            ArgumentNullException.ThrowIfNull(entry);
+
+            if (Status.State == GameHistoryRecordingState.SavePending
+                && string.Equals(Status.LastSavedHistoryId, entry.Id, StringComparison.Ordinal))
+            {
+                Status = GameHistoryRecordingStatus.Saved(entry.Id, entry.MapIdentity.FriendlyName);
+            }
+        }
+
+        public void MarkCompletedEntrySaveFailed(GameHistoryEntry entry, string? errorMessage = null)
+        {
+            ArgumentNullException.ThrowIfNull(entry);
+
+            if (Status.State == GameHistoryRecordingState.SavePending
+                && string.Equals(Status.LastSavedHistoryId, entry.Id, StringComparison.Ordinal))
+            {
+                Status = GameHistoryRecordingStatus.FailedSave(
+                    entry.Id,
+                    entry.MapIdentity.FriendlyName,
+                    errorMessage);
+            }
+        }
+
+        private GameHistoryEntry? ProcessEvent(
             GameConnectionSnapshot snapshot,
             GameEvent gameEvent,
             GameMapIdentity mapIdentity,
@@ -345,12 +404,13 @@ namespace BO2.Services
                     HandleRoundEnd(gameEvent, observedStats, roundDuration);
                     break;
                 case GameEventType.EndGame:
-                    HandleEndGame(gameEvent, observedStats, gameDuration, roundDuration);
-                    break;
+                    return HandleEndGame(gameEvent, observedStats, gameDuration, roundDuration);
                 case GameEventType.BoxEvent:
                     HandleBoxEvent(gameEvent);
                     break;
             }
+
+            return null;
         }
 
         private void HandleRoundStart(
@@ -409,7 +469,7 @@ namespace BO2.Services
             }
         }
 
-        private void HandleEndGame(
+        private GameHistoryEntry? HandleEndGame(
             GameEvent gameEvent,
             GameHistoryStats? observedStats,
             TimeSpan? gameDuration,
@@ -417,7 +477,7 @@ namespace BO2.Services
         {
             if (_candidate is null)
             {
-                return;
+                return null;
             }
 
             GameHistoryStats? finalStats = observedStats ?? _candidate.LatestStats;
@@ -425,23 +485,23 @@ namespace BO2.Services
                 && !TryCloseActiveRound(gameEvent.ReceivedAt, finalStats, roundDuration))
             {
                 Discard(GameHistoryRecordingDiscardReason.MissingRequiredStats);
-                return;
+                return null;
             }
 
             finalStats ??= _candidate.LatestStats;
             if (finalStats is null || _candidate.Rounds.Count == 0)
             {
                 Discard(GameHistoryRecordingDiscardReason.MissingRequiredStats);
-                return;
+                return null;
             }
 
             GameHistoryEntry entry = _candidate.ToEntry(
                 gameEvent.ReceivedAt,
                 finalStats,
                 gameDuration ?? _candidate.LatestGameDuration);
-            _saveEntry(entry);
             _candidate = null;
-            Status = GameHistoryRecordingStatus.Saved(entry.Id, entry.MapIdentity.FriendlyName);
+            Status = GameHistoryRecordingStatus.SavePending(entry.Id, entry.MapIdentity.FriendlyName);
+            return entry;
         }
 
         private void HandleBoxEvent(GameEvent gameEvent)
