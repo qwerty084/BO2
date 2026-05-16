@@ -392,7 +392,7 @@
                 <StackPanel Spacing="16">
                     <Border Style="{StaticResource BO2CardBorderStyle}">
                         <StackPanel Spacing="16">
-                            <Grid ColumnSpacing="20">
+                            <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
@@ -403,6 +403,7 @@
                                 <Button
                                     AutomationProperties.Name="Show saved games sidebar"
                                     Click="OnShowHistoryRailButtonClick"
+                                    Margin="0,0,20,0"
                                     MinWidth="0"
                                     Padding="8,4"
                                     Style="{StaticResource BO2SecondaryButtonStyle}"
@@ -432,6 +433,7 @@
 
                                 <StackPanel
                                     Grid.Column="2"
+                                    Margin="20,0,0,0"
                                     MinWidth="120"
                                     Spacing="4">
                                     <TextBlock
@@ -444,14 +446,20 @@
 
                                 <StackPanel
                                     Grid.Column="3"
+                                    HorizontalAlignment="Right"
+                                    Margin="20,0,0,0"
                                     MinWidth="96"
                                     Spacing="4">
                                     <TextBlock
                                         x:Uid="GameHistoryDurationLabel"
-                                        Style="{StaticResource BO2CaptionTextBlockStyle}" />
+                                        HorizontalAlignment="Right"
+                                        Style="{StaticResource BO2CaptionTextBlockStyle}"
+                                        TextAlignment="Right" />
                                     <TextBlock
+                                        HorizontalAlignment="Right"
                                         Style="{StaticResource BO2StatValueTextBlockStyle}"
-                                        Text="{Binding SelectedGame.GameDurationText, Mode=OneWay}" />
+                                        Text="{Binding SelectedGame.GameDurationText, Mode=OneWay}"
+                                        TextAlignment="Right" />
                                 </StackPanel>
                             </Grid>
 
