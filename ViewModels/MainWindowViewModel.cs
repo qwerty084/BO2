@@ -408,13 +408,25 @@ namespace BO2.ViewModels
             }
             catch (Exception ex) when (IsNonFatalException(ex))
             {
-                await RunOnDispatcherAsync(
-                    () =>
-                    {
-                        _gameHistoryRecorder.MarkCompletedEntrySaveFailed(completedEntry, ex.Message);
-                        ApplyGameHistoryRecordingStatus(_gameHistoryRecorder.Status);
-                    },
-                    CancellationToken.None);
+                try
+                {
+                    await RunOnDispatcherAsync(
+                        () =>
+                        {
+                            _gameHistoryRecorder.MarkCompletedEntrySaveFailed(completedEntry, ex.Message);
+                            ApplyGameHistoryRecordingStatus(_gameHistoryRecorder.Status);
+                        },
+                        cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (InvalidOperationException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 return;
             }
 
@@ -433,23 +445,34 @@ namespace BO2.ViewModels
                 summaryLoadError = AppStrings.Format("GameHistoryLoadErrorTextFormat", ex.Message);
             }
 
-            await RunOnDispatcherAsync(
-                () =>
-                {
-                    if (summaries is not null)
+            try
+            {
+                await RunOnDispatcherAsync(
+                    () =>
                     {
-                        _gameHistoryPage.ReplaceSummaries(summaries);
-                        _gameHistoryPage.SelectGameById(completedEntry.Id);
-                    }
-                    else if (summaryLoadError is not null)
-                    {
-                        _gameHistoryPage.ShowSummaryLoadError(summaryLoadError);
-                    }
+                        if (summaries is not null)
+                        {
+                            _gameHistoryPage.ReplaceSummaries(summaries);
+                            _gameHistoryPage.SelectGameById(completedEntry.Id);
+                        }
+                        else if (summaryLoadError is not null)
+                        {
+                            _gameHistoryPage.ShowSummaryLoadError(summaryLoadError);
+                        }
 
-                    _gameHistoryRecorder.MarkCompletedEntrySaved(completedEntry);
-                    ApplyGameHistoryRecordingStatus(_gameHistoryRecorder.Status);
-                },
-                cancellationToken);
+                        _gameHistoryRecorder.MarkCompletedEntrySaved(completedEntry);
+                        ApplyGameHistoryRecordingStatus(_gameHistoryRecorder.Status);
+                    },
+                    cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (InvalidOperationException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
         }
 
         private void OnSelectedGameDetailRequested(object? sender, GameHistoryDetailRequestedEventArgs args)
