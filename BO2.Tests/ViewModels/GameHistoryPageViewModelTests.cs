@@ -315,6 +315,52 @@ namespace BO2.Tests.ViewModels
         }
 
         [Fact]
+        public void DetailProjection_OrdersBoxEventsByReceivedTimeAndPreservesEqualTimestampOrder()
+        {
+            var viewModel = new GameHistoryPageViewModel();
+            GameHistoryEntry game = CreateDetailedGame("town-run");
+            DateTimeOffset sameReceivedAt = CreateLocalDate(2026, 5, 10, 14, 45);
+            game.BoxEvents =
+            [
+                new GameHistoryBoxEvent
+                {
+                    ReceivedAt = sameReceivedAt.AddMinutes(1),
+                    RoundNumber = 2,
+                    EventName = "randomization_done",
+                    RawWeaponToken = "galil_zm",
+                    WeaponDisplayName = "Galil",
+                    OwnerId = 7,
+                    StringValue = 300
+                },
+                new GameHistoryBoxEvent
+                {
+                    ReceivedAt = sameReceivedAt,
+                    RoundNumber = 2,
+                    EventName = "randomization_done",
+                    RawWeaponToken = "ray_gun_zm",
+                    WeaponDisplayName = "Ray Gun",
+                    OwnerId = 7,
+                    StringValue = 100
+                },
+                new GameHistoryBoxEvent
+                {
+                    ReceivedAt = sameReceivedAt,
+                    RoundNumber = 2,
+                    EventName = "randomization_done",
+                    RawWeaponToken = "m32_zm",
+                    WeaponDisplayName = "War Machine",
+                    OwnerId = 7,
+                    StringValue = 200
+                }
+            ];
+            viewModel.ReplaceSavedGames([game]);
+
+            GameHistoryDetailViewModel detail = SelectAndLoad(viewModel, game);
+
+            Assert.Equal(["Ray Gun", "War Machine", "Galil"], detail.BoxEvents.Select(boxEvent => boxEvent.WeaponText));
+        }
+
+        [Fact]
         public void ApplyRecordingStatus_ProjectsActiveUnavailableAndDiscardedStatesWithoutAddingEntries()
         {
             var viewModel = new GameHistoryPageViewModel();

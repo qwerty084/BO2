@@ -216,7 +216,7 @@ namespace BO2.Tests.Services
                 {
                     ReceivedAt = entry.StartedAt.AddMinutes(6),
                     RoundNumber = 2,
-                    EventName = "randomization_done",
+                    EventName = "closed",
                     RawWeaponToken = null,
                     WeaponDisplayName = null,
                     OwnerId = 8,
@@ -231,6 +231,16 @@ namespace BO2.Tests.Services
                     WeaponDisplayName = "Ray Gun",
                     OwnerId = 7,
                     StringValue = 100
+                },
+                new GameHistoryBoxEvent
+                {
+                    ReceivedAt = entry.StartedAt.AddMinutes(5),
+                    RoundNumber = 1,
+                    EventName = "user_grabbed_weapon",
+                    RawWeaponToken = "m32_zm",
+                    WeaponDisplayName = "War Machine",
+                    OwnerId = 9,
+                    StringValue = 200
                 }
             ];
             await store.AppendAsync(entry, CancellationToken.None);
@@ -254,8 +264,38 @@ namespace BO2.Tests.Services
             Assert.Null(loaded.Rounds[1].RoundDuration);
             Assert.Equal(900, loaded.Rounds[1].CumulativeStats.Points);
             Assert.Equal(400, loaded.Rounds[1].DeltaStats.Points);
-            Assert.Equal(["ray_gun_zm", null], loaded.BoxEvents.Select(boxEvent => boxEvent.RawWeaponToken));
-            Assert.Equal(["Ray Gun", null], loaded.BoxEvents.Select(boxEvent => boxEvent.WeaponDisplayName));
+            Assert.Collection(
+                loaded.BoxEvents,
+                boxEvent =>
+                {
+                    Assert.Equal(entry.StartedAt.AddMinutes(5), boxEvent.ReceivedAt);
+                    Assert.Equal(1, boxEvent.RoundNumber);
+                    Assert.Equal("randomization_done", boxEvent.EventName);
+                    Assert.Equal("ray_gun_zm", boxEvent.RawWeaponToken);
+                    Assert.Equal("Ray Gun", boxEvent.WeaponDisplayName);
+                    Assert.Equal((uint)7, boxEvent.OwnerId);
+                    Assert.Equal((uint)100, boxEvent.StringValue);
+                },
+                boxEvent =>
+                {
+                    Assert.Equal(entry.StartedAt.AddMinutes(5), boxEvent.ReceivedAt);
+                    Assert.Equal(1, boxEvent.RoundNumber);
+                    Assert.Equal("user_grabbed_weapon", boxEvent.EventName);
+                    Assert.Equal("m32_zm", boxEvent.RawWeaponToken);
+                    Assert.Equal("War Machine", boxEvent.WeaponDisplayName);
+                    Assert.Equal((uint)9, boxEvent.OwnerId);
+                    Assert.Equal((uint)200, boxEvent.StringValue);
+                },
+                boxEvent =>
+                {
+                    Assert.Equal(entry.StartedAt.AddMinutes(6), boxEvent.ReceivedAt);
+                    Assert.Equal(2, boxEvent.RoundNumber);
+                    Assert.Equal("closed", boxEvent.EventName);
+                    Assert.Null(boxEvent.RawWeaponToken);
+                    Assert.Null(boxEvent.WeaponDisplayName);
+                    Assert.Equal((uint)8, boxEvent.OwnerId);
+                    Assert.Equal((uint)101, boxEvent.StringValue);
+                });
         }
 
         [Fact]
@@ -275,6 +315,34 @@ namespace BO2.Tests.Services
                     RoundDuration = TimeSpan.FromMinutes(1),
                     CumulativeStats = CreateStats(500, 7, 0, 0, 3),
                     DeltaStats = CreateStats(500, 7, 0, 0, 3)
+                }
+            ];
+
+            await Assert.ThrowsAsync<SqliteException>(
+                () => store.AppendAsync(entry, CancellationToken.None));
+
+            Assert.Empty(await store.LoadSummariesNewestFirstAsync(CancellationToken.None));
+            Assert.Null(await store.LoadDetailByIdAsync(entry.Id, CancellationToken.None));
+        }
+
+        [Fact]
+        public async Task AppendAsync_WhenBoxEventInsertFails_RollsBackCompletedGameAppend()
+        {
+            var store = new GameHistoryStore(CreateDatabasePath());
+            await store.LoadSummariesNewestFirstAsync(CancellationToken.None);
+            await CreateFailingBoxEventInsertTriggerAsync(store.DatabasePath);
+            GameHistoryEntry entry = CreateEntry("box-event-fails", daysOffset: 0);
+            entry.BoxEvents =
+            [
+                new GameHistoryBoxEvent
+                {
+                    ReceivedAt = entry.StartedAt.AddMinutes(5),
+                    RoundNumber = 1,
+                    EventName = "randomization_done",
+                    RawWeaponToken = "ray_gun_zm",
+                    WeaponDisplayName = "Ray Gun",
+                    OwnerId = 7,
+                    StringValue = 100
                 }
             ];
 
@@ -415,6 +483,25 @@ namespace BO2.Tests.Services
                 BEFORE INSERT ON game_history_rounds
                 BEGIN
                     SELECT RAISE(FAIL, 'round insert failed');
+                END;
+                """;
+            await command.ExecuteNonQueryAsync();
+        }
+
+        private static async Task CreateFailingBoxEventInsertTriggerAsync(string databasePath)
+        {
+            await using SqliteConnection connection = new(new SqliteConnectionStringBuilder
+            {
+                DataSource = databasePath
+            }.ToString());
+            await connection.OpenAsync();
+            await using SqliteCommand command = connection.CreateCommand();
+            command.CommandText =
+                """
+                CREATE TRIGGER fail_game_history_box_event_insert
+                BEFORE INSERT ON game_history_box_events
+                BEGIN
+                    SELECT RAISE(FAIL, 'box event insert failed');
                 END;
                 """;
             await command.ExecuteNonQueryAsync();
