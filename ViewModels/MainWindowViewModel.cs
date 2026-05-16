@@ -16,13 +16,13 @@ namespace BO2.ViewModels
 
         private readonly DispatcherQueue _dispatcherQueue;
         private readonly GameConnectionSession _connectionSession;
-        private readonly GameHistoryStore _gameHistoryStore;
+        private readonly GameHistoryPersistenceCoordinator _gameHistoryPersistence;
         private readonly GameHistoryRecorder _gameHistoryRecorder;
         private readonly ShellConnectionDisplayProjector _shellDisplayProjector;
         private readonly CurrentGamePageViewModel _currentGamePage = new();
         private readonly GameHistoryPageViewModel _gameHistoryPage = new();
         private readonly SemaphoreSlim _operationSemaphore = new(1, 1);
-        private readonly CancellationTokenSource _gameHistoryPersistenceCancellationTokenSource = new();
+        private readonly CancellationTokenSource _gameHistoryUiCancellationTokenSource = new();
         private CancellationTokenSource? _gameHistoryDetailLoadCancellationTokenSource;
         private bool _disposed;
         private string _detectedGameText = AppStrings.Get("NoGameDetected");
@@ -57,7 +57,7 @@ namespace BO2.ViewModels
         internal MainWindowViewModel(
             DispatcherQueue dispatcherQueue,
             GameConnectionSession connectionSession,
-            GameHistoryStore gameHistoryStore)
+            IGameHistoryStore gameHistoryStore)
         {
             ArgumentNullException.ThrowIfNull(dispatcherQueue);
             ArgumentNullException.ThrowIfNull(connectionSession);
@@ -65,7 +65,7 @@ namespace BO2.ViewModels
 
             _dispatcherQueue = dispatcherQueue;
             _connectionSession = connectionSession;
-            _gameHistoryStore = gameHistoryStore;
+            _gameHistoryPersistence = new GameHistoryPersistenceCoordinator(gameHistoryStore);
             _gameHistoryRecorder = new GameHistoryRecorder();
             _shellDisplayProjector = new ShellConnectionDisplayProjector();
             _connectionSession.SnapshotChanged += OnSnapshotChanged;
@@ -279,12 +279,12 @@ namespace BO2.ViewModels
             _disposed = true;
             _connectionSession.SnapshotChanged -= OnSnapshotChanged;
             _gameHistoryPage.SelectedGameDetailRequested -= OnSelectedGameDetailRequested;
-            _gameHistoryPersistenceCancellationTokenSource.Cancel();
+            _gameHistoryUiCancellationTokenSource.Cancel();
             _gameHistoryDetailLoadCancellationTokenSource?.Cancel();
             _gameHistoryRecorder.DiscardForAppClose();
             _connectionSession.Dispose();
-            _gameHistoryStore.Dispose();
-            _gameHistoryPersistenceCancellationTokenSource.Dispose();
+            _gameHistoryPersistence.Dispose();
+            _gameHistoryUiCancellationTokenSource.Dispose();
             _operationSemaphore.Dispose();
         }
 
@@ -383,7 +383,7 @@ namespace BO2.ViewModels
             {
                 _ = SaveCompletedGameAsync(
                     completedEntry,
-                    _gameHistoryPersistenceCancellationTokenSource.Token);
+                    _gameHistoryUiCancellationTokenSource.Token);
             }
 
             ApplyShellDisplayState(_shellDisplayProjector.Project(snapshot));
@@ -400,7 +400,7 @@ namespace BO2.ViewModels
         {
             try
             {
-                await _gameHistoryStore.AppendAsync(completedEntry, cancellationToken);
+                await _gameHistoryPersistence.AppendCompletedEntryAsync(completedEntry);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -422,7 +422,7 @@ namespace BO2.ViewModels
             string? summaryLoadError = null;
             try
             {
-                summaries = await _gameHistoryStore.LoadSummariesNewestFirstAsync(cancellationToken);
+                summaries = await _gameHistoryPersistence.LoadSummariesNewestFirstAsync(cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -472,7 +472,7 @@ namespace BO2.ViewModels
             {
                 try
                 {
-                    detail = await _gameHistoryStore.LoadDetailByIdAsync(id, cancellationToken);
+                    detail = await _gameHistoryPersistence.LoadDetailByIdAsync(id, cancellationToken);
                     if (detail is null)
                     {
                         detailLoadError = AppStrings.Format("GameHistoryDetailLoadNotFoundTextFormat", id);
@@ -539,7 +539,7 @@ namespace BO2.ViewModels
             try
             {
                 IReadOnlyList<GameHistorySummary> summaries =
-                    await _gameHistoryStore.LoadSummariesNewestFirstAsync(cancellationToken);
+                    await _gameHistoryPersistence.LoadSummariesNewestFirstAsync(cancellationToken);
                 await RunOnDispatcherAsync(
                     () => _gameHistoryPage.ReplaceSummaries(summaries),
                     cancellationToken);

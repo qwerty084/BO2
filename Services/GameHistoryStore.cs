@@ -8,7 +8,7 @@ using Microsoft.Data.Sqlite;
 
 namespace BO2.Services
 {
-    internal sealed class GameHistoryStore(string databasePath) : IDisposable
+    internal sealed class GameHistoryStore(string databasePath) : IGameHistoryStore
     {
         public const int CurrentSchemaVersion = 1;
 
