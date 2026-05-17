@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using BO2.Services;
@@ -11,11 +10,7 @@ namespace BO2.ViewModels
 {
     public sealed class GameHistoryPageViewModel : INotifyPropertyChanged
     {
-        private const string CompletedBoxRollEventName = "randomization_done";
-
-        public const string MissingValueText = "--";
-
-        private readonly StatFormatter _statFormatter = new(MissingValueText);
+        private readonly GameHistoryDisplayProjector _displayProjector = new();
         private bool _isHistoryRailOpen = true;
         private GameHistoryDetailViewModel? _selectedGame;
         private GameHistorySummaryViewModel? _selectedGameSummary;
@@ -115,25 +110,28 @@ namespace BO2.ViewModels
         {
             ArgumentNullException.ThrowIfNull(summaries);
 
-            ReplaceSavedGames(summaries.Select(CreateEntry));
+            ReplaceSavedGameSummaries(_displayProjector.ProjectSavedSummaries(summaries));
         }
 
         internal void ReplaceSavedGames(IEnumerable<GameHistoryEntry> savedGames)
         {
             ArgumentNullException.ThrowIfNull(savedGames);
 
+            ReplaceSavedGameSummaries(_displayProjector.ProjectSavedGameSummaries(savedGames));
+        }
+
+        private void ReplaceSavedGameSummaries(IEnumerable<GameHistorySummaryDisplayState> summaries)
+        {
+            ArgumentNullException.ThrowIfNull(summaries);
+
             ClearSummaryLoadError();
 
             string? selectedId = SelectedGameSummary?.Id ?? SelectedGame?.Id;
 
-            GameHistorySummaryViewModel[] summaries = [.. savedGames
-                .OrderByDescending(static game => game.EndedAt)
-                .ThenByDescending(static game => game.StartedAt)
-                .ThenBy(static game => game.Id, StringComparer.Ordinal)
-                .Select(CreateSummary)];
+            GameHistorySummaryViewModel[] summaryViewModels = [.. summaries.Select(CreateSummaryViewModel)];
 
             SavedGames.Clear();
-            foreach (GameHistorySummaryViewModel summary in summaries)
+            foreach (GameHistorySummaryViewModel summary in summaryViewModels)
             {
                 SavedGames.Add(summary);
             }
@@ -231,29 +229,7 @@ namespace BO2.ViewModels
         {
             ArgumentNullException.ThrowIfNull(status);
 
-            (RecordingStatusTitle, RecordingStatusText) = status.State switch
-            {
-                GameHistoryRecordingState.Recording => (
-                    AppStrings.Get("GameHistoryRecordingStatusActiveTitle"),
-                    ProjectActiveRecordingText(status)),
-                GameHistoryRecordingState.WaitingForRoundOne => (
-                    AppStrings.Get("GameHistoryRecordingStatusActiveTitle"),
-                    ProjectWaitingForRoundOneText(status.MapName)),
-                GameHistoryRecordingState.SavePending => (
-                    AppStrings.Get("GameHistoryRecordingStatusSavePendingTitle"),
-                    ProjectSavePendingText(status.MapName)),
-                GameHistoryRecordingState.FailedSave => (
-                    AppStrings.Get("GameHistoryRecordingStatusFailedSaveTitle"),
-                    ProjectFailedSaveText(status.MapName)),
-                GameHistoryRecordingState.Saved => (
-                    AppStrings.Get("GameHistoryRecordingStatusSavedTitle"),
-                    ProjectSavedText(status.MapName)),
-                GameHistoryRecordingState.Discarded => ProjectDiscardedStatus(status.DiscardReason),
-                GameHistoryRecordingState.Unavailable => ProjectUnavailableStatus(status.UnavailableReason),
-                _ => (
-                    AppStrings.Get("GameHistoryRecordingStatusWaitingTitle"),
-                    AppStrings.Get("GameHistoryRecordingStatusWaitingText"))
-            };
+            ApplyRecordingStatusDisplayState(_displayProjector.ProjectRecordingStatus(status));
         }
 
         internal void ApplySnapshot(GameConnectionSnapshot snapshot)
@@ -292,53 +268,6 @@ namespace BO2.ViewModels
                 ProjectUnavailableReason(snapshot.MapIdentityResult)));
         }
 
-        private static string ProjectActiveRecordingText(GameHistoryRecordingStatus status)
-        {
-            string? mapName = NormalizeMapName(status.MapName);
-            if (status.ActiveRoundNumber is int roundNumber)
-            {
-                return mapName is null
-                    ? AppStrings.Format("GameHistoryRecordingStatusActiveRoundFormat", roundNumber)
-                    : AppStrings.Format("GameHistoryRecordingStatusActiveMapRoundFormat", mapName, roundNumber);
-            }
-
-            return mapName is null
-                ? AppStrings.Get("GameHistoryRecordingStatusActiveText")
-                : AppStrings.Format("GameHistoryRecordingStatusActiveMapFormat", mapName);
-        }
-
-        private static string ProjectWaitingForRoundOneText(string? mapName)
-        {
-            string? normalizedMapName = NormalizeMapName(mapName);
-            return normalizedMapName is null
-                ? AppStrings.Get("GameHistoryRecordingStatusWaitingForRoundOneText")
-                : AppStrings.Format("GameHistoryRecordingStatusWaitingForRoundOneMapFormat", normalizedMapName);
-        }
-
-        private static string ProjectSavedText(string? mapName)
-        {
-            string? normalizedMapName = NormalizeMapName(mapName);
-            return normalizedMapName is null
-                ? AppStrings.Get("GameHistoryRecordingStatusSavedText")
-                : AppStrings.Format("GameHistoryRecordingStatusSavedMapFormat", normalizedMapName);
-        }
-
-        private static string ProjectSavePendingText(string? mapName)
-        {
-            string? normalizedMapName = NormalizeMapName(mapName);
-            return normalizedMapName is null
-                ? AppStrings.Get("GameHistoryRecordingStatusSavePendingText")
-                : AppStrings.Format("GameHistoryRecordingStatusSavePendingMapFormat", normalizedMapName);
-        }
-
-        private static string ProjectFailedSaveText(string? mapName)
-        {
-            string? normalizedMapName = NormalizeMapName(mapName);
-            return normalizedMapName is null
-                ? AppStrings.Get("GameHistoryRecordingStatusFailedSaveText")
-                : AppStrings.Format("GameHistoryRecordingStatusFailedSaveMapFormat", normalizedMapName);
-        }
-
         private static GameHistoryRecordingUnavailableReason ProjectUnavailableReason(
             GameMapIdentityReadResult? mapIdentityResult)
         {
@@ -351,249 +280,22 @@ namespace BO2.ViewModels
             };
         }
 
-        private static (string Title, string Text) ProjectUnavailableStatus(
-            GameHistoryRecordingUnavailableReason unavailableReason)
+        private void ApplyRecordingStatusDisplayState(GameHistoryRecordingStatusDisplayState state)
         {
-            return unavailableReason switch
-            {
-                GameHistoryRecordingUnavailableReason.RequiresHookBackedEventMonitor => (
-                    AppStrings.Get("GameHistoryRecordingStatusRequiresHookTitle"),
-                    AppStrings.Get("GameHistoryRecordingStatusRequiresHookText")),
-                GameHistoryRecordingUnavailableReason.RequiresSupportedMap
-                    or GameHistoryRecordingUnavailableReason.MissingMapIdentity
-                    or GameHistoryRecordingUnavailableReason.MissingFriendlyMapName => (
-                        AppStrings.Get("GameHistoryRecordingStatusRequiresSupportedMapTitle"),
-                        AppStrings.Get("GameHistoryRecordingStatusRequiresSupportedMapText")),
-                _ => (
-                    AppStrings.Get("GameHistoryRecordingStatusWaitingTitle"),
-                    AppStrings.Get("GameHistoryRecordingStatusWaitingText"))
-            };
+            ArgumentNullException.ThrowIfNull(state);
+
+            RecordingStatusTitle = state.Title;
+            RecordingStatusText = state.BodyText;
         }
 
-        private static (string Title, string Text) ProjectDiscardedStatus(
-            GameHistoryRecordingDiscardReason discardReason)
+        private static GameHistorySummaryViewModel CreateSummaryViewModel(GameHistorySummaryDisplayState state)
         {
-            return discardReason switch
-            {
-                GameHistoryRecordingDiscardReason.SequenceGap
-                    or GameHistoryRecordingDiscardReason.DroppedLifecycleData
-                    or GameHistoryRecordingDiscardReason.PollingFallback => (
-                        AppStrings.Get("GameHistoryRecordingStatusDiscardedTitle"),
-                        AppStrings.Get("GameHistoryRecordingStatusDiscardedSequenceText")),
-                GameHistoryRecordingDiscardReason.MissingRequiredStats => (
-                    AppStrings.Get("GameHistoryRecordingStatusDiscardedTitle"),
-                    AppStrings.Get("GameHistoryRecordingStatusDiscardedMissingStatsText")),
-                GameHistoryRecordingDiscardReason.DetectedGameChanged
-                    or GameHistoryRecordingDiscardReason.Disconnected
-                    or GameHistoryRecordingDiscardReason.AppClosed => (
-                        AppStrings.Get("GameHistoryRecordingStatusDiscardedTitle"),
-                        AppStrings.Get("GameHistoryRecordingStatusDiscardedConnectionEndedText")),
-                GameHistoryRecordingDiscardReason.MissingMapIdentity
-                    or GameHistoryRecordingDiscardReason.UnsupportedMapIdentity
-                    or GameHistoryRecordingDiscardReason.MissingFriendlyMapName => (
-                        AppStrings.Get("GameHistoryRecordingStatusRequiresSupportedMapTitle"),
-                        AppStrings.Get("GameHistoryRecordingStatusRequiresSupportedMapText")),
-                _ => (
-                    AppStrings.Get("GameHistoryRecordingStatusDiscardedTitle"),
-                    AppStrings.Get("GameHistoryRecordingStatusDiscardedSequenceText"))
-            };
-        }
-
-        private static string? NormalizeMapName(string? mapName)
-        {
-            return string.IsNullOrWhiteSpace(mapName)
-                ? null
-                : mapName.Trim();
-        }
-
-        private GameHistorySummaryViewModel CreateSummary(GameHistoryEntry game)
-        {
-            return new GameHistorySummaryViewModel(
-                game,
-                FormatDate(game.EndedAt),
-                game.MapIdentity.FriendlyName,
-                AppStrings.Format("GameHistoryFinalRoundFormat", game.FinalRound),
-                FormatDuration(game.GameDuration),
-                _statFormatter.FormatStat(game.FinalStats.Points),
-                _statFormatter.FormatStat(game.FinalStats.Kills),
-                _statFormatter.FormatStat(game.FinalStats.Downs),
-                _statFormatter.FormatStat(game.FinalStats.Revives),
-                _statFormatter.FormatStat(game.FinalStats.Headshots));
-        }
-
-        private static GameHistoryEntry CreateEntry(GameHistorySummary summary)
-        {
-            return new GameHistoryEntry
-            {
-                Id = summary.Id,
-                StartedAt = summary.StartedAt,
-                EndedAt = summary.EndedAt,
-                MapIdentity = summary.MapIdentity,
-                FinalRound = summary.FinalRound,
-                FinalStats = new GameHistoryStats
-                {
-                    Points = summary.FinalStats.Points,
-                    Kills = summary.FinalStats.Kills,
-                    Downs = summary.FinalStats.Downs,
-                    Revives = summary.FinalStats.Revives,
-                    Headshots = summary.FinalStats.Headshots
-                },
-                GameDuration = summary.GameDuration
-            };
+            return new GameHistorySummaryViewModel(state);
         }
 
         private GameHistoryDetailViewModel CreateDetail(GameHistoryEntry game)
         {
-            IReadOnlyList<GameHistoryBoxEvent> boxRolls =
-            [
-                .. game.BoxEvents
-                    .Where(IsCompletedBoxRoll)
-                    .OrderBy(static boxEvent => boxEvent.ReceivedAt)
-            ];
-            IReadOnlyList<GameHistoryBoxWeaponAverageViewModel> boxWeaponAverages = CreateBoxWeaponAverages(boxRolls);
-
-            return new GameHistoryDetailViewModel(
-                game.Id,
-                FormatDate(game.EndedAt),
-                game.MapIdentity.FriendlyName,
-                AppStrings.Format("GameHistoryFinalRoundFormat", game.FinalRound),
-                FormatDuration(game.GameDuration),
-                CreateStatsDisplay(game.FinalStats, isDelta: false),
-                [.. game.Rounds
-                    .OrderBy(static round => round.RoundNumber)
-                    .Select(CreateRound)],
-                [.. boxRolls.Select(CreateBoxRoll)],
-                boxWeaponAverages,
-                FormatCount(boxRolls.Count),
-                FormatCount(boxWeaponAverages.Count),
-                FormatAverageRollsPerRound(boxRolls.Count, game.FinalRound),
-                boxWeaponAverages.Count == 0 ? MissingValueText : boxWeaponAverages[0].WeaponText);
-        }
-
-        private GameHistoryRoundViewModel CreateRound(GameHistoryRound round)
-        {
-            return new GameHistoryRoundViewModel(
-                round.RoundNumber,
-                AppStrings.Format("GameHistoryRoundTitleFormat", round.RoundNumber),
-                FormatDuration(round.RoundDuration),
-                CreateStatsDisplay(round.CumulativeStats, isDelta: false),
-                CreateStatsDisplay(round.DeltaStats, isDelta: true));
-        }
-
-        private GameHistoryBoxEventViewModel CreateBoxRoll(GameHistoryBoxEvent boxEvent)
-        {
-            string receivedAtText = FormatDate(boxEvent.ReceivedAt);
-            string roundText = AppStrings.Format("GameHistoryRoundTitleFormat", boxEvent.RoundNumber);
-            string weaponText = FormatBoxWeapon(boxEvent);
-            string primaryText = AppStrings.Format(
-                "GameHistoryBoxRollPrimaryFormat",
-                roundText,
-                weaponText);
-
-            return new GameHistoryBoxEventViewModel(
-                receivedAtText,
-                roundText,
-                weaponText,
-                primaryText);
-        }
-
-        private IReadOnlyList<GameHistoryBoxWeaponAverageViewModel> CreateBoxWeaponAverages(
-            IReadOnlyList<GameHistoryBoxEvent> boxRolls)
-        {
-            int totalRolls = boxRolls.Count;
-            if (totalRolls == 0)
-            {
-                return [];
-            }
-
-            return
-            [
-                .. boxRolls
-                    .GroupBy(FormatBoxWeapon, StringComparer.CurrentCultureIgnoreCase)
-                    .Select(group => new
-                    {
-                        WeaponText = group.Key,
-                        RollCount = group.Count(),
-                        AverageRound = group.Average(static boxEvent => boxEvent.RoundNumber),
-                        Share = (double)group.Count() / totalRolls
-                    })
-                    .OrderByDescending(group => group.RollCount)
-                    .ThenBy(group => group.WeaponText, StringComparer.CurrentCultureIgnoreCase)
-                    .Select(group => new GameHistoryBoxWeaponAverageViewModel(
-                        group.WeaponText,
-                        FormatCount(group.RollCount),
-                        FormatAverageRound(group.AverageRound),
-                        FormatPercent(group.Share)))
-            ];
-        }
-
-        private static bool IsCompletedBoxRoll(GameHistoryBoxEvent boxEvent)
-        {
-            return string.Equals(boxEvent.EventName, CompletedBoxRollEventName, StringComparison.Ordinal);
-        }
-
-        private static string FormatBoxWeapon(GameHistoryBoxEvent boxEvent)
-        {
-            return string.IsNullOrWhiteSpace(boxEvent.WeaponDisplayName)
-                ? AppStrings.Get("GameHistoryBoxEventUnknownWeapon")
-                : boxEvent.WeaponDisplayName!;
-        }
-
-        private GameHistoryStatsDisplayViewModel CreateStatsDisplay(GameHistoryStats stats, bool isDelta)
-        {
-            return new GameHistoryStatsDisplayViewModel(
-                FormatStat(stats.Points, isDelta),
-                FormatStat(stats.Kills, isDelta),
-                FormatStat(stats.Downs, isDelta),
-                FormatStat(stats.Revives, isDelta),
-                FormatStat(stats.Headshots, isDelta));
-        }
-
-        private string FormatStat(int value, bool isDelta)
-        {
-            return isDelta
-                ? value.ToString("+#,0;-#,0;0", CultureInfo.CurrentCulture)
-                : _statFormatter.FormatStat(value);
-        }
-
-        private static string FormatCount(int value)
-        {
-            return value.ToString("N0", CultureInfo.CurrentCulture);
-        }
-
-        private static string FormatAverageRound(double value)
-        {
-            return value.ToString("0.#", CultureInfo.CurrentCulture);
-        }
-
-        private static string FormatAverageRollsPerRound(int rollCount, int finalRound)
-        {
-            if (rollCount == 0 || finalRound <= 0)
-            {
-                return MissingValueText;
-            }
-
-            return ((double)rollCount / finalRound).ToString("0.#", CultureInfo.CurrentCulture);
-        }
-
-        private static string FormatPercent(double value)
-        {
-            return value.ToString("P0", CultureInfo.CurrentCulture);
-        }
-
-        private static string FormatDate(DateTimeOffset date)
-        {
-            return date.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
-        }
-
-        private static string FormatDuration(TimeSpan? duration)
-        {
-            if (duration is not TimeSpan value || value < TimeSpan.Zero)
-            {
-                return MissingValueText;
-            }
-
-            return GameTimerDurationFormatter.Format(value);
+            return new GameHistoryDetailViewModel(_displayProjector.ProjectSelectedDetail(game));
         }
 
         private static bool HasDroppedEventMonitorData(GameEventMonitorStatus status)
@@ -728,51 +430,34 @@ namespace BO2.ViewModels
     {
         private bool _isSelected;
 
-        internal GameHistorySummaryViewModel(
-            GameHistoryEntry source,
-            string dateText,
-            string mapNameText,
-            string finalRoundText,
-            string gameDurationText,
-            string pointsText,
-            string killsText,
-            string downsText,
-            string revivesText,
-            string headshotsText)
+        internal GameHistorySummaryViewModel(GameHistorySummaryDisplayState displayState)
         {
-            Source = source;
-            DateText = dateText;
-            MapNameText = mapNameText;
-            FinalRoundText = finalRoundText;
-            GameDurationText = gameDurationText;
-            PointsText = pointsText;
-            KillsText = killsText;
-            DownsText = downsText;
-            RevivesText = revivesText;
-            HeadshotsText = headshotsText;
+            ArgumentNullException.ThrowIfNull(displayState);
+
+            DisplayState = displayState;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        public string Id => Source.Id;
+        public string Id => DisplayState.Id;
 
-        public string DateText { get; }
+        public string DateText => DisplayState.DateText;
 
-        public string MapNameText { get; }
+        public string MapNameText => DisplayState.MapNameText;
 
-        public string FinalRoundText { get; }
+        public string FinalRoundText => DisplayState.FinalRoundText;
 
-        public string GameDurationText { get; }
+        public string GameDurationText => DisplayState.GameDurationText;
 
-        public string PointsText { get; }
+        public string PointsText => DisplayState.PointsText;
 
-        public string KillsText { get; }
+        public string KillsText => DisplayState.KillsText;
 
-        public string DownsText { get; }
+        public string DownsText => DisplayState.DownsText;
 
-        public string RevivesText { get; }
+        public string RevivesText => DisplayState.RevivesText;
 
-        public string HeadshotsText { get; }
+        public string HeadshotsText => DisplayState.HeadshotsText;
 
         public bool IsSelected
         {
@@ -789,7 +474,7 @@ namespace BO2.ViewModels
             }
         }
 
-        internal GameHistoryEntry Source { get; }
+        internal GameHistorySummaryDisplayState DisplayState { get; }
     }
 
     public sealed class GameHistoryDetailRequestedEventArgs(string id) : EventArgs
@@ -799,48 +484,36 @@ namespace BO2.ViewModels
 
     public sealed class GameHistoryDetailViewModel
     {
-        internal GameHistoryDetailViewModel(
-            string id,
-            string dateText,
-            string mapNameText,
-            string finalRoundText,
-            string gameDurationText,
-            GameHistoryStatsDisplayViewModel finalStats,
-            IReadOnlyList<GameHistoryRoundViewModel> rounds,
-            IReadOnlyList<GameHistoryBoxEventViewModel> boxEvents,
-            IReadOnlyList<GameHistoryBoxWeaponAverageViewModel> boxWeaponAverages,
-            string boxRollCountText,
-            string boxUniqueWeaponCountText,
-            string boxAverageRollsPerRoundText,
-            string boxMostSeenWeaponText)
+        internal GameHistoryDetailViewModel(GameHistoryDetailDisplayState displayState)
         {
-            Id = id;
-            DateText = dateText;
-            MapNameText = mapNameText;
-            FinalRoundText = finalRoundText;
-            GameDurationText = gameDurationText;
-            FinalStats = finalStats;
+            ArgumentNullException.ThrowIfNull(displayState);
+
+            DisplayState = displayState;
+            FinalStats = new GameHistoryStatsDisplayViewModel(displayState.FinalStats);
             Rounds = new ReadOnlyObservableCollection<GameHistoryRoundViewModel>(
-                new ObservableCollection<GameHistoryRoundViewModel>(rounds));
+                new ObservableCollection<GameHistoryRoundViewModel>(
+                    displayState.Rounds.Select(static round => new GameHistoryRoundViewModel(round))));
             BoxEvents = new ReadOnlyObservableCollection<GameHistoryBoxEventViewModel>(
-                new ObservableCollection<GameHistoryBoxEventViewModel>(boxEvents));
+                new ObservableCollection<GameHistoryBoxEventViewModel>(
+                    displayState.BoxEvents.Select(static boxEvent => new GameHistoryBoxEventViewModel(boxEvent))));
             BoxWeaponAverages = new ReadOnlyObservableCollection<GameHistoryBoxWeaponAverageViewModel>(
-                new ObservableCollection<GameHistoryBoxWeaponAverageViewModel>(boxWeaponAverages));
-            BoxRollCountText = boxRollCountText;
-            BoxUniqueWeaponCountText = boxUniqueWeaponCountText;
-            BoxAverageRollsPerRoundText = boxAverageRollsPerRoundText;
-            BoxMostSeenWeaponText = boxMostSeenWeaponText;
+                new ObservableCollection<GameHistoryBoxWeaponAverageViewModel>(
+                    displayState.BoxWeaponAverages.Select(static average => new GameHistoryBoxWeaponAverageViewModel(average))));
+            BoxRollCountText = displayState.BoxRollCountText;
+            BoxUniqueWeaponCountText = displayState.BoxUniqueWeaponCountText;
+            BoxAverageRollsPerRoundText = displayState.BoxAverageRollsPerRoundText;
+            BoxMostSeenWeaponText = displayState.BoxMostSeenWeaponText;
         }
 
-        public string Id { get; }
+        public string Id => DisplayState.Id;
 
-        public string DateText { get; }
+        public string DateText => DisplayState.DateText;
 
-        public string MapNameText { get; }
+        public string MapNameText => DisplayState.MapNameText;
 
-        public string FinalRoundText { get; }
+        public string FinalRoundText => DisplayState.FinalRoundText;
 
-        public string GameDurationText { get; }
+        public string GameDurationText => DisplayState.GameDurationText;
 
         public GameHistoryStatsDisplayViewModel FinalStats { get; }
 
@@ -863,80 +536,93 @@ namespace BO2.ViewModels
         public bool IsBoxEventsEmpty => !HasBoxEvents;
 
         public string BoxEventsEmptyText => AppStrings.Get("GameHistoryBoxEventsEmpty");
+
+        internal GameHistoryDetailDisplayState DisplayState { get; }
     }
 
     public sealed class GameHistoryRoundViewModel
     {
-        internal GameHistoryRoundViewModel(
-            int roundNumber,
-            string roundTitleText,
-            string durationText,
-            GameHistoryStatsDisplayViewModel cumulativeStats,
-            GameHistoryStatsDisplayViewModel deltaStats)
+        internal GameHistoryRoundViewModel(GameHistoryRoundDisplayState displayState)
         {
-            RoundNumber = roundNumber;
-            RoundTitleText = roundTitleText;
-            DurationText = durationText;
-            CumulativeStats = cumulativeStats;
-            DeltaStats = deltaStats;
+            ArgumentNullException.ThrowIfNull(displayState);
+
+            DisplayState = displayState;
+            CumulativeStats = new GameHistoryStatsDisplayViewModel(displayState.CumulativeStats);
+            DeltaStats = new GameHistoryStatsDisplayViewModel(displayState.DeltaStats);
         }
 
-        public int RoundNumber { get; }
+        public int RoundNumber => DisplayState.RoundNumber;
 
-        public string RoundTitleText { get; }
+        public string RoundTitleText => DisplayState.RoundTitleText;
 
-        public string DurationText { get; }
+        public string DurationText => DisplayState.DurationText;
 
         public GameHistoryStatsDisplayViewModel CumulativeStats { get; }
 
         public GameHistoryStatsDisplayViewModel DeltaStats { get; }
+
+        internal GameHistoryRoundDisplayState DisplayState { get; }
     }
 
-    public sealed class GameHistoryStatsDisplayViewModel(
-        string pointsText,
-        string killsText,
-        string downsText,
-        string revivesText,
-        string headshotsText)
+    public sealed class GameHistoryStatsDisplayViewModel
     {
-        public string PointsText { get; } = pointsText;
+        internal GameHistoryStatsDisplayViewModel(GameHistoryStatsDisplayState displayState)
+        {
+            ArgumentNullException.ThrowIfNull(displayState);
 
-        public string KillsText { get; } = killsText;
+            DisplayState = displayState;
+        }
 
-        public string DownsText { get; } = downsText;
+        public string PointsText => DisplayState.PointsText;
 
-        public string RevivesText { get; } = revivesText;
+        public string KillsText => DisplayState.KillsText;
 
-        public string HeadshotsText { get; } = headshotsText;
+        public string DownsText => DisplayState.DownsText;
+
+        public string RevivesText => DisplayState.RevivesText;
+
+        public string HeadshotsText => DisplayState.HeadshotsText;
+
+        internal GameHistoryStatsDisplayState DisplayState { get; }
     }
 
-    public sealed class GameHistoryBoxEventViewModel(
-        string receivedAtText,
-        string roundText,
-        string weaponText,
-        string primaryText)
+    public sealed class GameHistoryBoxEventViewModel
     {
-        public string ReceivedAtText { get; } = receivedAtText;
+        internal GameHistoryBoxEventViewModel(GameHistoryBoxEventDisplayState displayState)
+        {
+            ArgumentNullException.ThrowIfNull(displayState);
 
-        public string RoundText { get; } = roundText;
+            DisplayState = displayState;
+        }
 
-        public string WeaponText { get; } = weaponText;
+        public string ReceivedAtText => DisplayState.ReceivedAtText;
 
-        public string PrimaryText { get; } = primaryText;
+        public string RoundText => DisplayState.RoundText;
+
+        public string WeaponText => DisplayState.WeaponText;
+
+        public string PrimaryText => DisplayState.PrimaryText;
+
+        internal GameHistoryBoxEventDisplayState DisplayState { get; }
     }
 
-    public sealed class GameHistoryBoxWeaponAverageViewModel(
-        string weaponText,
-        string rollCountText,
-        string averageRoundText,
-        string shareText)
+    public sealed class GameHistoryBoxWeaponAverageViewModel
     {
-        public string WeaponText { get; } = weaponText;
+        internal GameHistoryBoxWeaponAverageViewModel(GameHistoryBoxWeaponAverageDisplayState displayState)
+        {
+            ArgumentNullException.ThrowIfNull(displayState);
 
-        public string RollCountText { get; } = rollCountText;
+            DisplayState = displayState;
+        }
 
-        public string AverageRoundText { get; } = averageRoundText;
+        public string WeaponText => DisplayState.WeaponText;
 
-        public string ShareText { get; } = shareText;
+        public string RollCountText => DisplayState.RollCountText;
+
+        public string AverageRoundText => DisplayState.AverageRoundText;
+
+        public string ShareText => DisplayState.ShareText;
+
+        internal GameHistoryBoxWeaponAverageDisplayState DisplayState { get; }
     }
 }

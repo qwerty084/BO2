@@ -1,5 +1,5 @@
 using System;
-using System.Globalization;
+using System.Collections.Generic;
 using System.Linq;
 using BO2.Services;
 using BO2.ViewModels;
@@ -10,20 +10,17 @@ namespace BO2.Tests.ViewModels
     public sealed class GameHistoryPageViewModelTests
     {
         [Fact]
-        public void ReplaceSavedGames_OrdersSummariesNewestFirstBySavedDate()
+        public void ReplaceSavedGames_PopulatesListStateWithoutSelectingGame()
         {
             var viewModel = new GameHistoryPageViewModel();
-            GameHistoryEntry oldest = CreateGame("oldest", 2026, 5, 8, 20, 0);
-            GameHistoryEntry newest = CreateGame("newest", 2026, 5, 10, 20, 0);
-            GameHistoryEntry middle = CreateGame("middle", 2026, 5, 9, 20, 0);
+            GameHistoryEntry game = CreateGame("town-run", 2026, 5, 8, 20, 0);
 
-            viewModel.ReplaceSavedGames([oldest, newest, middle]);
+            viewModel.ReplaceSavedGames([game]);
 
-            Assert.Equal(["newest", "middle", "oldest"], viewModel.SavedGames.Select(game => game.Id));
+            Assert.Equal("town-run", Assert.Single(viewModel.SavedGames).Id);
             Assert.Null(viewModel.SelectedGameSummary);
-            Assert.Equal("GameHistoryTrackedGameCountFormat(3)", viewModel.TrackedGameCountText);
+            Assert.Equal("GameHistoryTrackedGameCountFormat(1)", viewModel.TrackedGameCountText);
             Assert.False(viewModel.SavedGames[0].IsSelected);
-            Assert.False(viewModel.SavedGames[1].IsSelected);
             Assert.True(viewModel.IsListVisible);
             Assert.False(viewModel.IsDetailVisible);
         }
@@ -150,6 +147,26 @@ namespace BO2.Tests.ViewModels
         }
 
         [Fact]
+        public void ReplaceSavedGames_PreservesSelectedSummaryWhenStillPresent()
+        {
+            var viewModel = new GameHistoryPageViewModel();
+            GameHistoryEntry first = CreateDetailedGame("first");
+            GameHistoryEntry second = CreateDetailedGame("second");
+            viewModel.ReplaceSavedGames([first, second]);
+            viewModel.SelectGame(viewModel.SavedGames.Single(game => game.Id == "second"));
+            viewModel.ShowSelectedGameDetail(second);
+
+            viewModel.ReplaceSavedGames([CreateDetailedGame("second"), CreateDetailedGame("third")]);
+
+            Assert.Equal("second", viewModel.SelectedGameSummary?.Id);
+            Assert.True(viewModel.SavedGames.Single(game => game.Id == "second").IsSelected);
+            Assert.False(viewModel.SavedGames.Single(game => game.Id == "third").IsSelected);
+            Assert.Equal("second", Assert.IsType<GameHistoryDetailViewModel>(viewModel.SelectedGame).Id);
+            Assert.True(viewModel.IsDetailVisible);
+            Assert.True(viewModel.IsSelectedGameDetailContentVisible);
+        }
+
+        [Fact]
         public void SelectGameById_SelectsSummaryAndRequestsDetailLoad()
         {
             var viewModel = new GameHistoryPageViewModel();
@@ -166,7 +183,27 @@ namespace BO2.Tests.ViewModels
         }
 
         [Fact]
-        public void ShowSelectedGameDetailError_ClearsStaleDetail()
+        public void SelectGameById_WhenSummaryIsMissingKeepsListVisibleWithoutRequestingDetailLoad()
+        {
+            var viewModel = new GameHistoryPageViewModel();
+            int detailRequestCount = 0;
+            viewModel.SelectedGameDetailRequested += (_, _) => detailRequestCount++;
+            viewModel.ReplaceSavedGames([CreateDetailedGame("first")]);
+
+            viewModel.SelectGameById("missing");
+
+            Assert.Null(viewModel.SelectedGameSummary);
+            Assert.False(viewModel.SavedGames.Single().IsSelected);
+            Assert.True(viewModel.IsListVisible);
+            Assert.False(viewModel.IsDetailVisible);
+            Assert.False(viewModel.IsSelectedGameDetailLoadingVisible);
+            Assert.Equal(0, detailRequestCount);
+        }
+
+        [Theory]
+        [InlineData("database locked")]
+        [InlineData("GameHistoryDetailLoadNotFoundTextFormat(missing)")]
+        public void ShowSelectedGameDetailError_ShowsLoadFailureAndClearsStaleDetail(string detailErrorText)
         {
             var viewModel = new GameHistoryPageViewModel();
             GameHistoryEntry first = CreateDetailedGame("first");
@@ -175,14 +212,14 @@ namespace BO2.Tests.ViewModels
             SelectAndLoad(viewModel, first);
 
             viewModel.SelectGame(viewModel.SavedGames.Single(game => game.Id == "second"));
-            viewModel.ShowSelectedGameDetailError("database locked");
+            viewModel.ShowSelectedGameDetailError(detailErrorText);
 
             Assert.Equal("second", viewModel.SelectedGameSummary?.Id);
             Assert.Null(viewModel.SelectedGame);
             Assert.False(viewModel.IsSelectedGameDetailLoadingVisible);
             Assert.False(viewModel.IsSelectedGameDetailContentVisible);
             Assert.True(viewModel.IsSelectedGameDetailErrorVisible);
-            Assert.Equal("database locked", viewModel.SelectedGameDetailErrorText);
+            Assert.Equal(detailErrorText, viewModel.SelectedGameDetailErrorText);
         }
 
         [Fact]
@@ -202,206 +239,24 @@ namespace BO2.Tests.ViewModels
         }
 
         [Fact]
-        public void DetailProjection_ShowsFinalRoundStatsRoundDeltasAndMissingDurations()
+        public void ApplyRecordingStatus_AppliesProjectedStateWithoutAddingEntries()
         {
             var viewModel = new GameHistoryPageViewModel();
-            GameHistoryEntry game = CreateDetailedGame("town-run");
-            viewModel.ReplaceSavedGames([game]);
+            GameHistoryRecordingStatus status = GameHistoryRecordingStatus.Recording(3, "Farm");
+            GameHistoryRecordingStatusDisplayState expectedState =
+                new GameHistoryDisplayProjector().ProjectRecordingStatus(status);
+            List<string?> changedProperties = [];
+            viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
 
-            GameHistoryDetailViewModel detail = SelectAndLoad(viewModel, game);
+            viewModel.ApplyRecordingStatus(status);
 
-            Assert.Equal("Town", detail.MapNameText);
-            Assert.Equal("GameHistoryFinalRoundFormat(12)", detail.FinalRoundText);
-            Assert.Equal("1:02:03", detail.GameDurationText);
-            Assert.Equal(12345.ToString("N0", CultureInfo.CurrentCulture), detail.FinalStats.PointsText);
-            Assert.Equal("98", detail.FinalStats.KillsText);
-
-            Assert.Equal(2, detail.Rounds.Count);
-            Assert.Equal("0:45", detail.Rounds[0].DurationText);
-            Assert.Equal("500", detail.Rounds[0].CumulativeStats.PointsText);
-            Assert.Equal("+500", detail.Rounds[0].DeltaStats.PointsText);
-            Assert.Equal(GameHistoryPageViewModel.MissingValueText, detail.Rounds[1].DurationText);
-            Assert.Equal(1200.ToString("N0", CultureInfo.CurrentCulture), detail.Rounds[1].CumulativeStats.PointsText);
-            Assert.Equal("+700", detail.Rounds[1].DeltaStats.PointsText);
-        }
-
-        [Fact]
-        public void SavedDates_UseCurrentCultureShortDateAndTimeFormat()
-        {
-            CultureInfo culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
-            culture.DateTimeFormat.ShortDatePattern = "M/d/yyyy";
-            culture.DateTimeFormat.ShortTimePattern = "HH:mm";
-            using var cultureScope = new CultureScope(culture);
-            var viewModel = new GameHistoryPageViewModel();
-
-            GameHistoryEntry game = CreateGame("town-run", 2026, 5, 15, 20, 0);
-            viewModel.ReplaceSavedGames([game]);
-            GameHistoryDetailViewModel detail = SelectAndLoad(viewModel, game);
-
-            string expectedDateText = game.EndedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
-            Assert.Equal("5/15/2026 20:30", expectedDateText);
-            Assert.Equal(expectedDateText, viewModel.SavedGames[0].DateText);
-            Assert.Equal(expectedDateText, detail.DateText);
-        }
-
-        [Theory]
-        [InlineData("zm_transit", "farm", "zm_transit_gump_farm", "Farm")]
-        [InlineData("zm_transit", "transit", "zm_transit_gump_transit_zclassic", "TranZit")]
-        [InlineData("zm_transit", "transit", "zm_transit_gump_transit_zstandard", "Bus Depot")]
-        [InlineData("zm_buried", null, "zm_buried", "Buried")]
-        [InlineData("zm_highrise", null, "zm_highrise", "Die Rise")]
-        [InlineData("zm_prison", null, "zm_prison", "Mob of the Dead")]
-        [InlineData("zm_nuked", null, "zm_nuked", "Nuketown")]
-        [InlineData("zm_tomb", null, "zm_tomb", "Origins")]
-        public void SavedMapProjection_ShowsMapNameInSummaryAndDetail(
-            string baseMapToken,
-            string? startLocationToken,
-            string internalMapToken,
-            string friendlyName)
-        {
-            var viewModel = new GameHistoryPageViewModel();
-            GameHistoryEntry game = CreateDetailedGame(
-                "saved-run",
-                startLocationToken,
-                internalMapToken,
-                friendlyName,
-                baseMapToken);
-            viewModel.ReplaceSavedGames([game]);
-
-            Assert.Equal(friendlyName, viewModel.SavedGames[0].MapNameText);
-
-            GameHistoryDetailViewModel detail = SelectAndLoad(viewModel, game);
-            Assert.Equal(friendlyName, detail.MapNameText);
-        }
-
-        [Fact]
-        public void DetailProjection_TracksMysteryBoxAveragesWithoutInternalEventNames()
-        {
-            var viewModel = new GameHistoryPageViewModel();
-            GameHistoryEntry game = CreateDetailedGame("town-run");
-            viewModel.ReplaceSavedGames([game]);
-
-            GameHistoryDetailViewModel detail = SelectAndLoad(viewModel, game);
-
-            Assert.True(detail.HasBoxEvents);
-            Assert.Equal(3, detail.BoxEvents.Count);
-            Assert.Equal("3", detail.BoxRollCountText);
-            Assert.Equal("2", detail.BoxUniqueWeaponCountText);
-            Assert.Equal((3d / 12).ToString("0.#", CultureInfo.CurrentCulture), detail.BoxAverageRollsPerRoundText);
-            Assert.Equal("Ray Gun", detail.BoxMostSeenWeaponText);
-
-            Assert.Equal("Ray Gun", detail.BoxEvents[0].WeaponText);
-            Assert.Equal("Ray Gun", detail.BoxEvents[1].WeaponText);
-            Assert.Equal("GameHistoryBoxEventUnknownWeapon", detail.BoxEvents[2].WeaponText);
-
-            Assert.Equal(2, detail.BoxWeaponAverages.Count);
-            Assert.Equal("Ray Gun", detail.BoxWeaponAverages[0].WeaponText);
-            Assert.Equal("2", detail.BoxWeaponAverages[0].RollCountText);
-            Assert.Equal(2.5.ToString("0.#", CultureInfo.CurrentCulture), detail.BoxWeaponAverages[0].AverageRoundText);
-            Assert.Equal((2d / 3).ToString("P0", CultureInfo.CurrentCulture), detail.BoxWeaponAverages[0].ShareText);
-
-            Assert.Equal("GameHistoryBoxEventUnknownWeapon", detail.BoxWeaponAverages[1].WeaponText);
-            Assert.Equal("1", detail.BoxWeaponAverages[1].RollCountText);
-            Assert.Equal("4", detail.BoxWeaponAverages[1].AverageRoundText);
-            Assert.Equal((1d / 3).ToString("P0", CultureInfo.CurrentCulture), detail.BoxWeaponAverages[1].ShareText);
-
-            Assert.All(detail.BoxEvents, boxEvent =>
-            {
-                Assert.DoesNotContain("randomization_done", boxEvent.PrimaryText, StringComparison.Ordinal);
-                Assert.DoesNotContain("user_grabbed_weapon", boxEvent.PrimaryText, StringComparison.Ordinal);
-                Assert.DoesNotContain("ray_gun_zm", boxEvent.PrimaryText, StringComparison.Ordinal);
-                Assert.DoesNotContain("zm_weap_future", boxEvent.PrimaryText, StringComparison.Ordinal);
-            });
-        }
-
-        [Fact]
-        public void DetailProjection_OrdersBoxEventsByReceivedTimeAndPreservesEqualTimestampOrder()
-        {
-            var viewModel = new GameHistoryPageViewModel();
-            GameHistoryEntry game = CreateDetailedGame("town-run");
-            DateTimeOffset sameReceivedAt = CreateLocalDate(2026, 5, 10, 14, 45);
-            game.BoxEvents =
-            [
-                new GameHistoryBoxEvent
-                {
-                    ReceivedAt = sameReceivedAt.AddMinutes(1),
-                    RoundNumber = 2,
-                    EventName = "randomization_done",
-                    RawWeaponToken = "galil_zm",
-                    WeaponDisplayName = "Galil",
-                    OwnerId = 7,
-                    StringValue = 300
-                },
-                new GameHistoryBoxEvent
-                {
-                    ReceivedAt = sameReceivedAt,
-                    RoundNumber = 2,
-                    EventName = "randomization_done",
-                    RawWeaponToken = "ray_gun_zm",
-                    WeaponDisplayName = "Ray Gun",
-                    OwnerId = 7,
-                    StringValue = 100
-                },
-                new GameHistoryBoxEvent
-                {
-                    ReceivedAt = sameReceivedAt,
-                    RoundNumber = 2,
-                    EventName = "randomization_done",
-                    RawWeaponToken = "m32_zm",
-                    WeaponDisplayName = "War Machine",
-                    OwnerId = 7,
-                    StringValue = 200
-                }
-            ];
-            viewModel.ReplaceSavedGames([game]);
-
-            GameHistoryDetailViewModel detail = SelectAndLoad(viewModel, game);
-
-            Assert.Equal(["Ray Gun", "War Machine", "Galil"], detail.BoxEvents.Select(boxEvent => boxEvent.WeaponText));
-        }
-
-        [Fact]
-        public void ApplyRecordingStatus_ProjectsActiveUnavailableAndDiscardedStatesWithoutAddingEntries()
-        {
-            var viewModel = new GameHistoryPageViewModel();
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Recording(3, "Farm"));
-            Assert.Equal("GameHistoryRecordingStatusActiveTitle", viewModel.RecordingStatusTitle);
-            Assert.Equal("GameHistoryRecordingStatusActiveMapRoundFormat(Farm, 3)", viewModel.RecordingStatusText);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.WaitingForRoundOne("Farm"));
-            Assert.Equal("GameHistoryRecordingStatusWaitingForRoundOneMapFormat(Farm)", viewModel.RecordingStatusText);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.SavePending("farm-run", "Farm"));
-            Assert.Equal("GameHistoryRecordingStatusSavePendingMapFormat(Farm)", viewModel.RecordingStatusText);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Saved("farm-run", "Farm"));
-            Assert.Equal("GameHistoryRecordingStatusSavedMapFormat(Farm)", viewModel.RecordingStatusText);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.FailedSave("farm-run", "Farm", "database locked"));
-            Assert.Equal("GameHistoryRecordingStatusFailedSaveMapFormat(Farm)", viewModel.RecordingStatusText);
+            Assert.Equal(expectedState.Title, viewModel.RecordingStatusTitle);
+            Assert.Equal(expectedState.BodyText, viewModel.RecordingStatusText);
             Assert.Empty(viewModel.SavedGames);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Unavailable(
-                GameHistoryRecordingUnavailableReason.RequiresSupportedMap));
-            Assert.Equal("GameHistoryRecordingStatusRequiresSupportedMapText", viewModel.RecordingStatusText);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Unavailable(
-                GameHistoryRecordingUnavailableReason.RequiresHookBackedEventMonitor));
-            Assert.Equal("GameHistoryRecordingStatusRequiresHookText", viewModel.RecordingStatusText);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Discarded(
-                GameHistoryRecordingDiscardReason.SequenceGap));
-            Assert.Equal("GameHistoryRecordingStatusDiscardedSequenceText", viewModel.RecordingStatusText);
-            Assert.Empty(viewModel.SavedGames);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Discarded(
-                GameHistoryRecordingDiscardReason.MissingRequiredStats));
-            Assert.Equal("GameHistoryRecordingStatusDiscardedMissingStatsText", viewModel.RecordingStatusText);
-
-            viewModel.ApplyRecordingStatus(GameHistoryRecordingStatus.Discarded(
-                GameHistoryRecordingDiscardReason.Disconnected));
-            Assert.Equal("GameHistoryRecordingStatusDiscardedConnectionEndedText", viewModel.RecordingStatusText);
+            Assert.Contains(nameof(GameHistoryPageViewModel.RecordingStatusTitle), changedProperties);
+            Assert.Contains(nameof(GameHistoryPageViewModel.RecordingStatusText), changedProperties);
+            Assert.DoesNotContain(nameof(GameHistoryPageViewModel.IsListVisible), changedProperties);
+            Assert.DoesNotContain(nameof(GameHistoryPageViewModel.IsDetailVisible), changedProperties);
         }
 
         [Theory]
@@ -428,10 +283,10 @@ namespace BO2.Tests.ViewModels
                     detectedGame,
                     new GameMapIdentity(baseMapToken, startLocationToken, internalMapToken, friendlyName))));
 
-            Assert.Equal("GameHistoryRecordingStatusActiveTitle", viewModel.RecordingStatusTitle);
-            Assert.Equal(
-                $"GameHistoryRecordingStatusWaitingForRoundOneMapFormat({friendlyName})",
-                viewModel.RecordingStatusText);
+            GameHistoryRecordingStatusDisplayState expectedState = new GameHistoryDisplayProjector()
+                .ProjectRecordingStatus(GameHistoryRecordingStatus.WaitingForRoundOne(friendlyName));
+            Assert.Equal(expectedState.Title, viewModel.RecordingStatusTitle);
+            Assert.Equal(expectedState.BodyText, viewModel.RecordingStatusText);
         }
 
         private static GameHistoryDetailViewModel SelectAndLoad(
@@ -469,66 +324,6 @@ namespace BO2.Tests.ViewModels
             game.FinalRound = 12;
             game.FinalStats = CreateStats(12345, 98, 2, 4, 55);
             game.GameDuration = TimeSpan.FromSeconds(3723);
-            game.Rounds =
-            [
-                new GameHistoryRound
-                {
-                    RoundNumber = 2,
-                    RoundDuration = null,
-                    CumulativeStats = CreateStats(1200, 16, 1, 0, 8),
-                    DeltaStats = CreateStats(700, 9, 1, 0, 5)
-                },
-                new GameHistoryRound
-                {
-                    RoundNumber = 1,
-                    RoundDuration = TimeSpan.FromSeconds(45),
-                    CumulativeStats = CreateStats(500, 7, 0, 0, 3),
-                    DeltaStats = CreateStats(500, 7, 0, 0, 3)
-                }
-            ];
-            game.BoxEvents =
-            [
-                new GameHistoryBoxEvent
-                {
-                    ReceivedAt = CreateLocalDate(2026, 5, 10, 14, 45),
-                    RoundNumber = 2,
-                    EventName = "randomization_done",
-                    RawWeaponToken = "ray_gun_zm",
-                    WeaponDisplayName = "Ray Gun",
-                    OwnerId = 7,
-                    StringValue = 100
-                },
-                new GameHistoryBoxEvent
-                {
-                    ReceivedAt = CreateLocalDate(2026, 5, 10, 14, 46),
-                    RoundNumber = 2,
-                    EventName = "user_grabbed_weapon",
-                    RawWeaponToken = "ray_gun_zm",
-                    WeaponDisplayName = "Ray Gun",
-                    OwnerId = 7,
-                    StringValue = 200
-                },
-                new GameHistoryBoxEvent
-                {
-                    ReceivedAt = CreateLocalDate(2026, 5, 10, 14, 47),
-                    RoundNumber = 3,
-                    EventName = "randomization_done",
-                    RawWeaponToken = "ray_gun_zm",
-                    WeaponDisplayName = "Ray Gun",
-                    OwnerId = 7,
-                    StringValue = 101
-                },
-                new GameHistoryBoxEvent
-                {
-                    ReceivedAt = CreateLocalDate(2026, 5, 10, 14, 48),
-                    RoundNumber = 4,
-                    EventName = "randomization_done",
-                    RawWeaponToken = "zm_weap_future",
-                    WeaponDisplayName = null,
-                    OwnerId = 42,
-                    StringValue = 102
-                }
-            ];
             return game;
         }
 
@@ -609,21 +404,6 @@ namespace BO2.Tests.ViewModels
         private static DateTimeOffset CreateLocalDate(int year, int month, int day, int hour, int minute)
         {
             return new DateTimeOffset(new DateTime(year, month, day, hour, minute, 0, DateTimeKind.Local));
-        }
-
-        private sealed class CultureScope : IDisposable
-        {
-            private readonly CultureInfo _originalCulture = CultureInfo.CurrentCulture;
-
-            public CultureScope(CultureInfo culture)
-            {
-                CultureInfo.CurrentCulture = culture;
-            }
-
-            public void Dispose()
-            {
-                CultureInfo.CurrentCulture = _originalCulture;
-            }
         }
     }
 }
