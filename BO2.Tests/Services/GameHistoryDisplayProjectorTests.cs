@@ -245,6 +245,43 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void ProjectSavedGameSummaries_ProjectsFullEntriesNewestFirstAndFormatsText()
+        {
+            CultureInfo culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+            culture.DateTimeFormat.ShortDatePattern = "M/d/yyyy";
+            culture.DateTimeFormat.ShortTimePattern = "HH:mm";
+            using var cultureScope = new CultureScope(culture);
+            GameHistoryEntry older = CreateDetailedGame("older-run");
+            older.StartedAt = CreateLocalDate(2026, 5, 14, 19, 0);
+            older.EndedAt = older.StartedAt.AddMinutes(30);
+            GameHistoryEntry newer = CreateDetailedGame(
+                "farm-run",
+                "farm",
+                "zm_transit_gump_farm",
+                "Farm");
+            newer.StartedAt = CreateLocalDate(2026, 5, 15, 20, 0);
+            newer.EndedAt = newer.StartedAt.AddMinutes(45);
+            newer.FinalRound = 9;
+            newer.FinalStats = CreateStats(67890, 123, 4, 5, 67);
+            newer.GameDuration = TimeSpan.FromSeconds(3661);
+
+            IReadOnlyList<GameHistorySummaryDisplayState> states = CreateProjector().ProjectSavedGameSummaries(
+                [older, newer]);
+
+            Assert.Equal(["farm-run", "older-run"], states.Select(static state => state.Id));
+            GameHistorySummaryDisplayState state = states[0];
+            Assert.Equal("5/15/2026 20:45", state.DateText);
+            Assert.Equal("Farm", state.MapNameText);
+            Assert.Equal("GameHistoryFinalRoundFormat(9)", state.FinalRoundText);
+            Assert.Equal("1:01:01", state.GameDurationText);
+            Assert.Equal(67890.ToString("N0", CultureInfo.CurrentCulture), state.PointsText);
+            Assert.Equal("123", state.KillsText);
+            Assert.Equal("4", state.DownsText);
+            Assert.Equal("5", state.RevivesText);
+            Assert.Equal("67", state.HeadshotsText);
+        }
+
+        [Fact]
         public void ProjectSavedSummaries_UsesMissingTextForNullDuration()
         {
             GameHistorySummary summary = CreateSummary("town-run", gameDuration: null);

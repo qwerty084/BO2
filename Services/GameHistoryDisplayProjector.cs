@@ -38,6 +38,14 @@ namespace BO2.Services
             ];
         }
 
+        public IReadOnlyList<GameHistorySummaryDisplayState> ProjectSavedGameSummaries(
+            IEnumerable<GameHistoryEntry> savedGames)
+        {
+            ArgumentNullException.ThrowIfNull(savedGames);
+
+            return ProjectSavedSummaries(savedGames.Select(CreateSummary));
+        }
+
         public GameHistoryRecordingStatusDisplayState ProjectRecordingStatus(GameHistoryRecordingStatus status)
         {
             ArgumentNullException.ThrowIfNull(status);
@@ -103,6 +111,20 @@ namespace BO2.Services
                 FormatCount(boxWeaponAverages.Length),
                 FormatAverageRollsPerRound(boxRolls.Length, game.FinalRound),
                 boxWeaponAverages.Length == 0 ? FormatMissingValue() : boxWeaponAverages[0].WeaponText);
+        }
+
+        private static GameHistorySummary CreateSummary(GameHistoryEntry game)
+        {
+            ArgumentNullException.ThrowIfNull(game);
+
+            return new GameHistorySummary(
+                game.Id,
+                game.StartedAt,
+                game.EndedAt,
+                game.MapIdentity,
+                game.FinalRound,
+                game.FinalStats,
+                game.GameDuration);
         }
 
         private GameHistorySummaryDisplayState ProjectSavedSummary(GameHistorySummary summary)

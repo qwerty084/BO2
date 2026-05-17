@@ -117,7 +117,7 @@ namespace BO2.ViewModels
         {
             ArgumentNullException.ThrowIfNull(savedGames);
 
-            ReplaceSavedGameSummaries(_displayProjector.ProjectSavedSummaries(savedGames.Select(CreateSummary)));
+            ReplaceSavedGameSummaries(_displayProjector.ProjectSavedGameSummaries(savedGames));
         }
 
         private void ReplaceSavedGameSummaries(IEnumerable<GameHistorySummaryDisplayState> summaries)
@@ -291,20 +291,6 @@ namespace BO2.ViewModels
         private static GameHistorySummaryViewModel CreateSummaryViewModel(GameHistorySummaryDisplayState state)
         {
             return new GameHistorySummaryViewModel(state);
-        }
-
-        private static GameHistorySummary CreateSummary(GameHistoryEntry game)
-        {
-            ArgumentNullException.ThrowIfNull(game);
-
-            return new GameHistorySummary(
-                game.Id,
-                game.StartedAt,
-                game.EndedAt,
-                game.MapIdentity,
-                game.FinalRound,
-                game.FinalStats,
-                game.GameDuration);
         }
 
         private GameHistoryDetailViewModel CreateDetail(GameHistoryEntry game)
