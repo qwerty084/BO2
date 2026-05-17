@@ -7,6 +7,8 @@ namespace BO2.Services
 {
     internal sealed class GameHistoryDisplayProjector
     {
+        private const string CompletedBoxRollEventName = "randomization_done";
+
         private readonly DisplayTextRenderer _renderer;
 
         public GameHistoryDisplayProjector()
@@ -75,6 +77,17 @@ namespace BO2.Services
                     .OrderBy(static round => round.RoundNumber)
                     .Select(ProjectRound)
             ];
+            GameHistoryBoxEvent[] boxRolls =
+            [
+                .. game.BoxEvents
+                    .Where(IsCompletedBoxRoll)
+                    .OrderBy(static boxEvent => boxEvent.ReceivedAt)
+            ];
+            GameHistoryBoxEventDisplayState[] boxEvents =
+            [
+                .. boxRolls.Select(ProjectBoxRoll)
+            ];
+            GameHistoryBoxWeaponAverageDisplayState[] boxWeaponAverages = ProjectBoxWeaponAverages(boxRolls);
 
             return new GameHistoryDetailDisplayState(
                 game.Id,
@@ -83,7 +96,13 @@ namespace BO2.Services
                 _renderer.Render(DisplayText.Format("GameHistoryFinalRoundFormat", game.FinalRound)),
                 FormatDuration(game.GameDuration),
                 ProjectStats(game.FinalStats, isDelta: false),
-                Array.AsReadOnly(rounds));
+                Array.AsReadOnly(rounds),
+                Array.AsReadOnly(boxEvents),
+                Array.AsReadOnly(boxWeaponAverages),
+                FormatCount(boxRolls.Length),
+                FormatCount(boxWeaponAverages.Length),
+                FormatAverageRollsPerRound(boxRolls.Length, game.FinalRound),
+                boxWeaponAverages.Length == 0 ? FormatMissingValue() : boxWeaponAverages[0].WeaponText);
         }
 
         private GameHistorySummaryDisplayState ProjectSavedSummary(GameHistorySummary summary)
@@ -113,6 +132,53 @@ namespace BO2.Services
                 ProjectStats(round.DeltaStats, isDelta: true));
         }
 
+        private GameHistoryBoxEventDisplayState ProjectBoxRoll(GameHistoryBoxEvent boxEvent)
+        {
+            string roundText = _renderer.Render(DisplayText.Format(
+                "GameHistoryRoundTitleFormat",
+                boxEvent.RoundNumber));
+            string weaponText = FormatBoxWeapon(boxEvent);
+
+            return new GameHistoryBoxEventDisplayState(
+                FormatDate(boxEvent.ReceivedAt),
+                roundText,
+                weaponText,
+                _renderer.Render(DisplayText.Format(
+                    "GameHistoryBoxRollPrimaryFormat",
+                    roundText,
+                    weaponText)));
+        }
+
+        private GameHistoryBoxWeaponAverageDisplayState[] ProjectBoxWeaponAverages(
+            IReadOnlyCollection<GameHistoryBoxEvent> boxRolls)
+        {
+            int totalRolls = boxRolls.Count;
+            if (totalRolls == 0)
+            {
+                return [];
+            }
+
+            return
+            [
+                .. boxRolls
+                    .GroupBy(FormatBoxWeapon, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => new
+                    {
+                        WeaponText = group.Key,
+                        RollCount = group.Count(),
+                        AverageRound = group.Average(static boxEvent => boxEvent.RoundNumber),
+                        Share = (double)group.Count() / totalRolls
+                    })
+                    .OrderByDescending(static group => group.RollCount)
+                    .ThenBy(static group => group.WeaponText, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => new GameHistoryBoxWeaponAverageDisplayState(
+                        group.WeaponText,
+                        FormatCount(group.RollCount),
+                        FormatAverageRound(group.AverageRound),
+                        FormatPercent(group.Share)))
+            ];
+        }
+
         private GameHistoryStatsDisplayState ProjectStats(GameHistoryStats stats, bool isDelta)
         {
             return new GameHistoryStatsDisplayState(
@@ -128,6 +194,43 @@ namespace BO2.Services
             return isDelta
                 ? value.ToString("+#,0;-#,0;0", CultureInfo.CurrentCulture)
                 : _renderer.Render(DisplayText.Integer(value));
+        }
+
+        private static bool IsCompletedBoxRoll(GameHistoryBoxEvent boxEvent)
+        {
+            return string.Equals(boxEvent.EventName, CompletedBoxRollEventName, StringComparison.Ordinal);
+        }
+
+        private string FormatBoxWeapon(GameHistoryBoxEvent boxEvent)
+        {
+            return string.IsNullOrWhiteSpace(boxEvent.WeaponDisplayName)
+                ? _renderer.Render(DisplayText.Resource("GameHistoryBoxEventUnknownWeapon"))
+                : boxEvent.WeaponDisplayName!;
+        }
+
+        private static string FormatCount(int value)
+        {
+            return value.ToString("N0", CultureInfo.CurrentCulture);
+        }
+
+        private static string FormatAverageRound(double value)
+        {
+            return value.ToString("0.#", CultureInfo.CurrentCulture);
+        }
+
+        private string FormatAverageRollsPerRound(int rollCount, int finalRound)
+        {
+            if (rollCount == 0 || finalRound <= 0)
+            {
+                return FormatMissingValue();
+            }
+
+            return ((double)rollCount / finalRound).ToString("0.#", CultureInfo.CurrentCulture);
+        }
+
+        private static string FormatPercent(double value)
+        {
+            return value.ToString("P0", CultureInfo.CurrentCulture);
         }
 
         private GameHistoryRecordingStatusDisplayState Render(
@@ -247,10 +350,15 @@ namespace BO2.Services
         {
             if (duration is not TimeSpan value || value < TimeSpan.Zero)
             {
-                return _renderer.Render(GameConnectionDisplayTextProjector.EmptyValueText);
+                return FormatMissingValue();
             }
 
             return GameTimerDurationFormatter.Format(value);
+        }
+
+        private string FormatMissingValue()
+        {
+            return _renderer.Render(GameConnectionDisplayTextProjector.EmptyValueText);
         }
     }
 
@@ -273,7 +381,13 @@ namespace BO2.Services
         string FinalRoundText,
         string GameDurationText,
         GameHistoryStatsDisplayState FinalStats,
-        IReadOnlyList<GameHistoryRoundDisplayState> Rounds);
+        IReadOnlyList<GameHistoryRoundDisplayState> Rounds,
+        IReadOnlyList<GameHistoryBoxEventDisplayState> BoxEvents,
+        IReadOnlyList<GameHistoryBoxWeaponAverageDisplayState> BoxWeaponAverages,
+        string BoxRollCountText,
+        string BoxUniqueWeaponCountText,
+        string BoxAverageRollsPerRoundText,
+        string BoxMostSeenWeaponText);
 
     internal sealed record GameHistoryRoundDisplayState(
         int RoundNumber,
@@ -288,6 +402,18 @@ namespace BO2.Services
         string DownsText,
         string RevivesText,
         string HeadshotsText);
+
+    internal sealed record GameHistoryBoxEventDisplayState(
+        string ReceivedAtText,
+        string RoundText,
+        string WeaponText,
+        string PrimaryText);
+
+    internal sealed record GameHistoryBoxWeaponAverageDisplayState(
+        string WeaponText,
+        string RollCountText,
+        string AverageRoundText,
+        string ShareText);
 
     internal sealed record GameHistoryRecordingStatusDisplayState(string Title, string BodyText);
 

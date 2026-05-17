@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using BO2.Services;
 using BO2.ViewModels;
@@ -233,92 +232,6 @@ namespace BO2.Tests.ViewModels
         }
 
         [Fact]
-        public void DetailProjection_TracksMysteryBoxAveragesWithoutInternalEventNames()
-        {
-            var viewModel = new GameHistoryPageViewModel();
-            GameHistoryEntry game = CreateDetailedGame("town-run");
-            viewModel.ReplaceSavedGames([game]);
-
-            GameHistoryDetailViewModel detail = SelectAndLoad(viewModel, game);
-
-            Assert.True(detail.HasBoxEvents);
-            Assert.Equal(3, detail.BoxEvents.Count);
-            Assert.Equal("3", detail.BoxRollCountText);
-            Assert.Equal("2", detail.BoxUniqueWeaponCountText);
-            Assert.Equal((3d / 12).ToString("0.#", CultureInfo.CurrentCulture), detail.BoxAverageRollsPerRoundText);
-            Assert.Equal("Ray Gun", detail.BoxMostSeenWeaponText);
-
-            Assert.Equal("Ray Gun", detail.BoxEvents[0].WeaponText);
-            Assert.Equal("Ray Gun", detail.BoxEvents[1].WeaponText);
-            Assert.Equal("GameHistoryBoxEventUnknownWeapon", detail.BoxEvents[2].WeaponText);
-
-            Assert.Equal(2, detail.BoxWeaponAverages.Count);
-            Assert.Equal("Ray Gun", detail.BoxWeaponAverages[0].WeaponText);
-            Assert.Equal("2", detail.BoxWeaponAverages[0].RollCountText);
-            Assert.Equal(2.5.ToString("0.#", CultureInfo.CurrentCulture), detail.BoxWeaponAverages[0].AverageRoundText);
-            Assert.Equal((2d / 3).ToString("P0", CultureInfo.CurrentCulture), detail.BoxWeaponAverages[0].ShareText);
-
-            Assert.Equal("GameHistoryBoxEventUnknownWeapon", detail.BoxWeaponAverages[1].WeaponText);
-            Assert.Equal("1", detail.BoxWeaponAverages[1].RollCountText);
-            Assert.Equal("4", detail.BoxWeaponAverages[1].AverageRoundText);
-            Assert.Equal((1d / 3).ToString("P0", CultureInfo.CurrentCulture), detail.BoxWeaponAverages[1].ShareText);
-
-            Assert.All(detail.BoxEvents, boxEvent =>
-            {
-                Assert.DoesNotContain("randomization_done", boxEvent.PrimaryText, StringComparison.Ordinal);
-                Assert.DoesNotContain("user_grabbed_weapon", boxEvent.PrimaryText, StringComparison.Ordinal);
-                Assert.DoesNotContain("ray_gun_zm", boxEvent.PrimaryText, StringComparison.Ordinal);
-                Assert.DoesNotContain("zm_weap_future", boxEvent.PrimaryText, StringComparison.Ordinal);
-            });
-        }
-
-        [Fact]
-        public void DetailProjection_OrdersBoxEventsByReceivedTimeAndPreservesEqualTimestampOrder()
-        {
-            var viewModel = new GameHistoryPageViewModel();
-            GameHistoryEntry game = CreateDetailedGame("town-run");
-            DateTimeOffset sameReceivedAt = CreateLocalDate(2026, 5, 10, 14, 45);
-            game.BoxEvents =
-            [
-                new GameHistoryBoxEvent
-                {
-                    ReceivedAt = sameReceivedAt.AddMinutes(1),
-                    RoundNumber = 2,
-                    EventName = "randomization_done",
-                    RawWeaponToken = "galil_zm",
-                    WeaponDisplayName = "Galil",
-                    OwnerId = 7,
-                    StringValue = 300
-                },
-                new GameHistoryBoxEvent
-                {
-                    ReceivedAt = sameReceivedAt,
-                    RoundNumber = 2,
-                    EventName = "randomization_done",
-                    RawWeaponToken = "ray_gun_zm",
-                    WeaponDisplayName = "Ray Gun",
-                    OwnerId = 7,
-                    StringValue = 100
-                },
-                new GameHistoryBoxEvent
-                {
-                    ReceivedAt = sameReceivedAt,
-                    RoundNumber = 2,
-                    EventName = "randomization_done",
-                    RawWeaponToken = "m32_zm",
-                    WeaponDisplayName = "War Machine",
-                    OwnerId = 7,
-                    StringValue = 200
-                }
-            ];
-            viewModel.ReplaceSavedGames([game]);
-
-            GameHistoryDetailViewModel detail = SelectAndLoad(viewModel, game);
-
-            Assert.Equal(["Ray Gun", "War Machine", "Galil"], detail.BoxEvents.Select(boxEvent => boxEvent.WeaponText));
-        }
-
-        [Fact]
         public void ApplyRecordingStatus_AppliesProjectedStateWithoutAddingEntries()
         {
             var viewModel = new GameHistoryPageViewModel();
@@ -394,6 +307,14 @@ namespace BO2.Tests.ViewModels
             Assert.Equal(expected.GameDurationText, actual.GameDurationText);
             Assert.Equal(expected.FinalStats, actual.FinalStats.DisplayState);
             Assert.Equal(expected.Rounds, actual.Rounds.Select(static round => round.DisplayState));
+            Assert.Equal(expected.BoxEvents, actual.BoxEvents.Select(static boxEvent => boxEvent.DisplayState));
+            Assert.Equal(
+                expected.BoxWeaponAverages,
+                actual.BoxWeaponAverages.Select(static average => average.DisplayState));
+            Assert.Equal(expected.BoxRollCountText, actual.BoxRollCountText);
+            Assert.Equal(expected.BoxUniqueWeaponCountText, actual.BoxUniqueWeaponCountText);
+            Assert.Equal(expected.BoxAverageRollsPerRoundText, actual.BoxAverageRollsPerRoundText);
+            Assert.Equal(expected.BoxMostSeenWeaponText, actual.BoxMostSeenWeaponText);
         }
 
         private static GameHistoryEntry CreateDetailedGame(

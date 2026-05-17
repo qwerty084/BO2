@@ -345,6 +345,125 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void ProjectSelectedDetail_FiltersCompletedBoxRollsAndProjectsBoxRowsAndSummaryValues()
+        {
+            GameHistoryEntry game = CreateDetailedGame("town-run");
+            DateTimeOffset startedAt = CreateLocalDate(2026, 5, 10, 14, 45);
+            game.BoxEvents =
+            [
+                CreateBoxEvent(startedAt, 2, "randomization_done", "ray_gun_zm", "Ray Gun", 100),
+                CreateBoxEvent(startedAt.AddMinutes(1), 2, "user_grabbed_weapon", "ray_gun_zm", "Ray Gun", 200),
+                CreateBoxEvent(startedAt.AddMinutes(2), 3, "randomization_done", "ray_gun_zm", "Ray Gun", 101),
+                CreateBoxEvent(startedAt.AddMinutes(3), 4, "randomization_done", "zm_weap_future", null, 102)
+            ];
+
+            GameHistoryDetailDisplayState state = CreateProjector().ProjectSelectedDetail(game);
+
+            Assert.Equal(3, state.BoxEvents.Count);
+            Assert.Equal("3", state.BoxRollCountText);
+            Assert.Equal("2", state.BoxUniqueWeaponCountText);
+            Assert.Equal((3d / 12).ToString("0.#", CultureInfo.CurrentCulture), state.BoxAverageRollsPerRoundText);
+            Assert.Equal("Ray Gun", state.BoxMostSeenWeaponText);
+
+            Assert.Equal("Ray Gun", state.BoxEvents[0].WeaponText);
+            Assert.Equal("GameHistoryRoundTitleFormat(2)", state.BoxEvents[0].RoundText);
+            Assert.Equal(
+                "GameHistoryBoxRollPrimaryFormat(GameHistoryRoundTitleFormat(2), Ray Gun)",
+                state.BoxEvents[0].PrimaryText);
+            Assert.Equal("Ray Gun", state.BoxEvents[1].WeaponText);
+            Assert.Equal("GameHistoryBoxEventUnknownWeapon", state.BoxEvents[2].WeaponText);
+
+            Assert.Equal(2, state.BoxWeaponAverages.Count);
+            Assert.Equal("Ray Gun", state.BoxWeaponAverages[0].WeaponText);
+            Assert.Equal("2", state.BoxWeaponAverages[0].RollCountText);
+            Assert.Equal(2.5.ToString("0.#", CultureInfo.CurrentCulture), state.BoxWeaponAverages[0].AverageRoundText);
+            Assert.Equal((2d / 3).ToString("P0", CultureInfo.CurrentCulture), state.BoxWeaponAverages[0].ShareText);
+            Assert.Equal("GameHistoryBoxEventUnknownWeapon", state.BoxWeaponAverages[1].WeaponText);
+            Assert.Equal("1", state.BoxWeaponAverages[1].RollCountText);
+            Assert.Equal("4", state.BoxWeaponAverages[1].AverageRoundText);
+            Assert.Equal((1d / 3).ToString("P0", CultureInfo.CurrentCulture), state.BoxWeaponAverages[1].ShareText);
+
+            Assert.All(state.BoxEvents, boxEvent =>
+            {
+                Assert.DoesNotContain("randomization_done", boxEvent.PrimaryText, StringComparison.Ordinal);
+                Assert.DoesNotContain("user_grabbed_weapon", boxEvent.PrimaryText, StringComparison.Ordinal);
+                Assert.DoesNotContain("ray_gun_zm", boxEvent.PrimaryText, StringComparison.Ordinal);
+                Assert.DoesNotContain("zm_weap_future", boxEvent.PrimaryText, StringComparison.Ordinal);
+            });
+        }
+
+        [Fact]
+        public void ProjectSelectedDetail_ProjectsBoxWeaponAveragesInDeterministicOrder()
+        {
+            GameHistoryEntry game = CreateDetailedGame("town-run");
+            DateTimeOffset startedAt = CreateLocalDate(2026, 5, 10, 14, 45);
+            game.BoxEvents =
+            [
+                CreateBoxEvent(startedAt, 5, "randomization_done", "m32_zm", "War Machine", 100),
+                CreateBoxEvent(startedAt.AddMinutes(1), 2, "randomization_done", "ray_gun_zm", "Ray Gun", 101),
+                CreateBoxEvent(startedAt.AddMinutes(2), 3, "randomization_done", "ak74u_zm", "AK74u", 102),
+                CreateBoxEvent(startedAt.AddMinutes(3), 6, "randomization_done", "ray_gun_zm", "Ray Gun", 103)
+            ];
+
+            GameHistoryDetailDisplayState state = CreateProjector().ProjectSelectedDetail(game);
+
+            Assert.Equal(
+                ["Ray Gun", "AK74u", "War Machine"],
+                state.BoxWeaponAverages.Select(static average => average.WeaponText));
+            Assert.Equal("2", state.BoxWeaponAverages[0].RollCountText);
+            Assert.Equal(4d.ToString("0.#", CultureInfo.CurrentCulture), state.BoxWeaponAverages[0].AverageRoundText);
+            Assert.Equal((2d / 4).ToString("P0", CultureInfo.CurrentCulture), state.BoxWeaponAverages[0].ShareText);
+            Assert.Equal("1", state.BoxWeaponAverages[1].RollCountText);
+            Assert.Equal("3", state.BoxWeaponAverages[1].AverageRoundText);
+            Assert.Equal((1d / 4).ToString("P0", CultureInfo.CurrentCulture), state.BoxWeaponAverages[1].ShareText);
+            Assert.Equal("1", state.BoxWeaponAverages[2].RollCountText);
+            Assert.Equal("5", state.BoxWeaponAverages[2].AverageRoundText);
+            Assert.Equal((1d / 4).ToString("P0", CultureInfo.CurrentCulture), state.BoxWeaponAverages[2].ShareText);
+        }
+
+        [Fact]
+        public void ProjectSelectedDetail_OrdersBoxEventsByReceivedTimeAndPreservesEqualTimestampOrder()
+        {
+            GameHistoryEntry game = CreateDetailedGame("town-run");
+            DateTimeOffset sameReceivedAt = CreateLocalDate(2026, 5, 10, 14, 45);
+            game.BoxEvents =
+            [
+                CreateBoxEvent(sameReceivedAt.AddMinutes(1), 2, "randomization_done", "galil_zm", "Galil", 300),
+                CreateBoxEvent(sameReceivedAt, 2, "randomization_done", "ray_gun_zm", "Ray Gun", 100),
+                CreateBoxEvent(sameReceivedAt, 2, "randomization_done", "m32_zm", "War Machine", 200)
+            ];
+
+            GameHistoryDetailDisplayState state = CreateProjector().ProjectSelectedDetail(game);
+
+            Assert.Equal(["Ray Gun", "War Machine", "Galil"], state.BoxEvents.Select(boxEvent => boxEvent.WeaponText));
+        }
+
+        [Fact]
+        public void ProjectSelectedDetail_ReturnsEmptyBoxEventStateWhenNoCompletedBoxRolls()
+        {
+            GameHistoryEntry game = CreateDetailedGame("town-run");
+            game.BoxEvents =
+            [
+                CreateBoxEvent(
+                    CreateLocalDate(2026, 5, 10, 14, 45),
+                    2,
+                    "user_grabbed_weapon",
+                    "ray_gun_zm",
+                    "Ray Gun",
+                    100)
+            ];
+
+            GameHistoryDetailDisplayState state = CreateProjector().ProjectSelectedDetail(game);
+
+            Assert.Empty(state.BoxEvents);
+            Assert.Empty(state.BoxWeaponAverages);
+            Assert.Equal("0", state.BoxRollCountText);
+            Assert.Equal("0", state.BoxUniqueWeaponCountText);
+            Assert.Equal("--", state.BoxAverageRollsPerRoundText);
+            Assert.Equal("--", state.BoxMostSeenWeaponText);
+        }
+
+        [Fact]
         public void SummaryDisplayStateContract_IncludesSummaryTextFieldsOnly()
         {
             string[] propertyNames =
@@ -374,7 +493,7 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
-        public void DetailDisplayStateContracts_IncludeDetailStatsAndRoundTextFields()
+        public void DetailDisplayStateContracts_IncludeDetailStatsRoundAndBoxTextFields()
         {
             Assert.True(typeof(GameHistoryDetailDisplayState).IsSealed);
             Assert.Equal(
@@ -386,7 +505,13 @@ namespace BO2.Tests.Services
                     nameof(GameHistoryDetailDisplayState.FinalRoundText),
                     nameof(GameHistoryDetailDisplayState.GameDurationText),
                     nameof(GameHistoryDetailDisplayState.FinalStats),
-                    nameof(GameHistoryDetailDisplayState.Rounds)
+                    nameof(GameHistoryDetailDisplayState.Rounds),
+                    nameof(GameHistoryDetailDisplayState.BoxEvents),
+                    nameof(GameHistoryDetailDisplayState.BoxWeaponAverages),
+                    nameof(GameHistoryDetailDisplayState.BoxRollCountText),
+                    nameof(GameHistoryDetailDisplayState.BoxUniqueWeaponCountText),
+                    nameof(GameHistoryDetailDisplayState.BoxAverageRollsPerRoundText),
+                    nameof(GameHistoryDetailDisplayState.BoxMostSeenWeaponText)
                 }.Order(StringComparer.Ordinal),
                 GetPropertyNames<GameHistoryDetailDisplayState>());
 
@@ -413,6 +538,28 @@ namespace BO2.Tests.Services
                     nameof(GameHistoryRoundDisplayState.DeltaStats)
                 }.Order(StringComparer.Ordinal),
                 GetPropertyNames<GameHistoryRoundDisplayState>());
+
+            Assert.True(typeof(GameHistoryBoxEventDisplayState).IsSealed);
+            Assert.Equal(
+                new[]
+                {
+                    nameof(GameHistoryBoxEventDisplayState.ReceivedAtText),
+                    nameof(GameHistoryBoxEventDisplayState.RoundText),
+                    nameof(GameHistoryBoxEventDisplayState.WeaponText),
+                    nameof(GameHistoryBoxEventDisplayState.PrimaryText)
+                }.Order(StringComparer.Ordinal),
+                GetPropertyNames<GameHistoryBoxEventDisplayState>());
+
+            Assert.True(typeof(GameHistoryBoxWeaponAverageDisplayState).IsSealed);
+            Assert.Equal(
+                new[]
+                {
+                    nameof(GameHistoryBoxWeaponAverageDisplayState.WeaponText),
+                    nameof(GameHistoryBoxWeaponAverageDisplayState.RollCountText),
+                    nameof(GameHistoryBoxWeaponAverageDisplayState.AverageRoundText),
+                    nameof(GameHistoryBoxWeaponAverageDisplayState.ShareText)
+                }.Order(StringComparer.Ordinal),
+                GetPropertyNames<GameHistoryBoxWeaponAverageDisplayState>());
         }
 
         [Theory]
@@ -519,6 +666,26 @@ namespace BO2.Tests.Services
                         DeltaStats = CreateStats(500, 7, 0, 0, 3)
                     }
                 ]
+            };
+        }
+
+        private static GameHistoryBoxEvent CreateBoxEvent(
+            DateTimeOffset receivedAt,
+            int roundNumber,
+            string eventName,
+            string rawWeaponToken,
+            string? weaponDisplayName,
+            uint stringValue)
+        {
+            return new GameHistoryBoxEvent
+            {
+                ReceivedAt = receivedAt,
+                RoundNumber = roundNumber,
+                EventName = eventName,
+                RawWeaponToken = rawWeaponToken,
+                WeaponDisplayName = weaponDisplayName,
+                OwnerId = 7,
+                StringValue = stringValue
             };
         }
 
