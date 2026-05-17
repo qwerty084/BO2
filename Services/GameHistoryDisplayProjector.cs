@@ -65,6 +65,27 @@ namespace BO2.Services
             return Render(projection);
         }
 
+        public GameHistoryDetailDisplayState ProjectSelectedDetail(GameHistoryEntry game)
+        {
+            ArgumentNullException.ThrowIfNull(game);
+
+            GameHistoryRoundDisplayState[] rounds =
+            [
+                .. game.Rounds
+                    .OrderBy(static round => round.RoundNumber)
+                    .Select(ProjectRound)
+            ];
+
+            return new GameHistoryDetailDisplayState(
+                game.Id,
+                FormatDate(game.EndedAt),
+                game.MapIdentity.FriendlyName,
+                _renderer.Render(DisplayText.Format("GameHistoryFinalRoundFormat", game.FinalRound)),
+                FormatDuration(game.GameDuration),
+                ProjectStats(game.FinalStats, isDelta: false),
+                Array.AsReadOnly(rounds));
+        }
+
         private GameHistorySummaryDisplayState ProjectSavedSummary(GameHistorySummary summary)
         {
             ArgumentNullException.ThrowIfNull(summary);
@@ -80,6 +101,33 @@ namespace BO2.Services
                 _renderer.Render(DisplayText.Integer(summary.FinalStats.Downs)),
                 _renderer.Render(DisplayText.Integer(summary.FinalStats.Revives)),
                 _renderer.Render(DisplayText.Integer(summary.FinalStats.Headshots)));
+        }
+
+        private GameHistoryRoundDisplayState ProjectRound(GameHistoryRound round)
+        {
+            return new GameHistoryRoundDisplayState(
+                round.RoundNumber,
+                _renderer.Render(DisplayText.Format("GameHistoryRoundTitleFormat", round.RoundNumber)),
+                FormatDuration(round.RoundDuration),
+                ProjectStats(round.CumulativeStats, isDelta: false),
+                ProjectStats(round.DeltaStats, isDelta: true));
+        }
+
+        private GameHistoryStatsDisplayState ProjectStats(GameHistoryStats stats, bool isDelta)
+        {
+            return new GameHistoryStatsDisplayState(
+                FormatStat(stats.Points, isDelta),
+                FormatStat(stats.Kills, isDelta),
+                FormatStat(stats.Downs, isDelta),
+                FormatStat(stats.Revives, isDelta),
+                FormatStat(stats.Headshots, isDelta));
+        }
+
+        private string FormatStat(int value, bool isDelta)
+        {
+            return isDelta
+                ? value.ToString("+#,0;-#,0;0", CultureInfo.CurrentCulture)
+                : _renderer.Render(DisplayText.Integer(value));
         }
 
         private GameHistoryRecordingStatusDisplayState Render(
@@ -212,6 +260,29 @@ namespace BO2.Services
         string MapNameText,
         string FinalRoundText,
         string GameDurationText,
+        string PointsText,
+        string KillsText,
+        string DownsText,
+        string RevivesText,
+        string HeadshotsText);
+
+    internal sealed record GameHistoryDetailDisplayState(
+        string Id,
+        string DateText,
+        string MapNameText,
+        string FinalRoundText,
+        string GameDurationText,
+        GameHistoryStatsDisplayState FinalStats,
+        IReadOnlyList<GameHistoryRoundDisplayState> Rounds);
+
+    internal sealed record GameHistoryRoundDisplayState(
+        int RoundNumber,
+        string RoundTitleText,
+        string DurationText,
+        GameHistoryStatsDisplayState CumulativeStats,
+        GameHistoryStatsDisplayState DeltaStats);
+
+    internal sealed record GameHistoryStatsDisplayState(
         string PointsText,
         string KillsText,
         string DownsText,

@@ -265,6 +265,86 @@ namespace BO2.Tests.Services
         }
 
         [Fact]
+        public void ProjectSelectedDetail_FormatsHeaderFinalStatsAndRounds()
+        {
+            CultureInfo culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+            culture.DateTimeFormat.ShortDatePattern = "M/d/yyyy";
+            culture.DateTimeFormat.ShortTimePattern = "HH:mm";
+            using var cultureScope = new CultureScope(culture);
+            GameHistoryEntry game = CreateDetailedGame("town-run");
+
+            GameHistoryDetailDisplayState state = CreateProjector().ProjectSelectedDetail(game);
+
+            Assert.Equal("town-run", state.Id);
+            Assert.Equal("Town", state.MapNameText);
+            Assert.Equal("5/10/2026 15:00", state.DateText);
+            Assert.Equal("GameHistoryFinalRoundFormat(12)", state.FinalRoundText);
+            Assert.Equal("1:02:03", state.GameDurationText);
+            AssertStats(
+                new GameHistoryStatsDisplayState("12,345", "98", "2", "4", "55"),
+                state.FinalStats);
+
+            Assert.Equal([1, 2], state.Rounds.Select(static round => round.RoundNumber));
+            Assert.Equal("GameHistoryRoundTitleFormat(1)", state.Rounds[0].RoundTitleText);
+            Assert.Equal("0:45", state.Rounds[0].DurationText);
+            AssertStats(
+                new GameHistoryStatsDisplayState("500", "7", "0", "0", "3"),
+                state.Rounds[0].CumulativeStats);
+            AssertStats(
+                new GameHistoryStatsDisplayState("+500", "+7", "0", "0", "+3"),
+                state.Rounds[0].DeltaStats);
+            Assert.Equal("GameHistoryRoundTitleFormat(2)", state.Rounds[1].RoundTitleText);
+            Assert.Equal("--", state.Rounds[1].DurationText);
+            AssertStats(
+                new GameHistoryStatsDisplayState("1,200", "16", "1", "0", "8"),
+                state.Rounds[1].CumulativeStats);
+            AssertStats(
+                new GameHistoryStatsDisplayState("+700", "+9", "+1", "0", "+5"),
+                state.Rounds[1].DeltaStats);
+        }
+
+        [Fact]
+        public void ProjectSelectedDetail_UsesMissingTextForNegativeRoundDuration()
+        {
+            GameHistoryEntry game = CreateDetailedGame("town-run");
+            game.Rounds[0].RoundDuration = TimeSpan.FromSeconds(-1);
+
+            GameHistoryDetailDisplayState state = CreateProjector().ProjectSelectedDetail(game);
+
+            GameHistoryRoundDisplayState round = Assert.Single(
+                state.Rounds,
+                static candidate => candidate.RoundNumber == 2);
+            Assert.Equal("--", round.DurationText);
+        }
+
+        [Theory]
+        [InlineData("zm_transit", "farm", "zm_transit_gump_farm", "Farm")]
+        [InlineData("zm_transit", "transit", "zm_transit_gump_transit_zclassic", "TranZit")]
+        [InlineData("zm_transit", "transit", "zm_transit_gump_transit_zstandard", "Bus Depot")]
+        [InlineData("zm_buried", null, "zm_buried", "Buried")]
+        [InlineData("zm_highrise", null, "zm_highrise", "Die Rise")]
+        [InlineData("zm_prison", null, "zm_prison", "Mob of the Dead")]
+        [InlineData("zm_nuked", null, "zm_nuked", "Nuketown")]
+        [InlineData("zm_tomb", null, "zm_tomb", "Origins")]
+        public void ProjectSelectedDetail_UsesFriendlyMapName(
+            string baseMapToken,
+            string? startLocationToken,
+            string internalMapToken,
+            string friendlyName)
+        {
+            GameHistoryEntry game = CreateDetailedGame(
+                "saved-run",
+                startLocationToken,
+                internalMapToken,
+                friendlyName,
+                baseMapToken);
+
+            GameHistoryDetailDisplayState state = CreateProjector().ProjectSelectedDetail(game);
+
+            Assert.Equal(friendlyName, state.MapNameText);
+        }
+
+        [Fact]
         public void SummaryDisplayStateContract_IncludesSummaryTextFieldsOnly()
         {
             string[] propertyNames =
@@ -291,6 +371,48 @@ namespace BO2.Tests.Services
             Assert.Equal(
                 requiredProperties.Order(StringComparer.Ordinal),
                 propertyNames.Order(StringComparer.Ordinal));
+        }
+
+        [Fact]
+        public void DetailDisplayStateContracts_IncludeDetailStatsAndRoundTextFields()
+        {
+            Assert.True(typeof(GameHistoryDetailDisplayState).IsSealed);
+            Assert.Equal(
+                new[]
+                {
+                    nameof(GameHistoryDetailDisplayState.Id),
+                    nameof(GameHistoryDetailDisplayState.DateText),
+                    nameof(GameHistoryDetailDisplayState.MapNameText),
+                    nameof(GameHistoryDetailDisplayState.FinalRoundText),
+                    nameof(GameHistoryDetailDisplayState.GameDurationText),
+                    nameof(GameHistoryDetailDisplayState.FinalStats),
+                    nameof(GameHistoryDetailDisplayState.Rounds)
+                }.Order(StringComparer.Ordinal),
+                GetPropertyNames<GameHistoryDetailDisplayState>());
+
+            Assert.True(typeof(GameHistoryStatsDisplayState).IsSealed);
+            Assert.Equal(
+                new[]
+                {
+                    nameof(GameHistoryStatsDisplayState.PointsText),
+                    nameof(GameHistoryStatsDisplayState.KillsText),
+                    nameof(GameHistoryStatsDisplayState.DownsText),
+                    nameof(GameHistoryStatsDisplayState.RevivesText),
+                    nameof(GameHistoryStatsDisplayState.HeadshotsText)
+                }.Order(StringComparer.Ordinal),
+                GetPropertyNames<GameHistoryStatsDisplayState>());
+
+            Assert.True(typeof(GameHistoryRoundDisplayState).IsSealed);
+            Assert.Equal(
+                new[]
+                {
+                    nameof(GameHistoryRoundDisplayState.RoundNumber),
+                    nameof(GameHistoryRoundDisplayState.RoundTitleText),
+                    nameof(GameHistoryRoundDisplayState.DurationText),
+                    nameof(GameHistoryRoundDisplayState.CumulativeStats),
+                    nameof(GameHistoryRoundDisplayState.DeltaStats)
+                }.Order(StringComparer.Ordinal),
+                GetPropertyNames<GameHistoryRoundDisplayState>());
         }
 
         [Theory]
@@ -359,6 +481,47 @@ namespace BO2.Tests.Services
                 gameDuration);
         }
 
+        private static GameHistoryEntry CreateDetailedGame(
+            string id,
+            string? startLocationToken = "town",
+            string internalMapToken = "zm_transit_gump_town",
+            string friendlyName = "Town",
+            string baseMapToken = "zm_transit")
+        {
+            DateTimeOffset startedAt = CreateLocalDate(2026, 5, 10, 14, 30);
+            return new GameHistoryEntry
+            {
+                Id = id,
+                StartedAt = startedAt,
+                EndedAt = startedAt.AddMinutes(30),
+                MapIdentity = new GameHistoryMapIdentity(
+                    baseMapToken,
+                    startLocationToken,
+                    internalMapToken,
+                    friendlyName),
+                FinalRound = 12,
+                FinalStats = CreateStats(12345, 98, 2, 4, 55),
+                GameDuration = TimeSpan.FromSeconds(3723),
+                Rounds =
+                [
+                    new GameHistoryRound
+                    {
+                        RoundNumber = 2,
+                        RoundDuration = null,
+                        CumulativeStats = CreateStats(1200, 16, 1, 0, 8),
+                        DeltaStats = CreateStats(700, 9, 1, 0, 5)
+                    },
+                    new GameHistoryRound
+                    {
+                        RoundNumber = 1,
+                        RoundDuration = TimeSpan.FromSeconds(45),
+                        CumulativeStats = CreateStats(500, 7, 0, 0, 3),
+                        DeltaStats = CreateStats(500, 7, 0, 0, 3)
+                    }
+                ]
+            };
+        }
+
         private static GameHistoryStats CreateStats(
             int points,
             int kills,
@@ -379,6 +542,28 @@ namespace BO2.Tests.Services
         private static DateTimeOffset CreateLocalDate(int year, int month, int day, int hour, int minute)
         {
             return new DateTimeOffset(new DateTime(year, month, day, hour, minute, 0, DateTimeKind.Local));
+        }
+
+        private static IReadOnlyList<string> GetPropertyNames<T>()
+        {
+            return
+            [
+                .. typeof(T)
+                    .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                    .Select(static property => property.Name)
+                    .Order(StringComparer.Ordinal)
+            ];
+        }
+
+        private static void AssertStats(
+            GameHistoryStatsDisplayState expected,
+            GameHistoryStatsDisplayState actual)
+        {
+            Assert.Equal(expected.PointsText, actual.PointsText);
+            Assert.Equal(expected.KillsText, actual.KillsText);
+            Assert.Equal(expected.DownsText, actual.DownsText);
+            Assert.Equal(expected.RevivesText, actual.RevivesText);
+            Assert.Equal(expected.HeadshotsText, actual.HeadshotsText);
         }
 
         private static GameHistoryRecordingStatus CreateStatus(RecordingStatusCase statusCase)

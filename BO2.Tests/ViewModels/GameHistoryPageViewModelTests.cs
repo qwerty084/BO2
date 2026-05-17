@@ -220,73 +220,16 @@ namespace BO2.Tests.ViewModels
         }
 
         [Fact]
-        public void DetailProjection_ShowsFinalRoundStatsRoundDeltasAndMissingDurations()
+        public void ShowSelectedGameDetail_AppliesProjectedDisplayState()
         {
             var viewModel = new GameHistoryPageViewModel();
             GameHistoryEntry game = CreateDetailedGame("town-run");
+            GameHistoryDetailDisplayState expectedState = new GameHistoryDisplayProjector().ProjectSelectedDetail(game);
             viewModel.ReplaceSavedGames([game]);
 
             GameHistoryDetailViewModel detail = SelectAndLoad(viewModel, game);
 
-            Assert.Equal("Town", detail.MapNameText);
-            Assert.Equal("GameHistoryFinalRoundFormat(12)", detail.FinalRoundText);
-            Assert.Equal("1:02:03", detail.GameDurationText);
-            Assert.Equal(12345.ToString("N0", CultureInfo.CurrentCulture), detail.FinalStats.PointsText);
-            Assert.Equal("98", detail.FinalStats.KillsText);
-
-            Assert.Equal(2, detail.Rounds.Count);
-            Assert.Equal("0:45", detail.Rounds[0].DurationText);
-            Assert.Equal("500", detail.Rounds[0].CumulativeStats.PointsText);
-            Assert.Equal("+500", detail.Rounds[0].DeltaStats.PointsText);
-            Assert.Equal(GameHistoryPageViewModel.MissingValueText, detail.Rounds[1].DurationText);
-            Assert.Equal(1200.ToString("N0", CultureInfo.CurrentCulture), detail.Rounds[1].CumulativeStats.PointsText);
-            Assert.Equal("+700", detail.Rounds[1].DeltaStats.PointsText);
-        }
-
-        [Fact]
-        public void DetailDates_UseCurrentCultureShortDateAndTimeFormat()
-        {
-            CultureInfo culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
-            culture.DateTimeFormat.ShortDatePattern = "M/d/yyyy";
-            culture.DateTimeFormat.ShortTimePattern = "HH:mm";
-            using var cultureScope = new CultureScope(culture);
-            var viewModel = new GameHistoryPageViewModel();
-
-            GameHistoryEntry game = CreateGame("town-run", 2026, 5, 15, 20, 0);
-            viewModel.ReplaceSavedGames([game]);
-            GameHistoryDetailViewModel detail = SelectAndLoad(viewModel, game);
-
-            string expectedDateText = game.EndedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
-            Assert.Equal("5/15/2026 20:30", expectedDateText);
-            Assert.Equal(expectedDateText, detail.DateText);
-        }
-
-        [Theory]
-        [InlineData("zm_transit", "farm", "zm_transit_gump_farm", "Farm")]
-        [InlineData("zm_transit", "transit", "zm_transit_gump_transit_zclassic", "TranZit")]
-        [InlineData("zm_transit", "transit", "zm_transit_gump_transit_zstandard", "Bus Depot")]
-        [InlineData("zm_buried", null, "zm_buried", "Buried")]
-        [InlineData("zm_highrise", null, "zm_highrise", "Die Rise")]
-        [InlineData("zm_prison", null, "zm_prison", "Mob of the Dead")]
-        [InlineData("zm_nuked", null, "zm_nuked", "Nuketown")]
-        [InlineData("zm_tomb", null, "zm_tomb", "Origins")]
-        public void DetailProjection_ShowsMapName(
-            string baseMapToken,
-            string? startLocationToken,
-            string internalMapToken,
-            string friendlyName)
-        {
-            var viewModel = new GameHistoryPageViewModel();
-            GameHistoryEntry game = CreateDetailedGame(
-                "saved-run",
-                startLocationToken,
-                internalMapToken,
-                friendlyName,
-                baseMapToken);
-            viewModel.ReplaceSavedGames([game]);
-
-            GameHistoryDetailViewModel detail = SelectAndLoad(viewModel, game);
-            Assert.Equal(friendlyName, detail.MapNameText);
+            AssertDetailMatchesDisplayState(expectedState, detail);
         }
 
         [Fact]
@@ -438,6 +381,19 @@ namespace BO2.Tests.ViewModels
             viewModel.ShowSelectedGameDetail(game);
             Assert.True(viewModel.IsSelectedGameDetailContentVisible);
             return Assert.IsType<GameHistoryDetailViewModel>(viewModel.SelectedGame);
+        }
+
+        private static void AssertDetailMatchesDisplayState(
+            GameHistoryDetailDisplayState expected,
+            GameHistoryDetailViewModel actual)
+        {
+            Assert.Equal(expected.Id, actual.Id);
+            Assert.Equal(expected.DateText, actual.DateText);
+            Assert.Equal(expected.MapNameText, actual.MapNameText);
+            Assert.Equal(expected.FinalRoundText, actual.FinalRoundText);
+            Assert.Equal(expected.GameDurationText, actual.GameDurationText);
+            Assert.Equal(expected.FinalStats, actual.FinalStats.DisplayState);
+            Assert.Equal(expected.Rounds, actual.Rounds.Select(static round => round.DisplayState));
         }
 
         private static GameHistoryEntry CreateDetailedGame(
@@ -601,21 +557,6 @@ namespace BO2.Tests.ViewModels
         private static DateTimeOffset CreateLocalDate(int year, int month, int day, int hour, int minute)
         {
             return new DateTimeOffset(new DateTime(year, month, day, hour, minute, 0, DateTimeKind.Local));
-        }
-
-        private sealed class CultureScope : IDisposable
-        {
-            private readonly CultureInfo _originalCulture = CultureInfo.CurrentCulture;
-
-            public CultureScope(CultureInfo culture)
-            {
-                CultureInfo.CurrentCulture = culture;
-            }
-
-            public void Dispose()
-            {
-                CultureInfo.CurrentCulture = _originalCulture;
-            }
         }
     }
 }
