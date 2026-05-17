@@ -11,20 +11,17 @@ namespace BO2.Tests.ViewModels
     public sealed class GameHistoryPageViewModelTests
     {
         [Fact]
-        public void ReplaceSavedGames_OrdersSummariesNewestFirstBySavedDate()
+        public void ReplaceSavedGames_PopulatesListStateWithoutSelectingGame()
         {
             var viewModel = new GameHistoryPageViewModel();
-            GameHistoryEntry oldest = CreateGame("oldest", 2026, 5, 8, 20, 0);
-            GameHistoryEntry newest = CreateGame("newest", 2026, 5, 10, 20, 0);
-            GameHistoryEntry middle = CreateGame("middle", 2026, 5, 9, 20, 0);
+            GameHistoryEntry game = CreateGame("town-run", 2026, 5, 8, 20, 0);
 
-            viewModel.ReplaceSavedGames([oldest, newest, middle]);
+            viewModel.ReplaceSavedGames([game]);
 
-            Assert.Equal(["newest", "middle", "oldest"], viewModel.SavedGames.Select(game => game.Id));
+            Assert.Equal("town-run", Assert.Single(viewModel.SavedGames).Id);
             Assert.Null(viewModel.SelectedGameSummary);
-            Assert.Equal("GameHistoryTrackedGameCountFormat(3)", viewModel.TrackedGameCountText);
+            Assert.Equal("GameHistoryTrackedGameCountFormat(1)", viewModel.TrackedGameCountText);
             Assert.False(viewModel.SavedGames[0].IsSelected);
-            Assert.False(viewModel.SavedGames[1].IsSelected);
             Assert.True(viewModel.IsListVisible);
             Assert.False(viewModel.IsDetailVisible);
         }
@@ -151,6 +148,26 @@ namespace BO2.Tests.ViewModels
         }
 
         [Fact]
+        public void ReplaceSavedGames_PreservesSelectedSummaryWhenStillPresent()
+        {
+            var viewModel = new GameHistoryPageViewModel();
+            GameHistoryEntry first = CreateDetailedGame("first");
+            GameHistoryEntry second = CreateDetailedGame("second");
+            viewModel.ReplaceSavedGames([first, second]);
+            viewModel.SelectGame(viewModel.SavedGames.Single(game => game.Id == "second"));
+            viewModel.ShowSelectedGameDetail(second);
+
+            viewModel.ReplaceSavedGames([CreateDetailedGame("second"), CreateDetailedGame("third")]);
+
+            Assert.Equal("second", viewModel.SelectedGameSummary?.Id);
+            Assert.True(viewModel.SavedGames.Single(game => game.Id == "second").IsSelected);
+            Assert.False(viewModel.SavedGames.Single(game => game.Id == "third").IsSelected);
+            Assert.Equal("second", Assert.IsType<GameHistoryDetailViewModel>(viewModel.SelectedGame).Id);
+            Assert.True(viewModel.IsDetailVisible);
+            Assert.True(viewModel.IsSelectedGameDetailContentVisible);
+        }
+
+        [Fact]
         public void SelectGameById_SelectsSummaryAndRequestsDetailLoad()
         {
             var viewModel = new GameHistoryPageViewModel();
@@ -227,7 +244,7 @@ namespace BO2.Tests.ViewModels
         }
 
         [Fact]
-        public void SavedDates_UseCurrentCultureShortDateAndTimeFormat()
+        public void DetailDates_UseCurrentCultureShortDateAndTimeFormat()
         {
             CultureInfo culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
             culture.DateTimeFormat.ShortDatePattern = "M/d/yyyy";
@@ -241,7 +258,6 @@ namespace BO2.Tests.ViewModels
 
             string expectedDateText = game.EndedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
             Assert.Equal("5/15/2026 20:30", expectedDateText);
-            Assert.Equal(expectedDateText, viewModel.SavedGames[0].DateText);
             Assert.Equal(expectedDateText, detail.DateText);
         }
 
@@ -254,7 +270,7 @@ namespace BO2.Tests.ViewModels
         [InlineData("zm_prison", null, "zm_prison", "Mob of the Dead")]
         [InlineData("zm_nuked", null, "zm_nuked", "Nuketown")]
         [InlineData("zm_tomb", null, "zm_tomb", "Origins")]
-        public void SavedMapProjection_ShowsMapNameInSummaryAndDetail(
+        public void DetailProjection_ShowsMapName(
             string baseMapToken,
             string? startLocationToken,
             string internalMapToken,
@@ -268,8 +284,6 @@ namespace BO2.Tests.ViewModels
                 friendlyName,
                 baseMapToken);
             viewModel.ReplaceSavedGames([game]);
-
-            Assert.Equal(friendlyName, viewModel.SavedGames[0].MapNameText);
 
             GameHistoryDetailViewModel detail = SelectAndLoad(viewModel, game);
             Assert.Equal(friendlyName, detail.MapNameText);

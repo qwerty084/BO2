@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 
 namespace BO2.Services
 {
@@ -16,6 +19,21 @@ namespace BO2.Services
             ArgumentNullException.ThrowIfNull(renderer);
 
             _renderer = renderer;
+        }
+
+        public IReadOnlyList<GameHistorySummaryDisplayState> ProjectSavedSummaries(
+            IEnumerable<GameHistorySummary> summaries)
+        {
+            ArgumentNullException.ThrowIfNull(summaries);
+
+            return
+            [
+                .. summaries
+                    .OrderByDescending(static summary => summary.EndedAt)
+                    .ThenByDescending(static summary => summary.StartedAt)
+                    .ThenBy(static summary => summary.Id, StringComparer.Ordinal)
+                    .Select(ProjectSavedSummary)
+            ];
         }
 
         public GameHistoryRecordingStatusDisplayState ProjectRecordingStatus(GameHistoryRecordingStatus status)
@@ -45,6 +63,23 @@ namespace BO2.Services
             };
 
             return Render(projection);
+        }
+
+        private GameHistorySummaryDisplayState ProjectSavedSummary(GameHistorySummary summary)
+        {
+            ArgumentNullException.ThrowIfNull(summary);
+
+            return new GameHistorySummaryDisplayState(
+                summary.Id,
+                FormatDate(summary.EndedAt),
+                summary.MapIdentity.FriendlyName,
+                _renderer.Render(DisplayText.Format("GameHistoryFinalRoundFormat", summary.FinalRound)),
+                FormatDuration(summary.GameDuration),
+                _renderer.Render(DisplayText.Integer(summary.FinalStats.Points)),
+                _renderer.Render(DisplayText.Integer(summary.FinalStats.Kills)),
+                _renderer.Render(DisplayText.Integer(summary.FinalStats.Downs)),
+                _renderer.Render(DisplayText.Integer(summary.FinalStats.Revives)),
+                _renderer.Render(DisplayText.Integer(summary.FinalStats.Headshots)));
         }
 
         private GameHistoryRecordingStatusDisplayState Render(
@@ -154,7 +189,34 @@ namespace BO2.Services
                 ? null
                 : mapName.Trim();
         }
+
+        private static string FormatDate(DateTimeOffset date)
+        {
+            return date.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+        }
+
+        private string FormatDuration(TimeSpan? duration)
+        {
+            if (duration is not TimeSpan value || value < TimeSpan.Zero)
+            {
+                return _renderer.Render(GameConnectionDisplayTextProjector.EmptyValueText);
+            }
+
+            return GameTimerDurationFormatter.Format(value);
+        }
     }
+
+    internal sealed record GameHistorySummaryDisplayState(
+        string Id,
+        string DateText,
+        string MapNameText,
+        string FinalRoundText,
+        string GameDurationText,
+        string PointsText,
+        string KillsText,
+        string DownsText,
+        string RevivesText,
+        string HeadshotsText);
 
     internal sealed record GameHistoryRecordingStatusDisplayState(string Title, string BodyText);
 

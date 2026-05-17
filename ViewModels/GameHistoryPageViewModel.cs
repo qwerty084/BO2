@@ -116,25 +116,28 @@ namespace BO2.ViewModels
         {
             ArgumentNullException.ThrowIfNull(summaries);
 
-            ReplaceSavedGames(summaries.Select(CreateEntry));
+            ReplaceSavedGameSummaries(_displayProjector.ProjectSavedSummaries(summaries));
         }
 
         internal void ReplaceSavedGames(IEnumerable<GameHistoryEntry> savedGames)
         {
             ArgumentNullException.ThrowIfNull(savedGames);
 
+            ReplaceSavedGameSummaries(_displayProjector.ProjectSavedSummaries(savedGames.Select(CreateSummary)));
+        }
+
+        private void ReplaceSavedGameSummaries(IEnumerable<GameHistorySummaryDisplayState> summaries)
+        {
+            ArgumentNullException.ThrowIfNull(summaries);
+
             ClearSummaryLoadError();
 
             string? selectedId = SelectedGameSummary?.Id ?? SelectedGame?.Id;
 
-            GameHistorySummaryViewModel[] summaries = [.. savedGames
-                .OrderByDescending(static game => game.EndedAt)
-                .ThenByDescending(static game => game.StartedAt)
-                .ThenBy(static game => game.Id, StringComparer.Ordinal)
-                .Select(CreateSummary)];
+            GameHistorySummaryViewModel[] summaryViewModels = [.. summaries.Select(CreateSummaryViewModel)];
 
             SavedGames.Clear();
-            foreach (GameHistorySummaryViewModel summary in summaries)
+            foreach (GameHistorySummaryViewModel summary in summaryViewModels)
             {
                 SavedGames.Add(summary);
             }
@@ -291,40 +294,23 @@ namespace BO2.ViewModels
             RecordingStatusText = state.BodyText;
         }
 
-        private GameHistorySummaryViewModel CreateSummary(GameHistoryEntry game)
+        private static GameHistorySummaryViewModel CreateSummaryViewModel(GameHistorySummaryDisplayState state)
         {
-            return new GameHistorySummaryViewModel(
-                game,
-                FormatDate(game.EndedAt),
-                game.MapIdentity.FriendlyName,
-                AppStrings.Format("GameHistoryFinalRoundFormat", game.FinalRound),
-                FormatDuration(game.GameDuration),
-                _statFormatter.FormatStat(game.FinalStats.Points),
-                _statFormatter.FormatStat(game.FinalStats.Kills),
-                _statFormatter.FormatStat(game.FinalStats.Downs),
-                _statFormatter.FormatStat(game.FinalStats.Revives),
-                _statFormatter.FormatStat(game.FinalStats.Headshots));
+            return new GameHistorySummaryViewModel(state);
         }
 
-        private static GameHistoryEntry CreateEntry(GameHistorySummary summary)
+        private static GameHistorySummary CreateSummary(GameHistoryEntry game)
         {
-            return new GameHistoryEntry
-            {
-                Id = summary.Id,
-                StartedAt = summary.StartedAt,
-                EndedAt = summary.EndedAt,
-                MapIdentity = summary.MapIdentity,
-                FinalRound = summary.FinalRound,
-                FinalStats = new GameHistoryStats
-                {
-                    Points = summary.FinalStats.Points,
-                    Kills = summary.FinalStats.Kills,
-                    Downs = summary.FinalStats.Downs,
-                    Revives = summary.FinalStats.Revives,
-                    Headshots = summary.FinalStats.Headshots
-                },
-                GameDuration = summary.GameDuration
-            };
+            ArgumentNullException.ThrowIfNull(game);
+
+            return new GameHistorySummary(
+                game.Id,
+                game.StartedAt,
+                game.EndedAt,
+                game.MapIdentity,
+                game.FinalRound,
+                game.FinalStats,
+                game.GameDuration);
         }
 
         private GameHistoryDetailViewModel CreateDetail(GameHistoryEntry game)
@@ -613,51 +599,34 @@ namespace BO2.ViewModels
     {
         private bool _isSelected;
 
-        internal GameHistorySummaryViewModel(
-            GameHistoryEntry source,
-            string dateText,
-            string mapNameText,
-            string finalRoundText,
-            string gameDurationText,
-            string pointsText,
-            string killsText,
-            string downsText,
-            string revivesText,
-            string headshotsText)
+        internal GameHistorySummaryViewModel(GameHistorySummaryDisplayState displayState)
         {
-            Source = source;
-            DateText = dateText;
-            MapNameText = mapNameText;
-            FinalRoundText = finalRoundText;
-            GameDurationText = gameDurationText;
-            PointsText = pointsText;
-            KillsText = killsText;
-            DownsText = downsText;
-            RevivesText = revivesText;
-            HeadshotsText = headshotsText;
+            ArgumentNullException.ThrowIfNull(displayState);
+
+            DisplayState = displayState;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        public string Id => Source.Id;
+        public string Id => DisplayState.Id;
 
-        public string DateText { get; }
+        public string DateText => DisplayState.DateText;
 
-        public string MapNameText { get; }
+        public string MapNameText => DisplayState.MapNameText;
 
-        public string FinalRoundText { get; }
+        public string FinalRoundText => DisplayState.FinalRoundText;
 
-        public string GameDurationText { get; }
+        public string GameDurationText => DisplayState.GameDurationText;
 
-        public string PointsText { get; }
+        public string PointsText => DisplayState.PointsText;
 
-        public string KillsText { get; }
+        public string KillsText => DisplayState.KillsText;
 
-        public string DownsText { get; }
+        public string DownsText => DisplayState.DownsText;
 
-        public string RevivesText { get; }
+        public string RevivesText => DisplayState.RevivesText;
 
-        public string HeadshotsText { get; }
+        public string HeadshotsText => DisplayState.HeadshotsText;
 
         public bool IsSelected
         {
@@ -674,7 +643,7 @@ namespace BO2.ViewModels
             }
         }
 
-        internal GameHistoryEntry Source { get; }
+        internal GameHistorySummaryDisplayState DisplayState { get; }
     }
 
     public sealed class GameHistoryDetailRequestedEventArgs(string id) : EventArgs

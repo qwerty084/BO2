@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using BO2.Services;
@@ -178,6 +180,119 @@ namespace BO2.Tests.Services
             },
         };
 
+        [Fact]
+        public void ProjectSavedSummaries_ReturnsDisplayStatesNewestFirst()
+        {
+            DateTimeOffset sameEndedAt = CreateLocalDate(2026, 5, 9, 20, 0);
+            DateTimeOffset sameStartedAt = CreateLocalDate(2026, 5, 9, 18, 0);
+            GameHistorySummary oldest = CreateSummary(
+                "oldest",
+                endedAt: CreateLocalDate(2026, 5, 8, 20, 0));
+            GameHistorySummary newest = CreateSummary(
+                "newest",
+                endedAt: CreateLocalDate(2026, 5, 10, 20, 0));
+            GameHistorySummary sameEndLaterStart = CreateSummary(
+                "same-end-later-start",
+                startedAt: CreateLocalDate(2026, 5, 9, 19, 0),
+                endedAt: sameEndedAt);
+            GameHistorySummary sameEndSameStartB = CreateSummary(
+                "same-end-same-start-b",
+                startedAt: sameStartedAt,
+                endedAt: sameEndedAt);
+            GameHistorySummary sameEndSameStartA = CreateSummary(
+                "same-end-same-start-a",
+                startedAt: sameStartedAt,
+                endedAt: sameEndedAt);
+
+            IReadOnlyList<GameHistorySummaryDisplayState> states = CreateProjector().ProjectSavedSummaries(
+                [oldest, newest, sameEndSameStartB, sameEndLaterStart, sameEndSameStartA]);
+
+            Assert.Equal(
+                ["newest", "same-end-later-start", "same-end-same-start-a", "same-end-same-start-b", "oldest"],
+                states.Select(state => state.Id));
+        }
+
+        [Fact]
+        public void ProjectSavedSummaries_FormatsSummaryDisplayText()
+        {
+            CultureInfo culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+            culture.DateTimeFormat.ShortDatePattern = "M/d/yyyy";
+            culture.DateTimeFormat.ShortTimePattern = "HH:mm";
+            using var cultureScope = new CultureScope(culture);
+            DateTimeOffset startedAt = CreateLocalDate(2026, 5, 15, 20, 0);
+            GameHistorySummary summary = CreateSummary(
+                "town-run",
+                startedAt,
+                startedAt.AddMinutes(30),
+                friendlyName: "Town",
+                finalRound: 12,
+                finalStats: CreateStats(12345, 98, 2, 4, 55),
+                gameDuration: TimeSpan.FromSeconds(3723));
+
+            GameHistorySummaryDisplayState state = Assert.Single(CreateProjector().ProjectSavedSummaries([summary]));
+
+            Assert.Equal("town-run", state.Id);
+            Assert.Equal(summary.EndedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture), state.DateText);
+            Assert.Equal("5/15/2026 20:30", state.DateText);
+            Assert.Equal("Town", state.MapNameText);
+            Assert.Equal("GameHistoryFinalRoundFormat(12)", state.FinalRoundText);
+            Assert.Equal("1:02:03", state.GameDurationText);
+            Assert.Equal(12345.ToString("N0", CultureInfo.CurrentCulture), state.PointsText);
+            Assert.Equal("98", state.KillsText);
+            Assert.Equal("2", state.DownsText);
+            Assert.Equal("4", state.RevivesText);
+            Assert.Equal("55", state.HeadshotsText);
+        }
+
+        [Fact]
+        public void ProjectSavedSummaries_UsesMissingTextForNullDuration()
+        {
+            GameHistorySummary summary = CreateSummary("town-run", gameDuration: null);
+
+            GameHistorySummaryDisplayState state = Assert.Single(CreateProjector().ProjectSavedSummaries([summary]));
+
+            Assert.Equal("--", state.GameDurationText);
+        }
+
+        [Fact]
+        public void ProjectSavedSummaries_UsesMissingTextForNegativeDuration()
+        {
+            GameHistorySummary summary = CreateSummary("town-run", gameDuration: TimeSpan.FromSeconds(-1));
+
+            GameHistorySummaryDisplayState state = Assert.Single(CreateProjector().ProjectSavedSummaries([summary]));
+
+            Assert.Equal("--", state.GameDurationText);
+        }
+
+        [Fact]
+        public void SummaryDisplayStateContract_IncludesSummaryTextFieldsOnly()
+        {
+            string[] propertyNames =
+            [
+                .. typeof(GameHistorySummaryDisplayState)
+                    .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                    .Select(property => property.Name)
+            ];
+            string[] requiredProperties =
+            [
+                nameof(GameHistorySummaryDisplayState.Id),
+                nameof(GameHistorySummaryDisplayState.DateText),
+                nameof(GameHistorySummaryDisplayState.MapNameText),
+                nameof(GameHistorySummaryDisplayState.FinalRoundText),
+                nameof(GameHistorySummaryDisplayState.GameDurationText),
+                nameof(GameHistorySummaryDisplayState.PointsText),
+                nameof(GameHistorySummaryDisplayState.KillsText),
+                nameof(GameHistorySummaryDisplayState.DownsText),
+                nameof(GameHistorySummaryDisplayState.RevivesText),
+                nameof(GameHistorySummaryDisplayState.HeadshotsText)
+            ];
+
+            Assert.True(typeof(GameHistorySummaryDisplayState).IsSealed);
+            Assert.Equal(
+                requiredProperties.Order(StringComparer.Ordinal),
+                propertyNames.Order(StringComparer.Ordinal));
+        }
+
         [Theory]
         [MemberData(nameof(RecordingStatusCases))]
         public void ProjectRecordingStatus_ReturnsRenderedTitleAndBodyText(
@@ -216,6 +331,54 @@ namespace BO2.Tests.Services
         private static GameHistoryDisplayProjector CreateProjector()
         {
             return new GameHistoryDisplayProjector();
+        }
+
+        private static GameHistorySummary CreateSummary(
+            string id,
+            DateTimeOffset? startedAt = null,
+            DateTimeOffset? endedAt = null,
+            string friendlyName = "Town",
+            int finalRound = 5,
+            GameHistoryStats? finalStats = null,
+            TimeSpan? gameDuration = null)
+        {
+            DateTimeOffset effectiveStartedAt = startedAt ?? CreateLocalDate(2026, 5, 10, 14, 30);
+            DateTimeOffset effectiveEndedAt = endedAt ?? effectiveStartedAt.AddMinutes(30);
+
+            return new GameHistorySummary(
+                id,
+                effectiveStartedAt,
+                effectiveEndedAt,
+                new GameHistoryMapIdentity(
+                    "zm_transit",
+                    "town",
+                    "zm_transit_gump_town",
+                    friendlyName),
+                finalRound,
+                finalStats ?? CreateStats(1000, 20, 1, 0, 8),
+                gameDuration);
+        }
+
+        private static GameHistoryStats CreateStats(
+            int points,
+            int kills,
+            int downs,
+            int revives,
+            int headshots)
+        {
+            return new GameHistoryStats
+            {
+                Points = points,
+                Kills = kills,
+                Downs = downs,
+                Revives = revives,
+                Headshots = headshots
+            };
+        }
+
+        private static DateTimeOffset CreateLocalDate(int year, int month, int day, int hour, int minute)
+        {
+            return new DateTimeOffset(new DateTime(year, month, day, hour, minute, 0, DateTimeKind.Local));
         }
 
         private static GameHistoryRecordingStatus CreateStatus(RecordingStatusCase statusCase)
@@ -269,6 +432,21 @@ namespace BO2.Tests.Services
                     GameHistoryRecordingDiscardReason.MissingFriendlyMapName),
                 _ => throw new ArgumentOutOfRangeException(nameof(statusCase), statusCase, null)
             };
+        }
+
+        private sealed class CultureScope : IDisposable
+        {
+            private readonly CultureInfo _originalCulture = CultureInfo.CurrentCulture;
+
+            public CultureScope(CultureInfo culture)
+            {
+                CultureInfo.CurrentCulture = culture;
+            }
+
+            public void Dispose()
+            {
+                CultureInfo.CurrentCulture = _originalCulture;
+            }
         }
     }
 }
